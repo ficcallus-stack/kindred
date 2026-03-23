@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>NannyConnect US | Trusted Childcare Professionals</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "outline-variant": "#c4c6cf",
+              "on-primary": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "on-secondary-container": "#783d01",
+              "primary-fixed": "#d5e3ff",
+              "on-primary-container": "#879ec6",
+              "inverse-on-surface": "#f0f1f1",
+              "tertiary-container": "#003b3d",
+              "secondary": "#8e4e14",
+              "surface-container-lowest": "#ffffff",
+              "on-background": "#1a1c1c",
+              "on-secondary-fixed-variant": "#6f3800",
+              "on-error-container": "#93000a",
+              "surface-container-high": "#e8e8e8",
+              "background": "#f9f9f9",
+              "tertiary-fixed": "#b9ecee",
+              "inverse-primary": "#b0c7f1",
+              "on-primary-fixed-variant": "#30476a",
+              "on-secondary": "#ffffff",
+              "surface": "#f9f9f9",
+              "surface-container-highest": "#e2e2e2",
+              "primary-fixed-dim": "#b0c7f1",
+              "surface-container-low": "#f3f3f3",
+              "on-tertiary-container": "#75a5a7",
+              "on-surface-variant": "#44474e",
+              "surface-container": "#eeeeee",
+              "on-error": "#ffffff",
+              "on-secondary-fixed": "#2f1400",
+              "secondary-fixed-dim": "#ffb780",
+              "tertiary-fixed-dim": "#9ecfd1",
+              "secondary-container": "#ffab69",
+              "primary": "#031f41",
+              "surface-variant": "#e2e2e2",
+              "surface-dim": "#dadada",
+              "secondary-fixed": "#ffdcc4",
+              "error": "#ba1a1a",
+              "outline": "#74777f",
+              "surface-bright": "#f9f9f9",
+              "tertiary": "#002425",
+              "inverse-surface": "#2f3131",
+              "on-primary-fixed": "#001b3c",
+              "on-tertiary-fixed-variant": "#1a4e50",
+              "on-surface": "#1a1c1c",
+              "primary-container": "#1d3557",
+              "surface-tint": "#485f84",
+              "on-tertiary-fixed": "#002021"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .asymmetric-clip {
+            border-top-left-radius: 1.5rem;
+            border-bottom-right-radius: 1.5rem;
+            border-top-right-radius: 0.75rem;
+            border-bottom-left-radius: 0.75rem;
+        }
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface">
+<!-- Top Navigation Shell -->
+<nav class="fixed top-0 w-full z-50 glass-nav shadow-sm">
+<div class="flex justify-between items-center h-20 px-8 max-w-7xl mx-auto">
+<div class="text-2xl font-bold tracking-tight text-slate-900 font-headline">NannyConnect US</div>
+<div class="hidden md:flex items-center gap-8 font-headline font-medium text-sm">
+<a class="text-slate-900 border-b-2 border-slate-900 pb-1" href="#">Find a Nanny</a>
+<a class="text-slate-500 hover:text-slate-900 transition-opacity" href="#">How it Works</a>
+<a class="text-slate-500 hover:text-slate-900 transition-opacity" href="#">Pricing</a>
+<a class="text-slate-500 hover:text-slate-900 transition-opacity" href="#">Trust & Safety</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="text-slate-900 font-medium px-4 py-2 hover:opacity-80 transition-opacity">Login</button>
+<button class="bg-primary text-on-primary px-6 py-2.5 rounded-xl font-semibold shadow-md hover:opacity-90 transition-opacity">Join</button>
+</div>
+</div>
+</nav>
+<main class="pt-20">
+<!-- Hero Section -->
+<section class="relative min-h-[870px] flex items-center overflow-hidden bg-surface">
+<div class="max-w-7xl mx-auto px-8 w-full grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+<div class="z-10 py-12">
+<h1 class="font-headline text-5xl md:text-7xl font-extrabold text-primary leading-[1.1] mb-6">
+                        Bespoke Care for Your <span class="text-secondary italic">Little Ones</span>.
+                    </h1>
+<p class="text-on-surface-variant text-xl mb-10 max-w-lg leading-relaxed">
+                        Connecting elite families with the nation's most trusted, certified caregivers through an editorial-first experience.
+                    </p>
+<!-- Search Bar Component -->
+<div class="bg-surface-container-lowest p-2 rounded-2xl shadow-xl flex flex-col md:flex-row gap-2 max-w-2xl outline-variant/15 border border-outline-variant/15">
+<div class="flex-1 flex items-center px-4 py-3 gap-3">
+<span class="material-symbols-outlined text-primary-container">location_on</span>
+<input class="w-full border-none focus:ring-0 bg-transparent text-on-surface placeholder:text-on-surface-variant/60 font-medium" placeholder="Find a Nanny near [Zip Code / City]" type="text"/>
+</div>
+<button class="bg-secondary-container text-on-secondary-container px-8 py-4 rounded-xl font-bold text-lg hover:brightness-95 transition-all shadow-lg shadow-secondary-container/20">
+                            Search
+                        </button>
+</div>
+</div>
+<!-- Asymmetric Image Placement -->
+<div class="relative h-[600px] hidden lg:block">
+<div class="absolute inset-0 bg-primary-container rounded-[3rem] rotate-3 translate-x-4 opacity-5"></div>
+<img alt="Nanny and child" class="absolute inset-0 w-full h-full object-cover asymmetric-clip shadow-2xl z-20" data-alt="A professional nanny smiling while playing with a happy toddler" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBFiaWDBp5sScfIdcKXAt-MHWTwMQMzH31EjNtyjsppxqq2McGzMuEzkkQQGfAkeJo6N1hb13DAaZOcJCZcYPhVMcC6HT51YIdgYFhFghLug0LgUKy02Vj67V2yp6XtnESFPv2YA2zWQOGwZA7NGq8hjRqQXrmiZqxkCCMgFQn29i2fbeFDXpWRA-AsFGJEJJSDTWrz0UC3pMGbU0JC2Yd14nMuR7xUMMhPQG9wDik5RivmNmoPK4hn67PQKXVP5fjn2ldHItzc4C4"/>
+<div class="absolute -bottom-6 -left-6 bg-surface-container-lowest p-6 rounded-2xl shadow-xl z-30 flex items-center gap-4 border border-outline-variant/10">
+<div class="w-12 h-12 rounded-full bg-tertiary-fixed flex items-center justify-center">
+<span class="material-symbols-outlined text-on-tertiary-fixed" data-weight="fill">verified_user</span>
+</div>
+<div>
+<p class="text-sm font-bold text-primary">100% Background Checked</p>
+<p class="text-xs text-on-surface-variant">Safety is our absolute priority</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Trust Bar -->
+<section class="bg-surface-container-low py-12">
+<div class="max-w-7xl mx-auto px-8">
+<div class="flex flex-wrap items-center justify-between gap-8 opacity-60 grayscale hover:grayscale-0 transition-all">
+<div class="flex items-center gap-2 font-headline font-bold text-xl text-primary">
+<span class="material-symbols-outlined" data-weight="fill">star</span>
+<span>10,000+ Happy Families</span>
+</div>
+<div class="flex gap-12 items-center overflow-x-auto no-scrollbar">
+<span class="font-bold text-lg tracking-widest uppercase">TRUSTE</span>
+<span class="font-bold text-lg tracking-widest uppercase italic">The New York Times</span>
+<span class="font-bold text-lg tracking-widest uppercase">SafetyFirst</span>
+<span class="font-bold text-lg tracking-widest uppercase">CareCert</span>
+</div>
+</div>
+</div>
+</section>
+<!-- How It Works Section -->
+<section class="py-24 bg-surface">
+<div class="max-w-7xl mx-auto px-8">
+<div class="text-center mb-20">
+<h2 class="font-headline text-4xl font-bold text-primary mb-4">The NannyConnect Process</h2>
+<p class="text-on-surface-variant max-w-xl mx-auto">A seamless, concierge-style journey from discovery to lifelong childcare support.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-16 relative">
+<!-- Connector line for desktop -->
+<div class="hidden md:block absolute top-1/4 left-1/4 right-1/4 h-[2px] bg-outline-variant/20 -z-10"></div>
+<!-- Step 1 -->
+<div class="text-center group">
+<div class="w-20 h-20 bg-surface-container-lowest rounded-2xl shadow-lg flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform border border-outline-variant/10">
+<span class="material-symbols-outlined text-3xl text-primary" data-weight="fill">search</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-3">Search</h3>
+<p class="text-on-surface-variant leading-relaxed">Filter by location, certifications, years of experience, and specialized care needs.</p>
+</div>
+<!-- Step 2 -->
+<div class="text-center group">
+<div class="w-20 h-20 bg-surface-container-lowest rounded-2xl shadow-lg flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform border border-outline-variant/10">
+<span class="material-symbols-outlined text-3xl text-primary" data-weight="fill">chat_bubble</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-3">Connect</h3>
+<p class="text-on-surface-variant leading-relaxed">Securely message candidates, view video intros, and schedule initial interviews.</p>
+</div>
+<!-- Step 3 -->
+<div class="text-center group">
+<div class="w-20 h-20 bg-secondary-container rounded-2xl shadow-lg flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl text-on-secondary-container" data-weight="fill">handshake</span>
+</div>
+<h3 class="font-headline text-xl font-bold mb-3">Hire</h3>
+<p class="text-on-surface-variant leading-relaxed">Finalize terms with our secure contracts and automated payroll integrations.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Featured Nannies Carousel -->
+<section class="py-24 bg-surface-container-low overflow-hidden">
+<div class="max-w-7xl mx-auto px-8 mb-12 flex justify-between items-end">
+<div>
+<h2 class="font-headline text-4xl font-bold text-primary mb-2">Featured Nannies</h2>
+<p class="text-on-surface-variant">Hand-selected professionals with 5-star family ratings.</p>
+</div>
+<div class="flex gap-4">
+<button class="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+<span class="material-symbols-outlined">arrow_back</span>
+</button>
+<button class="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center hover:bg-primary hover:text-white transition-colors">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+</div>
+</div>
+<div class="flex gap-8 px-8 overflow-x-auto no-scrollbar pb-12">
+<!-- Nanny Card 1 -->
+<div class="min-w-[320px] bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow border border-outline-variant/10">
+<div class="h-64 relative">
+<img alt="Nanny profile" class="w-full h-full object-cover" data-alt="Professional headshot of a smiling female nanny" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDStJPNa_vAINfKtg-0gbABFsXtX46DQ4M2vsxma3Q8RAwrOn2XUPV4NwmmuJZEIxVC8y8mBVtr6ZYsnxHrdz5-olsVEJPS_tlicRjLvDvSMAoR6XUvBNsPxoQQvAo3tGye2kYOrmtCDUZFpJuft2oTNCJvbSaO_zvIA_XB4fM2yKX5UlBHy-rzDu0iyx7Q091LZFBRlROCuIDp6uLovQ8IuTInoc5yCAGu2-Z_9AtIOWrIKfKaBJXBTLNbj517Baw7T6gyYhlNMUk"/>
+<div class="absolute top-4 right-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-sm" data-weight="fill">verified</span>
+                            VERIFIED
+                        </div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="font-headline text-xl font-bold text-primary">Elena Rodriguez</h4>
+<div class="flex items-center text-on-surface-variant text-sm gap-1 mt-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                    San Francisco, CA
+                                </div>
+</div>
+<div class="flex items-center gap-1 bg-surface-container px-2 py-1 rounded-lg">
+<span class="material-symbols-outlined text-secondary text-sm" data-weight="fill">star</span>
+<span class="font-bold text-sm">4.9</span>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">CPR Certified</span>
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">8+ Years Exp</span>
+</div>
+<button class="w-full py-3 rounded-xl border border-primary text-primary font-bold hover:bg-primary hover:text-white transition-all">View Profile</button>
+</div>
+</div>
+<!-- Nanny Card 2 -->
+<div class="min-w-[320px] bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow border border-outline-variant/10">
+<div class="h-64 relative">
+<img alt="Nanny profile" class="w-full h-full object-cover" data-alt="Friendly male nanny smiling in a natural setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLSvP2Pu275NcX61urjnPUKaUOREVulECAqLeKz4rtaKXCNtIijytNYilWsK9gyGwFDt7ZlodHTU-s5BOm4GNQ68tagHpKg4z4Wt03_z_DsLrp-6o1FeydtqSxoWvx_WTPl9oVjIJ9HI-f5NNqow3mHy0r8koKVy1JMZVvAvQJZqzWYTIH5aNRKUXyoG1OXlwJ-uD6KEVV65gUmc0Yr4PwR3yknJNg6jm_059T0ATSXSb7i4pyzIU3o8Z8YTrAWt6eDMoeUd5_dTc"/>
+<div class="absolute top-4 right-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-sm" data-weight="fill">verified</span>
+                            VERIFIED
+                        </div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="font-headline text-xl font-bold text-primary">James Wilson</h4>
+<div class="flex items-center text-on-surface-variant text-sm gap-1 mt-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                    Austin, TX
+                                </div>
+</div>
+<div class="flex items-center gap-1 bg-surface-container px-2 py-1 rounded-lg">
+<span class="material-symbols-outlined text-secondary text-sm" data-weight="fill">star</span>
+<span class="font-bold text-sm">5.0</span>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">STEM Focused</span>
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">Tutor</span>
+</div>
+<button class="w-full py-3 rounded-xl border border-primary text-primary font-bold hover:bg-primary hover:text-white transition-all">View Profile</button>
+</div>
+</div>
+<!-- Nanny Card 3 -->
+<div class="min-w-[320px] bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow border border-outline-variant/10">
+<div class="h-64 relative">
+<img alt="Nanny profile" class="w-full h-full object-cover" data-alt="Professional nanny of color smiling warmly" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBnRiZTfqU6IdIFifnIYEP_AJZUon1S41jXByx_hNhyv3SgOcbq4ArQjoIKVD1gN2m_ADNWSg4ucx5HZltB8dbZvuUz9xtFy-dlOto38oaD2aEWYOV0ySR-xCIVPlYgTV1XBOPcm2t_TJhp3uQnZYTqBb3oCyWwEwXU_XpvWaq9W0j36TBJHuZ3Q9RMMcW2o7mbmscT6mqGxcVfu4CMTiM4OrsFEZQrD1u9VCsVryEiuYz74P5ypYFuaLea56L3bmw4DgRzmU_NQLk"/>
+<div class="absolute top-4 right-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-sm" data-weight="fill">verified</span>
+                            VERIFIED
+                        </div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="font-headline text-xl font-bold text-primary">Sarah Miller</h4>
+<div class="flex items-center text-on-surface-variant text-sm gap-1 mt-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                    Chicago, IL
+                                </div>
+</div>
+<div class="flex items-center gap-1 bg-surface-container px-2 py-1 rounded-lg">
+<span class="material-symbols-outlined text-secondary text-sm" data-weight="fill">star</span>
+<span class="font-bold text-sm">4.8</span>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">Newborn Care</span>
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">Doula</span>
+</div>
+<button class="w-full py-3 rounded-xl border border-primary text-primary font-bold hover:bg-primary hover:text-white transition-all">View Profile</button>
+</div>
+</div>
+<!-- Nanny Card 4 -->
+<div class="min-w-[320px] bg-surface-container-lowest rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow border border-outline-variant/10">
+<div class="h-64 relative">
+<img alt="Nanny profile" class="w-full h-full object-cover" data-alt="Young energetic nanny ready to engage with children" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDIYxetVOrRJ-5XYT49WgAK-awhesV1g-1yGTYcWjWI9VFNSXpzVLO6f_ssZHuWwjIEmfOltVqU6sGzFX9cHkD1FPPmKOTt7Tng6Kym1oxShmn3Ru6w9-qleqfiTglfzniJLMzXe6sAYWIXWH3oN7RpM0eceQ3_CpWT2p8dIvtxJD0jyc-xSp0eDWiFkODh6OjqoMoJUwsRq6Q0k1HMsEKdk0UDlMfaPjl56neOGFDulSAELavQm_bzkbnPWC1ot1uBSQi43BZ50Ug"/>
+<div class="absolute top-4 right-4 bg-tertiary-fixed text-on-tertiary-fixed px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 shadow-sm">
+<span class="material-symbols-outlined text-sm" data-weight="fill">verified</span>
+                            VERIFIED
+                        </div>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-start mb-4">
+<div>
+<h4 class="font-headline text-xl font-bold text-primary">Maya Chen</h4>
+<div class="flex items-center text-on-surface-variant text-sm gap-1 mt-1">
+<span class="material-symbols-outlined text-sm">location_on</span>
+                                    Seattle, WA
+                                </div>
+</div>
+<div class="flex items-center gap-1 bg-surface-container px-2 py-1 rounded-lg">
+<span class="material-symbols-outlined text-secondary text-sm" data-weight="fill">star</span>
+<span class="font-bold text-sm">5.0</span>
+</div>
+</div>
+<div class="flex flex-wrap gap-2 mb-6">
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">Multilingual</span>
+<span class="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[10px] font-bold uppercase tracking-wider">Arts & Crafts</span>
+</div>
+<button class="w-full py-3 rounded-xl border border-primary text-primary font-bold hover:bg-primary hover:text-white transition-all">View Profile</button>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="py-24 bg-surface max-w-7xl mx-auto px-8">
+<div class="bg-primary-container rounded-[3rem] p-12 lg:p-20 relative overflow-hidden shadow-2xl">
+<!-- Background decor -->
+<div class="absolute top-0 right-0 w-64 h-64 bg-secondary-container rounded-full blur-[120px] opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+<div class="relative z-10 flex flex-col lg:flex-row items-center gap-16">
+<div class="lg:w-1/2 text-center lg:text-left">
+<h2 class="font-headline text-4xl lg:text-5xl font-bold text-white mb-6">Join our growing community today.</h2>
+<p class="text-on-primary-container text-lg leading-relaxed max-w-md">Whether you're looking for the perfect nanny or looking to share your passion for childcare, we're here to help.</p>
+</div>
+<div class="lg:w-1/2 grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
+<!-- Primary CTA -->
+<div class="bg-surface-container-lowest p-8 rounded-3xl flex flex-col items-center text-center shadow-lg hover:-translate-y-1 transition-transform">
+<span class="material-symbols-outlined text-4xl text-primary mb-4">family_restroom</span>
+<h3 class="font-headline text-lg font-bold text-primary mb-2">I am looking for a Nanny</h3>
+<button class="mt-4 w-full bg-primary text-white py-3 rounded-xl font-bold shadow-md hover:brightness-110">Find Care</button>
+</div>
+<!-- Secondary CTA -->
+<div class="bg-secondary-fixed-dim p-8 rounded-3xl flex flex-col items-center text-center shadow-lg hover:-translate-y-1 transition-transform">
+<span class="material-symbols-outlined text-4xl text-on-secondary-fixed mb-4">work</span>
+<h3 class="font-headline text-lg font-bold text-on-secondary-fixed mb-2">I am a Nanny looking for work</h3>
+<button class="mt-4 w-full bg-on-secondary-fixed text-white py-3 rounded-xl font-bold shadow-md hover:brightness-110">Apply Now</button>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-slate-100 dark:bg-slate-950 w-full py-16">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-12 px-8 max-w-7xl mx-auto">
+<div class="space-y-6">
+<div class="text-xl font-bold text-slate-900 font-headline">NannyConnect US</div>
+<p class="text-slate-500 font-body text-sm leading-relaxed">Redefining elite childcare through trust, safety, and human connection.</p>
+<div class="flex gap-4">
+<a class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-xl">social_leaderboard</span>
+</a>
+<a class="w-10 h-10 rounded-full bg-surface-container flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all" href="#">
+<span class="material-symbols-outlined text-xl">camera</span>
+</a>
+</div>
+</div>
+<div>
+<h4 class="font-bold mb-6 text-slate-900 font-headline">Quick Links</h4>
+<ul class="space-y-4 text-sm font-body text-slate-500">
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">FAQ</a></li>
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Safety Center</a></li>
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">About Us</a></li>
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Careers</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold mb-6 text-slate-900 font-headline">Support</h4>
+<ul class="space-y-4 text-sm font-body text-slate-500">
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Privacy Policy</a></li>
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Terms of Service</a></li>
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Contact Us</a></li>
+<li><a class="hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Cookie Settings</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold mb-6 text-slate-900 font-headline">Newsletter</h4>
+<p class="text-slate-500 text-sm mb-4">Get the latest parenting tips and caregiver insights.</p>
+<div class="flex gap-2">
+<input class="flex-1 bg-white border-none rounded-lg focus:ring-1 focus:ring-primary text-sm px-4" placeholder="Your email" type="email"/>
+<button class="bg-primary text-white p-2 rounded-lg"><span class="material-symbols-outlined">send</span></button>
+</div>
+</div>
+</div>
+<div class="max-w-7xl mx-auto px-8 mt-16 pt-8 border-t border-slate-200">
+<p class="text-slate-500 text-sm font-body">© 2024 NannyConnect US. All rights reserved.</p>
+</div>
+</footer>
+</body></html>

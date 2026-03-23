@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Nanny Profile - NannyConnect US</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "outline-variant": "#c4c6cf",
+              "on-primary": "#ffffff",
+              "on-tertiary": "#ffffff",
+              "error-container": "#ffdad6",
+              "on-secondary-container": "#783d01",
+              "primary-fixed": "#d5e3ff",
+              "on-primary-container": "#879ec6",
+              "inverse-on-surface": "#f0f1f1",
+              "tertiary-container": "#003b3d",
+              "secondary": "#8e4e14",
+              "surface-container-lowest": "#ffffff",
+              "on-background": "#1a1c1c",
+              "on-secondary-fixed-variant": "#6f3800",
+              "on-error-container": "#93000a",
+              "surface-container-high": "#e8e8e8",
+              "background": "#f9f9f9",
+              "tertiary-fixed": "#b9ecee",
+              "inverse-primary": "#b0c7f1",
+              "on-primary-fixed-variant": "#30476a",
+              "on-secondary": "#ffffff",
+              "surface": "#f9f9f9",
+              "surface-container-highest": "#e2e2e2",
+              "primary-fixed-dim": "#b0c7f1",
+              "surface-container-low": "#f3f3f3",
+              "on-tertiary-container": "#75a5a7",
+              "on-surface-variant": "#44474e",
+              "surface-container": "#eeeeee",
+              "on-error": "#ffffff",
+              "on-secondary-fixed": "#2f1400",
+              "secondary-fixed-dim": "#ffb780",
+              "tertiary-fixed-dim": "#9ecfd1",
+              "secondary-container": "#ffab69",
+              "primary": "#031f41",
+              "surface-variant": "#e2e2e2",
+              "surface-dim": "#dadada",
+              "secondary-fixed": "#ffdcc4",
+              "error": "#ba1a1a",
+              "outline": "#74777f",
+              "surface-bright": "#f9f9f9",
+              "tertiary": "#002425",
+              "inverse-surface": "#2f3131",
+              "on-primary-fixed": "#001b3c",
+              "on-tertiary-fixed-variant": "#1a4e50",
+              "on-surface": "#1a1c1c",
+              "primary-container": "#1d3557",
+              "surface-tint": "#485f84",
+              "on-tertiary-fixed": "#002021"
+            },
+            fontFamily: {
+              "headline": ["Plus Jakarta Sans"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .editorial-offset {
+            margin-top: -80px;
+        }
+        .glass-nav {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm dark:shadow-none transition-all duration-300 ease-in-out">
+<div class="flex justify-between items-center h-20 px-8 max-w-7xl mx-auto">
+<div class="text-2xl font-bold tracking-tight text-slate-900 dark:text-white font-headline">NannyConnect US</div>
+<div class="hidden md:flex space-x-8 font-['Plus_Jakarta_Sans'] font-medium text-sm">
+<a class="text-slate-900 dark:text-white border-b-2 border-slate-900 dark:border-white pb-1 transition-opacity hover:opacity-80" href="#">Find a Nanny</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-opacity hover:opacity-80" href="#">How it Works</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-opacity hover:opacity-80" href="#">Pricing</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-opacity hover:opacity-80" href="#">Trust & Safety</a>
+</div>
+<div class="flex items-center space-x-4">
+<button class="text-slate-500 font-medium text-sm hover:text-slate-900">Login</button>
+<button class="bg-primary-container text-white px-6 py-2 rounded-xl font-medium text-sm hover:opacity-90 transition-opacity">Join</button>
+</div>
+</div>
+</nav>
+<main class="pt-20">
+<!-- Hero Section with Intentional Asymmetry -->
+<section class="relative bg-surface-container-low py-16 px-8 overflow-hidden">
+<div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
+<div class="lg:col-span-5 relative">
+<div class="aspect-[4/5] bg-surface-container-highest rounded-tl-[3rem] rounded-br-[3rem] overflow-hidden shadow-2xl relative z-10">
+<img alt="Elena Rodriguez Profile" class="w-full h-full object-cover" data-alt="Professional portrait of a smiling nanny Elena Rodriguez" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDl1veN8YO7Jg5YYpUQ9bjQKcaZaXd_156yMpyDgTiNJhY6LoSUXp7XBynB8GIPo7qFfh1VL9g1gIuDy4ZP0IjDSCJFHC6SDDnQzZKZfRxQmz7gMgSIqzJn76pbmuqcLZUVeMB7EjXfZXfl3Oz3gHBfQWOIWjKRJo5O5LVoPYoy3Ex0lCoVG-iIPRDk7zE2Af2JVXaRiqfFFSxU8EisnRXNg_y58c--v611Vc2i_X2e9d7JzO4dTLqp-LpM2aeh301hitiHu_fT0F0"/>
+</div>
+<!-- Decorative Element -->
+<div class="absolute -bottom-6 -left-6 w-32 h-32 bg-secondary-fixed-dim rounded-full -z-0 opacity-50"></div>
+</div>
+<div class="lg:col-span-7 pb-8">
+<div class="flex flex-col space-y-4">
+<div class="inline-flex items-center space-x-2 text-primary font-semibold tracking-wider uppercase text-xs">
+<span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">verified</span>
+<span>Premium Verified Caregiver</span>
+</div>
+<h1 class="text-5xl font-extrabold text-primary font-headline leading-tight">Elena Rodriguez, 29</h1>
+<p class="text-xl text-on-surface-variant flex items-center">
+<span class="material-symbols-outlined mr-2">location_on</span>
+                            Brooklyn, NY • 8 Years Experience
+                        </p>
+<div class="flex flex-wrap gap-4 pt-6">
+<button class="bg-gradient-to-br from-primary to-primary-container text-on-primary px-8 py-4 rounded-xl font-bold flex items-center gap-2 shadow-lg hover:opacity-90 transition-all">
+<span class="material-symbols-outlined">mail</span>
+                                Message Elena
+                            </button>
+<button class="bg-secondary-fixed-dim text-on-secondary-fixed px-8 py-4 rounded-xl font-bold flex items-center gap-2 hover:opacity-90 transition-all">
+<span class="material-symbols-outlined">calendar_today</span>
+                                Schedule Interview
+                            </button>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Main Content Bento Grid -->
+<section class="max-w-7xl mx-auto px-8 py-20">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Verification Module (Left Column) -->
+<div class="lg:col-span-1 space-y-8">
+<div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm space-y-6">
+<h3 class="font-headline font-bold text-xl text-primary">Verification Status</h3>
+<div class="space-y-4">
+<div class="flex items-center justify-between p-4 bg-tertiary-fixed/30 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-tertiary-fixed-variant" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+<span class="font-medium">Identity Verified</span>
+</div>
+<span class="text-xs text-on-surface-variant">Gov. ID</span>
+</div>
+<div class="flex items-center justify-between p-4 bg-tertiary-fixed/30 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-tertiary-fixed-variant" style="font-variation-settings: 'FILL' 1;">history</span>
+<span class="font-medium">Background Check</span>
+</div>
+<span class="text-xs text-on-surface-variant">Nov 2023</span>
+</div>
+<div class="flex items-center justify-between p-4 bg-tertiary-fixed/30 rounded-lg">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-on-tertiary-fixed-variant" style="font-variation-settings: 'FILL' 1;">groups</span>
+<span class="font-medium">References (4)</span>
+</div>
+<span class="text-xs text-on-surface-variant">All Positive</span>
+</div>
+</div>
+</div>
+<!-- Intro Video Placeholder -->
+<div class="relative group cursor-pointer overflow-hidden rounded-xl aspect-video bg-primary-container flex items-center justify-center">
+<img alt="Video Thumbnail" class="absolute inset-0 w-full h-full object-cover opacity-60 transition-transform duration-500 group-hover:scale-110" data-alt="Elena Rodriguez playing with children in a garden" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDAqrmko8O-m69pQNPioaBm91N4oBZToBv_lCJFdq2BO-NZkm0gKOluSf71cFsP9Foy0K6cDEFArzS9b18ps-MRLsq_Fl03dakbnYTTV3bjPMFFi8YPiLPMMrZNotGEnZ_fp8MHh7QwtpB_lTES9Hk39b0ts_uTEggwuvNfY9zNC-wD2C2D03Jw3Qqsxpl70GEhFrdEmE_ek9KKp-R3URPfiFIp9l1ZWWNFbV2nTMnD_TV8NjCPS1hFUZ3z0U0xlBrqpB0JNvLZ0Dc"/>
+<div class="relative z-10 flex flex-col items-center gap-2">
+<div class="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30">
+<span class="material-symbols-outlined text-white text-4xl" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
+</div>
+<span class="text-white font-bold tracking-wide">Watch Introduction</span>
+</div>
+</div>
+</div>
+<!-- Right Column (About & Skills) -->
+<div class="lg:col-span-2 space-y-12">
+<!-- About Me -->
+<div class="space-y-6">
+<h2 class="font-headline font-bold text-3xl text-primary">About Me</h2>
+<div class="prose prose-slate max-w-none text-on-surface-variant leading-relaxed">
+<p class="text-lg">
+                                Hello! I'm Elena, a dedicated and passionate caregiver with over 8 years of experience working with infants and toddlers. I believe that every child deserves a nurturing environment where they can feel safe to explore their world.
+                            </p>
+<p class="text-lg">
+                                My background is in Early Childhood Education, and I specialize in developmental milestones, sleep training, and bilingual enrichment. I'm originally from Spain and love incorporating Spanish language and culture into daily play and learning.
+                            </p>
+</div>
+</div>
+<!-- Skills Grid -->
+<div class="space-y-6">
+<h2 class="font-headline font-bold text-2xl text-primary">Skills & Certifications</h2>
+<div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">child_care</span>
+<span class="text-sm font-semibold">Infant Care</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">medical_services</span>
+<span class="text-sm font-semibold">CPR Certified</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">translate</span>
+<span class="text-sm font-semibold">Bilingual (ES/EN)</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">bedtime</span>
+<span class="text-sm font-semibold">Sleep Training</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">kitchen</span>
+<span class="text-sm font-semibold">Organic Prep</span>
+</div>
+<div class="bg-surface-container-low p-4 rounded-xl flex items-center gap-3">
+<span class="material-symbols-outlined text-primary">diversity_1</span>
+<span class="text-sm font-semibold">Multiples Exp.</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Availability Grid -->
+<section class="bg-surface-container-low py-20 px-8">
+<div class="max-w-7xl mx-auto">
+<div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+<div>
+<h2 class="font-headline font-bold text-3xl text-primary mb-2">Weekly Availability</h2>
+<p class="text-on-surface-variant">Last updated: Today at 9:00 AM</p>
+</div>
+<div class="flex items-center gap-4 text-sm font-medium">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 bg-secondary-container rounded-sm"></div>
+<span>Available</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 bg-surface-variant rounded-sm"></div>
+<span>Booked</span>
+</div>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full border-separate border-spacing-2">
+<thead>
+<tr>
+<th class="p-4 text-left font-headline font-bold text-primary">Time</th>
+<th class="p-4 text-center font-bold">Mon</th>
+<th class="p-4 text-center font-bold">Tue</th>
+<th class="p-4 text-center font-bold">Wed</th>
+<th class="p-4 text-center font-bold">Thu</th>
+<th class="p-4 text-center font-bold">Fri</th>
+<th class="p-4 text-center font-bold">Sat</th>
+<th class="p-4 text-center font-bold">Sun</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="p-4 font-semibold text-sm">Mornings</td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+</tr>
+<tr>
+<td class="p-4 font-semibold text-sm">Afternoons</td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+</tr>
+<tr>
+<td class="p-4 font-semibold text-sm">Evenings</td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-surface-variant rounded-xl opacity-40"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+<td class="p-4 bg-secondary-container rounded-xl"></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</section>
+<!-- Reviews Section -->
+<section class="max-w-7xl mx-auto px-8 py-20">
+<div class="mb-12">
+<h2 class="font-headline font-bold text-3xl text-primary mb-2">Reviews</h2>
+<div class="flex items-center gap-2">
+<div class="flex text-secondary-container">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">star</span>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<span class="font-bold text-xl">5.0</span>
+<span class="text-on-surface-variant">(42 reviews)</span>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Testimonial 1 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm border border-outline-variant/10">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-surface-container">
+<img alt="Reviewer" class="w-full h-full object-cover" data-alt="Profile photo of a happy parent reviewer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXWtBQrv4ZMmGmjCMbYxL9C6Genq3Fgc9MsVguHLZE-Jm_OpcWtpryejAM1WnshYNH1O9ONOmeQi-si5Kjy05I3Jj5Ys-BRC5W3EUxnixdx4lM5zAUQox55BT7TWuRimg3fbdbpl5hNjYbodDMC8yg1R-PYBPUE116ISftHCOQy-Qx5qzX6TtSJhg3Uw-XwV6Ok8ptQkAuIKwk985O-XSM9BA9PN_Oe6Is4k8wSK3i28gJmp1tM0Whn67RKCKQ34w3bAmFshQ8RGE"/>
+</div>
+<div>
+<h4 class="font-bold text-primary">Sarah Jenkins</h4>
+<p class="text-xs text-on-surface-variant italic">Mother of two • Brooklyn</p>
+</div>
+</div>
+<p class="text-on-surface-variant leading-relaxed">
+                        "Elena has been with our family for nearly 3 years. She is truly a part of the family. Her patience and ability to engage with my energetic toddlers is unmatched. We feel so safe leaving our boys in her care."
+                    </p>
+</div>
+<!-- Testimonial 2 -->
+<div class="bg-surface-container-lowest p-8 rounded-xl shadow-sm border border-outline-variant/10">
+<div class="flex items-center gap-4 mb-6">
+<div class="w-12 h-12 rounded-full overflow-hidden bg-surface-container">
+<img alt="Reviewer" class="w-full h-full object-cover" data-alt="Profile photo of a satisfied father reviewer" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkR0cRFlA39VDL6-rnyf6A0fPlH5uw7C_5XHaC-KG8sb_k2TdEpLnJbhSualRmw7VMLOk3Tsmdbv2pOEss1tWQtbAVSkzCy0FUHHzxWu1ZehjNC-sBFtE9mBYQ4sUAfdMhXY_F9bg2QuMw-aqsMlEC0oYATyADVd74TOrEAKUr_6h0WHK-zl29GCmQ52iFcF9XLHyIvM0UjK70rwqzLgKZgGjTXGHhBYSjEsh2Xm03URAL9DEy4Hyoq2H8mYUqOCGDWJw41aJYN-w"/>
+</div>
+<div>
+<h4 class="font-bold text-primary">Michael Chen</h4>
+<p class="text-xs text-on-surface-variant italic">Parent • Park Slope</p>
+</div>
+</div>
+<p class="text-on-surface-variant leading-relaxed">
+                        "Highly recommend Elena for infant care. She helped us tremendously with sleep training our 6-month-old. She's professional, punctual, and very knowledgeable about development."
+                    </p>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="bg-slate-100 dark:bg-slate-950 w-full py-16">
+<div class="grid grid-cols-1 md:grid-cols-4 gap-12 px-8 max-w-7xl mx-auto">
+<div class="space-y-4">
+<div class="text-xl font-bold text-slate-900 dark:text-white">NannyConnect US</div>
+<p class="font-['Inter'] text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                    Connecting families with the most trusted, elite caregivers in the country.
+                </p>
+</div>
+<div>
+<h5 class="font-bold text-slate-900 dark:text-white mb-6">Resources</h5>
+<ul class="space-y-4 font-['Inter'] text-sm">
+<li><a class="text-slate-500 hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">FAQ</a></li>
+<li><a class="text-slate-500 hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Safety Center</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-bold text-slate-900 dark:text-white mb-6">Company</h5>
+<ul class="space-y-4 font-['Inter'] text-sm">
+<li><a class="text-slate-500 hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">About Us</a></li>
+<li><a class="text-slate-500 hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Careers</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-bold text-slate-900 dark:text-white mb-6">Legal</h5>
+<ul class="space-y-4 font-['Inter'] text-sm">
+<li><a class="text-slate-500 hover:text-slate-900 underline decoration-2 underline-offset-4 duration-200" href="#">Privacy Policy</a></li>
+<li class="text-slate-500 font-semibold text-slate-900 dark:text-white">© 2024 NannyConnect US. All rights reserved.</li>
+</ul>
+</div>
+</div>
+</footer>
+</body></html>
