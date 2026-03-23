@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { MaterialIcon } from "@/components/MaterialIcon";
 import { SignIn } from "@clerk/nextjs";
 
-export default function Login() {
+export default function LoginPage() {
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen">
       {/* Top Navigation Shell */}

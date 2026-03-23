@@ -1,12 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { MaterialIcon } from "@/components/MaterialIcon";
-import { cn } from "@/lib/utils";
 import { SignUp } from "@clerk/nextjs";
 
-export default function SignUp() {
+export default function SignUpPage() {
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen">
       {/* Top Navigation */}
