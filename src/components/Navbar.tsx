@@ -70,16 +70,12 @@ export default function Navbar() {
           {/* Right Actions */}
           <div className="flex items-center gap-3">
             <Show when="signed-out">
-              <SignInButton mode="modal">
-                <button className="hidden sm:block text-slate-600 font-bold font-headline text-sm px-4 py-2 hover:text-primary transition-all">
-                  Login
-                </button>
-              </SignInButton>
-              <SignUpButton mode="modal">
-                <button className="hidden sm:block bg-slate-900 text-white px-7 py-3 rounded-2xl font-black font-headline text-sm shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:-translate-y-0.5 active:scale-95 transition-all uppercase tracking-wider">
-                  Join Now
-                </button>
-              </SignUpButton>
+              <Link href="/login" className="hidden sm:block text-slate-600 font-bold font-headline text-sm px-4 py-2 hover:text-primary transition-all">
+                Login
+              </Link>
+              <Link href="/signup" className="hidden sm:block bg-slate-900 text-white px-7 py-3 rounded-2xl font-black font-headline text-sm shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:-translate-y-0.5 active:scale-95 transition-all uppercase tracking-wider">
+                Join Now
+              </Link>
             </Show>
             
             <Show when="signed-in">
@@ -143,12 +139,8 @@ export default function Navbar() {
 
             <div className="p-6 bg-slate-50/50 space-y-3">
               <Show when="signed-out">
-                <SignUpButton mode="modal">
-                  <button className="w-full py-4 bg-primary text-white font-black text-sm rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95">Sign Up</button>
-                </SignUpButton>
-                <SignInButton mode="modal">
-                  <button className="w-full py-4 text-slate-600 font-bold text-sm hover:text-primary transition-all">Login</button>
-                </SignInButton>
+                <Link href="/signup" className="w-full py-4 bg-primary text-white font-black text-sm rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center">Sign Up</Link>
+                <Link href="/login" className="w-full py-4 text-slate-600 font-bold text-sm hover:text-primary transition-all flex items-center justify-center">Login</Link>
               </Show>
               <Show when="signed-in">
                 <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-200/50 shadow-sm">

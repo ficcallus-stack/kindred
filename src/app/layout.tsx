@@ -36,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider signInUrl="/login" signUpUrl="/signup">
       <html lang="en" className={`${plusJakartaSans.variable} ${inter.variable}`}>
         <head>
           <link
