@@ -8,9 +8,12 @@ import Step1 from "@/components/post-job/Step1";
 import Step2 from "@/components/post-job/Step2";
 import Step3 from "@/components/post-job/Step3";
 import Step4 from "@/components/post-job/Step4";
+import Step5 from "@/components/post-job/Step5";
+import { createJob } from "./actions";
 
 export default function PostJobPage() {
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     childCount: 2,
     location: "Austin, TX",
@@ -35,14 +38,28 @@ export default function PostJobPage() {
     setFormData((prev) => ({ ...prev, ...newData }));
   };
 
-  const nextStep = () => setStep((s) => Math.min(s + 1, 4));
+  const nextStep = () => setStep((s) => Math.min(s + 1, 5));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
   const goToStep = (s: number) => setStep(s);
 
+  const handleSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await createJob(formData);
+      router.push("/dashboard/parent");
+    } catch (error) {
+      console.error("Failed to create job:", error);
+      alert("Something went wrong while posting your job. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const STEPS = [
-    { title: "Family Details", subtitle: "Family Details", icon: "edit_note" },
+    { title: "Family Details", subtitle: "Job Details", icon: "edit_note" },
     { title: "Define your care schedule", subtitle: "Schedule", icon: "calendar_today" },
     { title: "Requirements", subtitle: "Requirements", icon: "verified_user" },
+    { title: "Secure Payment & Escrow", subtitle: "Payment", icon: "payments" },
     { title: "Review & Finalize", subtitle: "Review", icon: "visibility" },
   ];
 
@@ -53,7 +70,7 @@ export default function PostJobPage() {
         <aside className="hidden md:flex flex-col pt-12 pb-8 h-[calc(100vh-64px)] w-64 fixed left-0 top-16 bg-slate-50/50 border-r border-outline-variant/10 overflow-y-auto">
           <div className="px-6 mb-8">
             <h2 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1 font-label">New Job Posting</h2>
-            <p className="text-sm font-bold text-secondary font-headline">Step {step} of 4</p>
+            <p className="text-sm font-bold text-secondary font-headline">Step {step} of 5</p>
           </div>
           <nav className="flex-1 pr-4">
             {STEPS.map((s, i) => (
@@ -74,16 +91,13 @@ export default function PostJobPage() {
               </div>
             ))}
           </nav>
-          <div className="px-6 mt-auto">
-            <button className="w-full py-3 text-slate-500 font-bold hover:bg-slate-200/50 rounded-xl transition-all text-sm font-headline">Save Draft</button>
-          </div>
         </aside>
 
         {/* Main Content */}
-        <main className={cn("flex-1 pt-12 pb-20 px-6 md:px-12", step < 5 ? "md:ml-64" : "")}>
+        <main className={cn("flex-1 pt-12 pb-20 px-6 md:px-12", step < 4 ? "md:ml-64" : step === 4 ? "md:ml-64" : "md:ml-64")}>
           <div className="max-w-4xl mx-auto">
-            {/* Header Section (only for steps 1-3) */}
-            {step < 4 && (
+            {/* Header Section (only for steps 1-4) */}
+            {step < 5 && (
               <header className="mb-12">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
                   <div className="space-y-1">
@@ -94,12 +108,12 @@ export default function PostJobPage() {
                   </div>
                   <div className="w-full md:w-80">
                     <div className="flex justify-end text-[11px] font-bold text-primary mb-2 uppercase tracking-tight">
-                      <span className="font-headline">Step {step} of 4: {STEPS[step - 1].subtitle}</span>
+                      <span className="font-headline">Step {step} of 5: {STEPS[step - 1].subtitle}</span>
                     </div>
                     <div className="h-1.5 w-full bg-surface-container-high rounded-full overflow-hidden shadow-inner flex justify-end">
                       <div
                         className="h-full bg-primary transition-all duration-700 ease-out rounded-full"
-                        style={{ width: `${step * 25}%` }}
+                        style={{ width: `${step * 20}%` }}
                       ></div>
                     </div>
                   </div>
@@ -112,7 +126,8 @@ export default function PostJobPage() {
               {step === 1 && <Step1 data={formData} updateData={updateData} onNext={nextStep} onCancel={() => router.push("/dashboard/parent")} />}
               {step === 2 && <Step2 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
               {step === 3 && <Step3 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
-              {step === 4 && <Step4 data={formData} onEdit={goToStep} onBack={prevStep} onSubmit={() => router.push("/dashboard/parent")} />}
+              {step === 4 && <Step4 data={formData} onNext={nextStep} onBack={prevStep} />}
+              {step === 5 && <Step5 data={formData} onEdit={goToStep} onBack={prevStep} onSubmit={handleSubmit} />}
             </div>
           </div>
         </main>
@@ -124,10 +139,10 @@ export default function PostJobPage() {
           <div className="flex items-center gap-8">
             <button
               onClick={prevStep}
-              disabled={step === 1}
+              disabled={step === 1 || isSubmitting}
               className={cn(
                 "flex items-center gap-2 font-headline font-bold text-sm transition-all active:scale-95",
-                step === 1 ? "text-slate-300 pointer-events-none" : "text-primary hover:translate-x-[-4px]"
+                (step === 1 || isSubmitting) ? "text-slate-300 pointer-events-none" : "text-primary hover:translate-x-[-4px]"
               )}
             >
               <MaterialIcon name="arrow_back" className="text-lg" />
@@ -136,14 +151,18 @@ export default function PostJobPage() {
           </div>
           
           <div className="flex items-center gap-6">
-            <button className="text-primary font-headline font-bold text-sm hover:opacity-70 transition-opacity">
+            <button 
+              disabled={isSubmitting}
+              className="text-primary font-headline font-bold text-sm hover:opacity-70 transition-opacity disabled:opacity-30"
+            >
               Save as Draft
             </button>
             <button
-              onClick={step === 4 ? () => router.push("/dashboard/parent") : nextStep}
-              className="bg-primary text-on-primary px-10 py-3.5 rounded-xl font-headline font-extrabold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all"
+              disabled={isSubmitting}
+              onClick={step === 5 ? handleSubmit : nextStep}
+              className="bg-primary text-on-primary px-10 py-3.5 rounded-xl font-headline font-extrabold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
             >
-              {step === 4 ? "Post Job Now" : "Next Step"}
+              {isSubmitting ? "Processing..." : step === 5 ? "Post Job Now" : "Next Step"}
             </button>
           </div>
         </div>

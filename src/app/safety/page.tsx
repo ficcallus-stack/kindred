@@ -76,51 +76,7 @@ export default function SafetyPage() {
         </main>
       </div>
 
-      {/* Footer */}
-      <footer className="w-full py-20 px-8 mt-20 border-t border-outline-variant/10 bg-surface-container-lowest">
-        <div className="flex flex-col lg:flex-row justify-between items-start max-w-7xl mx-auto gap-20">
-          <div className="space-y-6 max-w-sm">
-            <div className="text-3xl font-black text-primary font-headline tracking-tighter italic">KindredCare <span className="not-italic text-secondary">US</span></div>
-            <p className="text-on-surface-variant text-lg font-medium opacity-70 leading-relaxed font-body">Building safer communities for our most precious ones since 2024. Your family's safety is our #1 priority.</p>
-            <div className="flex gap-4">
-               {["facebook", "instagram", "linkedin"].map(social => (
-                  <button key={social} className="w-10 h-10 rounded-full bg-primary/5 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-all shadow-sm">
-                    <MaterialIcon name="public" className="text-lg" />
-                  </button>
-               ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-16 md:gap-24">
-            <div className="space-y-6">
-              <h4 className="font-headline font-black text-xs uppercase tracking-[0.2em] text-primary">Trust & Safety</h4>
-              <ul className="space-y-4 text-sm text-on-surface-variant font-black uppercase tracking-widest opacity-60 hover:opacity-100 transition-opacity">
-                <li><button onClick={() => setActiveTab("verification")} className="hover:text-primary transition-colors text-left uppercase">Vetting Process</button></li>
-                <li><button onClick={() => setActiveTab("resources")} className="hover:text-primary transition-colors text-left uppercase">Safety Tips</button></li>
-                <li><button onClick={() => setActiveTab("reporting")} className="hover:text-primary transition-colors text-left text-error uppercase">Reporting Incident</button></li>
-              </ul>
-            </div>
-            <div className="space-y-6">
-              <h4 className="font-headline font-black text-xs uppercase tracking-[0.2em] text-primary">Platform</h4>
-              <ul className="space-y-4 text-sm text-on-surface-variant font-black uppercase tracking-widest opacity-60">
-                <li><a href="/" className="hover:text-primary transition-colors uppercase">Home</a></li>
-                <li><a href="/browse" className="hover:text-primary transition-colors uppercase">Browse Care</a></li>
-                <li><a href="/dashboard/nanny" className="hover:text-primary transition-colors uppercase">Nanny Hub</a></li>
-              </ul>
-            </div>
-            <div className="space-y-6 hidden md:block">
-              <h4 className="font-headline font-black text-xs uppercase tracking-[0.2em] text-primary">Vetting Standards</h4>
-              <div className="flex flex-wrap gap-2">
-                 <div className="px-3 py-1.5 bg-secondary-fixed text-on-secondary-fixed rounded-lg text-[10px] font-black uppercase tracking-tighter">SOC2 Ready</div>
-                 <div className="px-3 py-1.5 bg-tertiary-fixed text-on-tertiary-fixed rounded-lg text-[10px] font-black uppercase tracking-tighter">GDPR Compliant</div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto pt-20 mt-20 border-t border-outline-variant/10 flex justify-between items-center opacity-40">
-           <p className="text-[10px] font-black uppercase tracking-widest">© 2024 KindredCare US. All rights reserved.</p>
-           <p className="text-[10px] font-black uppercase tracking-widest hidden sm:block">Built with Love for Families</p>
-        </div>
-      </footer>
+      {/* Mobile Navigation (Floating Bottom Bar) */}
 
       {/* Mobile Navigation (Floating Bottom Bar) */}
       <div className="lg:hidden fixed bottom-6 left-6 right-6 z-50">

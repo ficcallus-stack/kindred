@@ -1,55 +1,55 @@
-"use client";
-
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import { syncUser } from "@/lib/user-sync";
+import { jobs, applications, users, nannyProfiles, children } from "@/db/schema";
+import { eq, desc, and } from "drizzle-orm";
+import { db } from "@/db";
 
-const CHILDREN = [
-  { 
-    name: "Liam", 
-    age: 4, 
-    type: "Pre-schooler", 
-    icon: "child_care", 
-    tags: ["ASD Level 1", "Sensory Sensitive"],
-    tagColor: "bg-tertiary-fixed text-on-tertiary-fixed"
-  },
-  { 
-    name: "Sophie", 
-    age: 2, 
-    type: "Toddler", 
-    icon: "baby_changing_station", 
-    tags: ["Food Allergies", "Nap Routine"],
-    tagColor: "bg-error-container text-on-error-container"
-  },
-];
+export default async function FamilyDashboard() {
+  const user = await syncUser();
 
-const APPLICANTS = [
-  {
-    id: 1,
-    name: "Elena Rodriguez",
-    role: "Full-time Caregiver",
-    experience: "6 Years Exp.",
-    skills: ["CPR Certified"],
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCX-9HbCGIJdd43IbmipcwpZ1aanR5L9XnpKIPyfHqjcSF2rzFESlcK9i40IkOGQ5yvTkLb4oU1ICcSIyo5xdq4SXTyRBi-t0CBCQ2unqpiZHKcKpwhUuU09tKXhlmJEtPhl_YrquGk3tQ_nFA5C5MtFTGTWTmWEWm_qlsX7cxu7F7xfYDBqpNgxy6hg0Eve-99iyK7egDLq3u5IFzCnhZKbWHaz4Q8dmIf11AqXh8Jy0B89ympH3vWV1PDfe9igevRv9vQ_b0n41s",
-    rotate: "-rotate-3"
-  },
-  {
-    id: 2,
-    name: "Jessica Thompson",
-    role: "Weekend Sitter",
-    experience: "3 Years Exp.",
-    skills: ["Special Needs"],
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuABUshUUWT0xV00-NzwnNN4lPcK6LEdXnGhcj5Fr-XjLwZMj2VyNGk1NRlZqtROsi7M5Vqxk3FoAb6-a4IE2zc6eIZJ8soRkEGa-JRnvw_jxBhL2FDBEiXDwa-hnp7Q0ppTwMgHlLPtjh4y9TZRQZeWKlMfWOSWUJUPWPKmduiS6rqStPfhNgjT53e4BsoKfqzbDYrm0yl44R7C-rHGuuYT9yfTMNFB4IsTsThrznCF0jjXUM02qjwgqczaxbpvyM1Yu6BOt27GEsA",
-    rotate: "rotate-3"
+  if (!user) {
+    redirect("/login");
   }
-];
 
-const SCHEDULE = [
-  { date: "14", day: "Today", title: "Interview: Elena R.", time: "4:00 PM - 4:45 PM", isToday: true },
-  { date: "16", day: "Fri", title: "Booking: Clara W.", time: "6:00 PM - 11:00 PM", isToday: false },
-];
+  // Security: Redirect caregivers trying to access parent dashboard
+  if (user.role === "caregiver") {
+    redirect("/dashboard/nanny");
+  }
 
-export default function FamilyDashboard() {
+  // Fetch jobs posted by this parent
+  const myJobs = await db.query.jobs.findMany({
+    where: eq(jobs.parentId, user.id),
+    orderBy: [desc(jobs.createdAt)],
+  });
+
+  // Fetch applicants for these jobs
+  const myApplicants = await db.select({
+    id: applications.id,
+    jobTitle: jobs.title,
+    nannyName: users.fullName,
+    nannyRate: nannyProfiles.hourlyRate,
+    nannyLocation: nannyProfiles.location,
+    status: applications.status,
+    createdAt: applications.createdAt,
+    caregiverId: users.id,
+  })
+  .from(applications)
+  .innerJoin(jobs, eq(applications.jobId, jobs.id))
+  .innerJoin(users, eq(applications.caregiverId, users.id))
+  .leftJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
+  .where(eq(jobs.parentId, user.id))
+  .orderBy(desc(applications.createdAt));
+
+  // Fetch children from DB
+  const myChildren = await db.query.children.findMany({
+    where: eq(children.parentId, user.id),
+  });
+
+  const fullName = user.fullName || "Parent";
+
   return (
     <div className="p-8 lg:p-12 animate-in fade-in duration-700">
       <div className="max-w-6xl mx-auto space-y-12">
@@ -58,18 +58,18 @@ export default function FamilyDashboard() {
         <header className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-primary to-primary-container p-10 md:p-14 text-white shadow-2xl shadow-primary/20 group">
           <div className="relative z-10 max-w-2xl">
             <h1 className="font-headline text-4xl md:text-5xl font-black tracking-tighter mb-6 leading-none italic">
-              Welcome back, <br className="md:hidden" /> Sarah Miller
+              Welcome back, <br className="md:hidden" /> {fullName}
             </h1>
             <p className="font-body text-xl text-on-primary-container leading-relaxed mb-10 opacity-90 italic">
-              Your household is humming. You have 2 new applications for the Weekend Sitter role and 1 interview scheduled for today at 4:00 PM.
+              Your household is humming. Start by posting a job or browsing our verified nannies to find the perfect match for your family.
             </p>
             <div className="flex flex-wrap gap-4">
-              <button className="px-8 py-4 bg-secondary-fixed-dim text-on-secondary-fixed font-black uppercase tracking-widest text-[10px] rounded-2xl active:scale-95 transition-transform shadow-xl shadow-orange-950/20">
-                Review Applicants
-              </button>
-              <button className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-white/20 transition-all">
-                View Schedule
-              </button>
+              <Link href="/dashboard/parent/post-job" className="px-8 py-4 bg-secondary-fixed-dim text-on-secondary-fixed font-black uppercase tracking-widest text-[10px] rounded-2xl active:scale-95 transition-transform shadow-xl shadow-orange-950/20">
+                Post a Job
+              </Link>
+              <Link href="/browse" className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-white/20 transition-all">
+                Browse Nannies
+              </Link>
             </div>
           </div>
           
@@ -91,69 +91,155 @@ export default function FamilyDashboard() {
               <div className="flex justify-between items-center mb-10 px-2">
                 <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic">My Children</h2>
                 <button className="text-primary font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:underline underline-offset-8">
-                  <MaterialIcon name="edit" className="text-xl" />
-                  Edit Profiles
+                  <MaterialIcon name="add_circle" className="text-xl" />
+                  Add Profile
                 </button>
               </div>
               
               <div className="grid md:grid-cols-2 gap-8">
-                {CHILDREN.map(child => (
-                  <div key={child.name} className="bg-surface-container-low p-8 rounded-[2.5rem] border-l-8 border-secondary shadow-inner relative group hover:shadow-xl transition-all">
-                    <div className="flex items-start justify-between mb-6">
-                      <div>
-                        <h3 className="font-headline text-2xl font-bold text-primary tracking-tight leading-none mb-1">{child.name}, {child.age}</h3>
-                        <p className="text-on-surface-variant text-sm font-black uppercase tracking-widest opacity-40">{child.type}</p>
+                {myChildren.length > 0 ? (
+                  myChildren.map((child: any) => {
+                    const tags: string[] = (() => { try { return JSON.parse(child.specialNeeds || "[]"); } catch { return []; } })();
+                    const icon = child.age < 2 ? "baby_changing_station" : child.age < 5 ? "child_care" : "face";
+                    return (
+                    <div key={child.id} className="bg-surface-container-low p-8 rounded-[2.5rem] border-l-8 border-secondary shadow-inner relative group hover:shadow-xl transition-all">
+                      <div className="flex items-start justify-between mb-6">
+                        <div>
+                          <h3 className="font-headline text-2xl font-bold text-primary tracking-tight leading-none mb-1">{child.name}, {child.age}</h3>
+                          <p className="text-on-surface-variant text-sm font-black uppercase tracking-widest opacity-40">{child.type}</p>
+                        </div>
+                        <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-secondary shadow-sm group-hover:scale-110 transition-transform">
+                          <MaterialIcon name={icon} className="text-3xl" />
+                        </div>
                       </div>
-                      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-secondary shadow-sm group-hover:scale-110 transition-transform">
-                        <MaterialIcon name={child.icon} className="text-3xl" />
+                      {tags.length > 0 && (
+                      <div className="space-y-4">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Special Considerations</p>
+                        <div className="flex flex-wrap gap-2">
+                          {tags.map((tag: string) => (
+                            <span key={tag} className="px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-tertiary-fixed text-on-tertiary-fixed">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                      )}
                     </div>
-                    <div className="space-y-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Special Considerations</p>
-                      <div className="flex flex-wrap gap-2">
-                        {child.tags.map(tag => (
-                          <span key={tag} className={cn("px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest", child.tagColor)}>
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-2 py-20 flex flex-col items-center justify-center text-center opacity-30 italic">
+                    <MaterialIcon name="child_care" className="text-6xl mb-4" />
+                    <p className="font-headline font-bold text-xl">No children profiles yet.</p>
+                    <p className="text-sm">Complete your profile to find better matches.</p>
                   </div>
-                ))}
+                )}
               </div>
             </section>
 
-            {/* Recent Applicants Section */}
+            {/* Latest Applicants Section */}
             <section className="bg-surface-container-lowest rounded-[3rem] p-10 shadow-sm border border-outline-variant/5">
-              <h2 className="font-headline text-3xl font-black text-primary mb-10 px-2 tracking-tighter italic">Recent Applicants</h2>
-              <div className="space-y-8">
-                {APPLICANTS.map(applicant => (
-                  <div key={applicant.id} className="flex flex-col md:flex-row items-center gap-8 p-6 rounded-[2.5rem] hover:bg-surface-container-low transition-all group border border-transparent hover:border-outline-variant/10">
-                    <div className="relative shrink-0">
-                      <img 
-                        src={applicant.image} 
-                        className={cn("w-24 h-24 rounded-2xl object-cover shadow-xl transition-all duration-500 group-hover:rotate-0", applicant.rotate)} 
-                      />
-                      <div className="absolute -bottom-2 -right-2 bg-primary rounded-full p-2 text-white border-4 border-white shadow-lg">
-                        <MaterialIcon name="verified" className="text-xs" fill />
+              <div className="flex justify-between items-center mb-10 px-2">
+                <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic">Latest Applicants</h2>
+                <Link href="/dashboard/parent/applicants" className="text-primary font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:underline underline-offset-8">
+                  View All
+                </Link>
+              </div>
+              
+              <div className="space-y-6">
+                {myApplicants.length > 0 ? (
+                  myApplicants.map((app: any) => (
+                    <div key={app.id} className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[2.5rem] bg-surface-container-low hover:shadow-xl transition-all group border border-transparent hover:border-outline-variant/10">
+                      <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0">
+                        <img 
+                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${app.nannyName}`} 
+                          className="w-12 h-12" 
+                          alt="Nanny"
+                        />
+                      </div>
+                      <div className="flex-grow space-y-1">
+                        <div className="flex items-center gap-3">
+                          <h4 className="font-headline text-2xl font-black text-primary tracking-tight leading-none">{app.nannyName}</h4>
+                          <span className="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-black uppercase tracking-widest rounded-lg">New</span>
+                        </div>
+                        <p className="text-on-surface-variant text-sm font-medium opacity-60">Applied for: <span className="text-primary font-black italic">{app.jobTitle}</span></p>
+                        <div className="flex items-center gap-4 pt-2">
+                          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                            <MaterialIcon name="payments" className="text-lg" />
+                            ${app.nannyRate}/hr
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                            <MaterialIcon name="location_on" className="text-lg" />
+                            {app.nannyLocation}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 w-full md:w-auto">
+                        <Link 
+                          href={`/nannies/${app.caregiverId}`}
+                          className="flex-1 md:flex-none px-8 py-4 bg-white text-primary rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:shadow-xl transition-all text-center"
+                        >
+                          View Profile
+                        </Link>
+                        <button className="flex-1 md:flex-none px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all">
+                          Message
+                        </button>
                       </div>
                     </div>
-                    <div className="flex-grow text-center md:text-left space-y-2 min-w-0">
-                      <h4 className="font-headline text-2xl font-black text-primary tracking-tight leading-none truncate">{applicant.name}</h4>
-                      <p className="text-on-surface-variant text-sm font-medium opacity-60 italic">Applied for: <span className="text-primary font-bold not-italic">{applicant.role}</span></p>
-                      <div className="flex flex-wrap justify-center md:justify-start gap-2 pt-2">
-                        <span className="text-[9px] font-black text-slate-500 border-2 border-outline-variant/30 px-3 py-1 rounded-xl uppercase tracking-widest">{applicant.experience}</span>
-                        {applicant.skills.map(skill => (
-                          <span key={skill} className="text-[9px] font-black text-slate-500 border-2 border-outline-variant/30 px-3 py-1 rounded-xl uppercase tracking-widest">{skill}</span>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-3 w-full md:w-auto">
-                      <button className="flex-1 md:flex-none px-6 py-4 text-primary border-2 border-outline-variant/30 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-white hover:shadow-lg transition-all">Profile</button>
-                      <button className="flex-1 md:flex-none px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all">Message</button>
-                    </div>
+                  ))
+                ) : (
+                  <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 italic">
+                    <MaterialIcon name="person_search" className="text-6xl mb-4" />
+                    <p className="font-headline font-bold text-xl">No applicants yet.</p>
+                    <p className="text-sm">Once caregivers apply to your jobs, they'll appear here.</p>
                   </div>
-                ))}
+                )}
+              </div>
+            </section>
+
+            {/* Active Jobs Section */}
+            <section className="bg-surface-container-lowest rounded-[3rem] p-10 shadow-sm border border-outline-variant/5">
+              <div className="flex justify-between items-center mb-10 px-2">
+                <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic">Active Jobs</h2>
+                <Link href="/dashboard/parent/jobs" className="text-primary font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:underline underline-offset-8">
+                  View All
+                </Link>
+              </div>
+              <div className="space-y-6">
+                {myJobs.length > 0 ? (
+                  myJobs.map((job: any) => (
+                    <div key={job.id} className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[2.5rem] bg-surface-container-low hover:shadow-xl transition-all group border border-transparent hover:border-outline-variant/10">
+                      <div className="flex-grow space-y-2">
+                        <div className="flex items-center gap-3">
+                          <span className="px-3 py-1 bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-lg">Active</span>
+                          <h4 className="font-headline text-2xl font-black text-primary tracking-tight leading-none">{job.title}</h4>
+                        </div>
+                        <p className="text-on-surface-variant text-sm font-medium opacity-60 italic line-clamp-2">{job.description}</p>
+                        <div className="flex items-center gap-4 pt-2">
+                          <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-widest">
+                            <MaterialIcon name="payments" className="text-lg" />
+                            {job.budget}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-widest">
+                            <MaterialIcon name="calendar_today" className="text-lg" />
+                            Posted {new Date(job.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 w-full md:w-auto">
+                        <button className="flex-1 md:flex-none px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all">
+                          Manage Job
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 italic">
+                    <MaterialIcon name="work_outline" className="text-6xl mb-4" />
+                    <p className="font-headline font-bold text-xl">No active jobs yet.</p>
+                    <Link href="/dashboard/parent/post-job" className="text-link font-black uppercase tracking-widest text-xs mt-4 underline underline-offset-8">Post your first job</Link>
+                  </div>
+                )}
               </div>
             </section>
           </div>
@@ -172,14 +258,14 @@ export default function FamilyDashboard() {
                   <MaterialIcon name="verified_user" className="text-on-tertiary-fixed text-4xl" fill />
                 </div>
                 <div>
-                  <h3 className="font-headline font-black text-2xl text-primary tracking-tight italic leading-none truncate">Verified Parent</h3>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40 mt-1">Trust Score: Excellent</p>
+                  <h3 className="font-headline font-black text-2xl text-primary tracking-tight italic leading-none truncate underline decoration-secondary-fixed decoration-2 underline-offset-8">Get Verified</h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40 mt-1">Boost trust with caregivers</p>
                 </div>
               </div>
-              <div className="space-y-4 relative z-0">
-                {["Identity Verified", "Background Check Cleared", "Home Safety Assessment"].map(item => (
-                  <div key={item} className="flex items-center gap-4 text-sm font-black text-slate-600 transition-all hover:translate-x-1">
-                    <MaterialIcon name="check_circle" className="text-emerald-500 text-lg" fill />
+              <div className="space-y-4 relative z-0 opacity-50">
+                {["Identity (Pending)", "Address (Pending)", "Payment (Linked)"].map(item => (
+                  <div key={item} className="flex items-center gap-4 text-sm font-black text-slate-600 transition-all">
+                    <MaterialIcon name="radio_button_unchecked" className="text-slate-300 text-lg" />
                     <span className="tracking-tight">{item}</span>
                   </div>
                 ))}
@@ -189,24 +275,16 @@ export default function FamilyDashboard() {
             {/* Upcoming Schedule */}
             <section className="bg-surface-container-lowest rounded-[3rem] p-10 shadow-sm border border-outline-variant/5">
               <h3 className="font-headline text-2xl font-black text-primary mb-10 tracking-tighter italic">Upcoming</h3>
-              <div className="space-y-10 px-2">
-                {SCHEDULE.map(entry => (
-                  <div key={entry.date} className="flex gap-6 group cursor-pointer">
-                    <div className="flex-shrink-0 w-14 text-center">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{entry.day}</p>
-                      <p className={cn("font-headline text-4xl font-black leading-none italic", entry.isToday ? "text-secondary" : "text-primary")}>{entry.date}</p>
-                    </div>
-                    <div className="flex-grow space-y-2">
-                      <p className="font-black text-primary text-lg tracking-tight leading-none group-hover:text-secondary transition-colors">{entry.title}</p>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40 flex items-center gap-2">
-                        <MaterialIcon name="schedule" className="text-base" />
-                        {entry.time}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="py-12 flex flex-col items-center justify-center text-center opacity-30 italic px-4">
+                <MaterialIcon name="event_busy" className="text-5xl mb-4" />
+                <p className="font-headline font-bold text-lg">No bookings yet.</p>
               </div>
-              <button className="w-full mt-12 py-5 bg-surface-container-low text-primary font-black uppercase tracking-widest text-[10px] rounded-2xl border-2 border-transparent hover:border-primary/5 transition-all active:scale-95">Full Calendar</button>
+              <Link 
+                href="/dashboard/parent/bookings"
+                className="block w-full mt-12 py-5 bg-surface-container-low text-primary font-black uppercase tracking-widest text-[10px] rounded-2xl border-2 border-transparent hover:border-primary/5 transition-all active:scale-95 text-center"
+              >
+                Full Calendar
+              </Link>
             </section>
 
             {/* Premium Upsell Banner */}
@@ -233,7 +311,6 @@ export default function FamilyDashboard() {
                   Go Premium Now
                 </Link>
               </div>
-              {/* Background Accent */}
               <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-secondary-fixed opacity-30 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
             </section>
 

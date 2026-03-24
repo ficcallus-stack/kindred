@@ -1,5 +1,4 @@
 import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 
@@ -231,8 +230,6 @@ export default function Profile() {
           </div>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 }

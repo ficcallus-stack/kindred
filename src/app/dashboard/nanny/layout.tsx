@@ -12,7 +12,7 @@ interface DashboardLayoutProps {
 const NAV_ITEMS = [
   { id: "home", label: "Dashboard Home", icon: "dashboard", href: "/dashboard/nanny" },
   { id: "profile", label: "Profile", icon: "person", href: "/dashboard/nanny/profile" },
-  { id: "messages", label: "Messages", icon: "mail", href: "/dashboard/nanny/messages" },
+  { id: "messages", label: "Messages", icon: "mail", href: "/dashboard/messages" },
   { id: "certifications", label: "Certifications", icon: "verified_user", href: "/dashboard/nanny/certifications" },
 ];
 

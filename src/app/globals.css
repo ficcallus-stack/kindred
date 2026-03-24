@@ -10,7 +10,7 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-body), 'Inter', sans-serif;
 }
 
 .material-symbols-outlined {
@@ -18,11 +18,15 @@ body {
   vertical-align: middle;
 }
 
-.asymmetric-clip {
+.asymmetric-radius {
   border-top-left-radius: 1.5rem;
   border-bottom-right-radius: 1.5rem;
   border-top-right-radius: 0.75rem;
   border-bottom-left-radius: 0.75rem;
+}
+
+.editorial-shadow {
+  box-shadow: 0 32px 48px -12px rgba(3, 31, 65, 0.05);
 }
 
 .glass-nav {

@@ -1,9 +1,150 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
+import { StripeProvider } from "@/components/StripeProvider";
+import { PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { enrollCertification } from "./actions";
+
+const PLANS = [
+  {
+    id: "registration",
+    icon: "how_to_reg",
+    title: "Registration Fee",
+    price: "$65",
+    priceRaw: 65,
+    description: "Required for all active caregivers. Covers essential background check and professional onboarding.",
+    featured: false,
+    buttonText: "Pay Fee Only",
+  },
+  {
+    id: "elite_bundle",
+    icon: "stars",
+    title: "Elite Bundle",
+    price: "$209",
+    priceRaw: 209,
+    originalPrice: "$240",
+    description: "Complete your professional profile. Includes Registration Fee ($65) and the Global Care Program ($175), saving you $31.",
+    featured: true,
+    buttonText: "Enroll in Elite Bundle",
+    features: [
+      "Background Check & Identity Verification",
+      "2-Week Global Standards Training",
+      "Professional 'Global Care' Badge",
+    ],
+  },
+  {
+    id: "standards_program",
+    icon: "school",
+    title: "Standards Program",
+    price: "$175",
+    priceRaw: 175,
+    description: "Standalone 2-week intensive certification. Does not include the mandatory registration/background check fee.",
+    featured: false,
+    buttonText: "Enroll in Program",
+  },
+];
+
+function CertPaymentForm({ clientSecret, onSuccess }: { clientSecret: string; onSuccess: () => void }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setProcessing(true);
+    setError(null);
+
+    const { error: submitError } = await elements.submit();
+    if (submitError) {
+      setError(submitError.message || "Error");
+      setProcessing(false);
+      return;
+    }
+
+    const { error: confirmError } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/dashboard/nanny/certifications?success=true`,
+      },
+      redirect: "if_required",
+    });
+
+    if (confirmError) {
+      setError(confirmError.message || "Payment failed");
+      setProcessing(false);
+      return;
+    }
+
+    onSuccess();
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement options={{ layout: "tabs" }} />
+      {error && (
+        <p className="text-red-600 text-sm font-medium flex items-center gap-2">
+          <MaterialIcon name="error" className="text-lg" fill /> {error}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={!stripe || processing}
+        className="w-full py-4 bg-primary text-white font-bold rounded-xl shadow-lg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
+      >
+        {processing ? "Processing..." : "Complete Payment"}
+      </button>
+    </form>
+  );
+}
 
 export default function CertificationsPage() {
+  const [isPending, startTransition] = useTransition();
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [paymentData, setPaymentData] = useState<{ clientSecret: string } | null>(null);
+  const [enrolledTypes, setEnrolledTypes] = useState<string[]>([]);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const success = searchParams.get("success");
+
+  const handleEnroll = (type: string) => {
+    setSelectedPlan(type);
+    startTransition(async () => {
+      try {
+        const result = await enrollCertification({ type: type as any });
+        setPaymentData({ clientSecret: result.clientSecret! });
+      } catch (err: any) {
+        alert(err.message || "Enrollment failed");
+        setSelectedPlan(null);
+      }
+    });
+  };
+
+  const handlePaymentSuccess = () => {
+    setEnrolledTypes((prev) => [...prev, selectedPlan!]);
+    setSelectedPlan(null);
+    setPaymentData(null);
+    router.refresh();
+  };
+
   return (
     <>
-      {/* Hero Section: Intentional Asymmetry */}
+      {/* Success Banner */}
+      {success && (
+        <div className="mb-8 bg-green-50 border border-green-200 rounded-2xl p-6 flex items-center gap-4">
+          <MaterialIcon name="check_circle" className="text-green-600 text-3xl" fill />
+          <div>
+            <h3 className="font-bold text-green-900">Enrollment Successful!</h3>
+            <p className="text-green-700 text-sm">Your certification has been activated. Welcome to the program!</p>
+          </div>
+        </div>
+      )}
+
+      {/* Hero Section */}
       <section className="relative mb-16">
         <div className="flex flex-col lg:flex-row gap-12 items-center">
           <div className="lg:w-3/5 z-10">
@@ -18,20 +159,9 @@ export default function CertificationsPage() {
             <p className="text-lg text-on-surface-variant leading-relaxed mb-8 max-w-2xl">
               Join our elite intensive program designed to refine your professional practice. Transition from a local caregiver to an internationally certified household management expert.
             </p>
-            <div className="flex flex-wrap gap-4">
-              <a
-                className="px-8 py-4 bg-gradient-to-br from-primary to-primary-container text-on-primary font-bold rounded-xl shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all active:scale-95 text-center"
-                href="#enrollment-options"
-              >
-                View Enrollment Options
-              </a>
-              <button className="px-8 py-4 bg-white text-primary font-bold rounded-xl border border-outline-variant/30 hover:bg-surface-container-low transition-all">
-                Download Syllabus
-              </button>
-            </div>
           </div>
           <div className="lg:w-2/5 relative">
-            <div className="relative w-full aspect-[4/5] asymmetric-clip overflow-hidden shadow-2xl z-0">
+            <div className="relative w-full aspect-[4/5] overflow-hidden shadow-2xl z-0 rounded-3xl">
               <img
                 alt="Professional caregiver smiling"
                 className="w-full h-full object-cover"
@@ -46,80 +176,109 @@ export default function CertificationsPage() {
         </div>
       </section>
 
-      {/* Enrollment Options: Pricing Paths */}
+      {/* Payment Modal */}
+      {selectedPlan && paymentData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="font-headline text-xl font-bold text-primary">
+                {PLANS.find((p) => p.id === selectedPlan)?.title}
+              </h3>
+              <button
+                onClick={() => {
+                  setSelectedPlan(null);
+                  setPaymentData(null);
+                }}
+                className="p-2 hover:bg-slate-100 rounded-lg"
+              >
+                <MaterialIcon name="close" />
+              </button>
+            </div>
+            <StripeProvider clientSecret={paymentData.clientSecret}>
+              <CertPaymentForm
+                clientSecret={paymentData.clientSecret}
+                onSuccess={handlePaymentSuccess}
+              />
+            </StripeProvider>
+          </div>
+        </div>
+      )}
+
+      {/* Enrollment Options */}
       <section className="mb-20" id="enrollment-options">
         <div className="flex flex-col items-center mb-10 text-center">
           <h2 className="font-headline text-3xl font-extrabold text-primary mb-2">Professional Pathways</h2>
           <p className="text-on-surface-variant">Choose the enrollment level that fits your career goals</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-sm border border-outline-variant/10 flex flex-col justify-between hover:border-outline transition-colors">
-            <div>
-              <div className="w-12 h-12 bg-surface-container rounded-xl flex items-center justify-center mb-6">
-                <MaterialIcon name="how_to_reg" className="text-primary" />
+          {PLANS.map((plan) => {
+            const isEnrolled = enrolledTypes.includes(plan.id);
+            return (
+              <div
+                key={plan.id}
+                className={
+                  plan.featured
+                    ? "bg-primary text-on-primary p-8 rounded-3xl shadow-xl flex flex-col justify-between relative overflow-hidden md:scale-105 z-10"
+                    : "bg-surface-container-lowest p-8 rounded-3xl shadow-sm border border-outline-variant/10 flex flex-col justify-between hover:border-outline transition-colors"
+                }
+              >
+                {plan.featured && (
+                  <div className="absolute top-4 right-4 bg-secondary text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">
+                    Best Value
+                  </div>
+                )}
+                <div>
+                  <div className={`w-12 h-12 ${plan.featured ? "bg-white/10" : "bg-surface-container"} rounded-xl flex items-center justify-center mb-6`}>
+                    <MaterialIcon name={plan.icon} className={plan.featured ? "text-white" : "text-primary"} fill={plan.featured} />
+                  </div>
+                  <h3 className={`font-headline text-xl font-bold mb-2 ${plan.featured ? "" : "text-primary"}`}>{plan.title}</h3>
+                  <div className="flex items-baseline gap-2 mb-4">
+                    <span className={`text-4xl font-extrabold font-headline ${plan.featured ? "" : "text-primary"}`}>{plan.price}</span>
+                    {plan.originalPrice && (
+                      <span className="text-on-primary/60 line-through text-sm font-bold">{plan.originalPrice}</span>
+                    )}
+                  </div>
+                  <p className={`${plan.featured ? "text-on-primary/80" : "text-on-surface-variant"} text-sm leading-relaxed mb-6`}>
+                    {plan.description}
+                  </p>
+                  {plan.features && (
+                    <ul className="space-y-3 mb-8">
+                      {plan.features.map((f) => (
+                        <li key={f} className="flex items-center gap-2 text-xs font-medium">
+                          <MaterialIcon name="check_circle" className="text-secondary text-sm" fill />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleEnroll(plan.id)}
+                  disabled={isPending || isEnrolled}
+                  className={
+                    isEnrolled
+                      ? "w-full py-4 bg-green-100 text-green-700 font-bold rounded-xl flex items-center justify-center gap-2"
+                      : plan.featured
+                      ? "w-full py-4 bg-white text-primary font-bold rounded-xl hover:bg-on-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      : "w-full py-4 bg-surface-container text-primary font-bold rounded-xl hover:bg-surface-container-high transition-all disabled:opacity-50"
+                  }
+                >
+                  {isEnrolled ? (
+                    <>
+                      <MaterialIcon name="check_circle" fill /> Enrolled
+                    </>
+                  ) : isPending && selectedPlan === plan.id ? (
+                    "Setting up..."
+                  ) : (
+                    <>
+                      {plan.buttonText}
+                      {plan.featured && <MaterialIcon name="arrow_forward" className="text-sm" />}
+                    </>
+                  )}
+                </button>
               </div>
-              <h3 className="font-headline text-xl font-bold text-primary mb-2">Registration Fee</h3>
-              <div className="text-4xl font-extrabold mb-4 text-primary font-headline">$65</div>
-              <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
-                Required for all active caregivers. Covers essential background check and professional onboarding.
-              </p>
-            </div>
-            <button className="w-full py-4 bg-surface-container text-primary font-bold rounded-xl hover:bg-surface-container-high transition-all">
-              Pay Fee Only
-            </button>
-          </div>
-
-          <div className="bg-primary text-on-primary p-8 rounded-3xl shadow-xl flex flex-col justify-between relative overflow-hidden md:scale-105 z-10">
-            <div className="absolute top-4 right-4 bg-secondary text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">
-              Best Value
-            </div>
-            <div>
-              <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mb-6">
-                <MaterialIcon name="stars" className="text-white" fill />
-              </div>
-              <h3 className="font-headline text-xl font-bold mb-2">Elite Bundle</h3>
-              <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-4xl font-extrabold font-headline">$209</span>
-                <span className="text-on-primary/60 line-through text-sm font-bold">$240</span>
-              </div>
-              <p className="text-on-primary/80 text-sm leading-relaxed mb-6">
-                Complete your professional profile. Includes Registration Fee ($65) and the Global Care Program ($175), saving you $31.
-              </p>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center gap-2 text-xs font-medium">
-                  <MaterialIcon name="check_circle" className="text-secondary text-sm" fill />
-                  Background Check & Identity Verification
-                </li>
-                <li className="flex items-center gap-2 text-xs font-medium">
-                  <MaterialIcon name="check_circle" className="text-secondary text-sm" fill />
-                  2-Week Global Standards Training
-                </li>
-                <li className="flex items-center gap-2 text-xs font-medium">
-                  <MaterialIcon name="check_circle" className="text-secondary text-sm" fill />
-                  Professional 'Global Care' Badge
-                </li>
-              </ul>
-            </div>
-            <button className="w-full py-4 bg-white text-primary font-bold rounded-xl hover:bg-on-primary/90 transition-all flex items-center justify-center gap-2">
-              Enroll in Elite Bundle <MaterialIcon name="arrow_forward" className="text-sm" />
-            </button>
-          </div>
-
-          <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-sm border border-outline-variant/10 flex flex-col justify-between hover:border-outline transition-colors">
-            <div>
-              <div className="w-12 h-12 bg-surface-container rounded-xl flex items-center justify-center mb-6">
-                <MaterialIcon name="school" className="text-primary" />
-              </div>
-              <h3 className="font-headline text-xl font-bold text-primary mb-2">Standards Program</h3>
-              <div className="text-4xl font-extrabold mb-4 text-primary font-headline">$175</div>
-              <p className="text-on-surface-variant text-sm leading-relaxed mb-6">
-                Standalone 2-week intensive certification. Does not include the mandatory registration/background check fee.
-              </p>
-            </div>
-            <button className="w-full py-4 bg-surface-container text-primary font-bold rounded-xl hover:bg-surface-container-high transition-all">
-              Enroll in Program
-            </button>
-          </div>
+            );
+          })}
         </div>
       </section>
 
@@ -139,36 +298,9 @@ export default function CertificationsPage() {
         <div className="bg-surface-container-low p-8 rounded-3xl">
           <MaterialIcon name="visibility" className="text-secondary text-4xl mb-4" />
           <h4 className="font-headline text-xl font-bold text-primary mb-2">Visibility</h4>
-          <p className="text-on-surface-variant text-sm">Priority placement in search results for families filtering by 'Expert'.</p>
+          <p className="text-on-surface-variant text-sm">Priority placement in search results for families filtering by &apos;Expert&apos;.</p>
         </div>
       </div>
-
-      {/* Curriculum */}
-      <section className="mb-20">
-        <div className="flex flex-col items-center mb-12 text-center">
-          <h2 className="font-headline text-3xl font-extrabold text-primary mb-4">The 2-Week Journey</h2>
-          <div className="w-20 h-1 bg-secondary rounded-full"></div>
-        </div>
-        <div className="max-w-4xl mx-auto space-y-4">
-          <div className="bg-surface-container-lowest p-8 rounded-3xl shadow-sm border-l-8 border-primary flex gap-8 items-start">
-            <div className="hidden sm:flex flex-col items-center">
-              <span className="text-xs font-bold uppercase text-primary">Week</span>
-              <span className="text-4xl font-black text-primary">01</span>
-            </div>
-            <div className="flex-grow">
-              <h3 className="font-headline text-xl font-bold text-primary mb-3">Advanced Development</h3>
-              <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {["Pediatric First Aid", "Cognitive Milestones", "Nutritional Planning", "Conflict Resolution"].map(item => (
-                  <li key={item} className="flex items-center gap-2 text-on-surface-variant text-sm">
-                    <MaterialIcon name="check_circle" className="text-secondary text-lg" fill />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
     </>
   );
 }

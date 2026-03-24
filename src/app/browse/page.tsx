@@ -1,47 +1,37 @@
-"use client";
-
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { db } from "@/db";
+import { users, nannyProfiles } from "@/db/schema";
+import { eq, and, sql, gte, lte } from "drizzle-orm";
 
-const NANNIES = [
-  {
-    id: 1,
-    name: "Elena M.",
-    location: "Upper East Side, NY",
-    experience: "9+ Years Exp.",
-    rate: "$35",
-    isVerified: true,
-    hasGlobalCare: true,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuCnn5OjVFtxEzI92RtSXeIlkZ9AwShhGOJRaq4UgsrL5S_ttoECu6QBFG5sAnVFjoNU1Wo0gyNEzXepGtB0RCkzSOZpIOT9doQo5GUYQZsqpLNh20Iqw7rAlMXR123HxhimptVygyk26RiVMgFDKPxk81CV3FrarwuCpU5HK0FnmNDxjmXHTns1VDdBLuW_FvwoDW7ZPxmBsnSBe2c-wOc1zUG0VaMUqz_ZZsLSECNxRJjoo2vraRzjtxX8YIG0-XOi9tmNygQUt6Q",
-    rotate: "-rotate-3"
-  },
-  {
-    id: 2,
-    name: "Sarah K.",
-    location: "Williamsburg, BK",
-    experience: "5 Years Exp.",
-    rate: "$28",
-    isVerified: true,
-    hasGlobalCare: true,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuBfBRCA05RMMOdJihIaf3UTskbnO6Qwl8WsahiVSv-NfaM9U6HmdVZkD2Qj4loXnZWjnpYQrSPhrMCQ01TJh1uXLOjxuqFptOhy8qyjTDQUtKAK-HuK4uPXzYONndi2nJ1-0aZUdeEVwILiflsOjqKHdzVw0j5M4Odkx3JfQoJkLCNHysxgMYvIfHaZyuSvg4SjZ_zW2sde5JG0RsEracR2hdFjpddUZZH43ahpI-0dJK9PtWD_DzcW1JyryWrpYAUVImaTm-d84Tk",
-    rotate: "rotate-3"
-  },
-  {
-    id: 3,
-    name: "Jordan L.",
-    location: "Hoboken, NJ",
-    experience: "12+ Years Exp.",
-    rate: "$42",
-    isVerified: true,
-    hasGlobalCare: false,
-    image: "https://lh3.googleusercontent.com/aida-public/AB6AXuA3IZHR9hJVvJLx0BTsdz5Hq5I075x6sn2NhQgZ4VXuAlz0S5yZ2ioiasyhnRr23mAPFMbtEUsJ50XfcefK8cwBzg5tTvUkNwh5nkLyEn6ZmB-p2UdwUIJqT5rCLzZRy40it68hpJrSY90F0svdkt_63b_FTEvk3Uo_79pT21YjhTd72Ee42zhThfmT1j8ace0tZJv3LnO9KLJXMXJK1WfNpA-lI1gP2uazzPKyEoI61J9U1GYuccr4KZNWIODY4l0TvbuPvz_eO4s",
-    rotate: "-rotate-2"
-  }
-];
+export default async function BrowseNannies({ searchParams }: { searchParams: Promise<{ location?: string, rate?: string }> }) {
+  const params = await searchParams;
+  const locationFilter = params.location || "";
+  const maxRateFilter = params.rate ? parseInt(params.rate) : 100;
 
-export default function BrowseNannies() {
+  // Fetch nannies with profiles
+  const nannies = await db.select({
+    id: users.id,
+    name: users.fullName,
+    email: users.email,
+    location: nannyProfiles.location,
+    experienceYears: nannyProfiles.experienceYears,
+    hourlyRate: nannyProfiles.hourlyRate,
+    isVerified: nannyProfiles.isVerified,
+    bio: nannyProfiles.bio,
+  })
+  .from(users)
+  .innerJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
+  .where(
+    and(
+      eq(users.role, "caregiver"),
+      locationFilter ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationFilter + '%'})` : undefined,
+      params.rate ? lte(nannyProfiles.hourlyRate, sql`${maxRateFilter}`) : undefined
+    )
+  );
+
   return (
     <div className="bg-surface min-h-screen">
       <Navbar />
@@ -55,14 +45,37 @@ export default function BrowseNannies() {
           </div>
           
           <div className="space-y-10">
+            {/* Location (Simple Text for now) */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
+                <MaterialIcon name="location_on" className="text-secondary" />
+                <span>Location</span>
+              </div>
+              <form action="/browse" method="get">
+                <input 
+                  name="location"
+                  defaultValue={locationFilter}
+                  placeholder="Enter city..."
+                  className="w-full bg-white border-2 border-transparent rounded-[1.5rem] shadow-sm py-4 px-6 text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 outline-none" 
+                />
+              </form>
+            </div>
+
             {/* Rate Range */}
             <div className="space-y-4">
               <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
                 <MaterialIcon name="payments" className="text-secondary" />
-                <span>Rate Range</span>
+                <span>Max Rate (${maxRateFilter}/hr)</span>
               </div>
               <div className="px-2">
-                <input className="w-full accent-primary h-2 rounded-full" max="100" min="15" type="range" defaultValue="45"/>
+                <Link href={`/browse?rate=${maxRateFilter}`} scroll={false}>
+                  <input 
+                    className="w-full accent-primary h-2 rounded-full cursor-pointer" 
+                    max="100" min="15" step="5" type="range" 
+                    value={maxRateFilter}
+                    onChange={() => {}} // Controlled by URL in Next.js usually, but let's keep it simple for now
+                  />
+                </Link>
                 <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 uppercase tracking-wider">
                   <span>$15/hr</span>
                   <span>$100/hr</span>
@@ -82,7 +95,7 @@ export default function BrowseNannies() {
                     key={years} 
                     className={cn(
                       "rounded-2xl p-3 text-xs font-black transition-all",
-                      i === 0 ? "bg-white text-primary shadow-sm" : "bg-transparent text-on-surface-variant/40 hover:bg-white/50"
+                      i === 2 ? "bg-white text-primary shadow-sm" : "bg-transparent text-on-surface-variant/40 hover:bg-white/50"
                     )}
                   >
                     {years}
@@ -90,42 +103,11 @@ export default function BrowseNannies() {
                 ))}
               </div>
             </div>
-
-            {/* Distance */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-                <MaterialIcon name="near_me" className="text-secondary text-base" />
-                <span>Distance</span>
-              </div>
-              <select className="w-full bg-white border-2 border-transparent rounded-[1.5rem] shadow-sm py-4 px-6 text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 appearance-none outline-none">
-                <option>Within 5 miles</option>
-                <option>Within 10 miles</option>
-                <option>Within 25 miles</option>
-              </select>
-            </div>
-
-            {/* Special Skills */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-                <MaterialIcon name="psychology" className="text-primary" />
-                <span>Special Skills</span>
-              </div>
-              <div className="space-y-3 px-1">
-                {["CPR Certified", "Montessori Trained", "Special Needs Exp.", "Twin Experience"].map((skill, i) => (
-                  <label key={skill} className="flex items-center gap-4 cursor-pointer group">
-                    <div className={cn("w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all", i === 1 ? "bg-primary border-primary" : "border-slate-200 group-hover:border-primary")}>
-                      {i === 1 && <MaterialIcon name="check" className="text-white text-sm" />}
-                    </div>
-                    <span className="text-sm font-bold text-slate-600 group-hover:text-primary transition-colors">{skill}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
           </div>
 
-          <button className="mt-auto py-6 text-primary font-black uppercase tracking-widest text-[10px] hover:underline underline-offset-8 text-center opacity-60 hover:opacity-100 transition-all">
+          <Link href="/browse" className="mt-auto py-6 text-primary font-black uppercase tracking-widest text-[10px] hover:underline underline-offset-8 text-center opacity-60 hover:opacity-100 transition-all">
             Reset All Filters
-          </button>
+          </Link>
         </aside>
 
         {/* Main Content Area */}
@@ -147,21 +129,23 @@ export default function BrowseNannies() {
 
           {/* Nanny Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
-            {NANNIES.map((nanny) => (
+            {nannies.length > 0 ? nannies.map((nanny, i) => (
               <div key={nanny.id} className="group bg-surface-container-lowest p-8 rounded-[3rem] shadow-[0_4px_32px_rgba(3,31,65,0.04)] hover:shadow-[0_40px_80px_-15px_rgba(3,31,65,0.1)] transition-all flex flex-col items-center text-center relative overflow-hidden border border-outline-variant/5">
                 
                 {/* Identity Verified Badge */}
-                <div className="absolute top-8 left-8 z-20">
-                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-sm border border-emerald-50 scale-90 group-hover:scale-100 transition-transform">
-                    <MaterialIcon name="check_circle" className="text-emerald-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }} />
-                    <span className="text-emerald-900 text-[10px] font-black uppercase tracking-widest">Verified</span>
+                {nanny.isVerified && (
+                  <div className="absolute top-8 left-8 z-20">
+                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-sm border border-emerald-50 scale-90 group-hover:scale-100 transition-transform">
+                      <MaterialIcon name="check_circle" className="text-emerald-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }} />
+                      <span className="text-emerald-900 text-[10px] font-black uppercase tracking-widest">Verified</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="w-full aspect-[4/4.5] mb-8 relative">
-                  <div className={cn("absolute inset-0 bg-secondary-fixed/5 rounded-[3rem] scale-105 transition-transform group-hover:rotate-0", nanny.rotate)}></div>
+                  <div className={cn("absolute inset-0 bg-secondary-fixed/5 rounded-[3rem] scale-105 transition-transform group-hover:rotate-0", i % 2 === 0 ? "-rotate-3" : "rotate-3")}></div>
                   <img 
-                    src={nanny.image} 
+                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${nanny.name}`} 
                     alt={nanny.name} 
                     className="w-full h-full object-cover rounded-[3rem] shadow-xl relative z-10 transition-transform duration-700 group-hover:scale-[1.02] group-hover:-rotate-1" 
                   />
@@ -172,24 +156,18 @@ export default function BrowseNannies() {
                     <h3 className="text-3xl font-black text-primary font-headline tracking-tighter leading-none mb-2">{nanny.name}</h3>
                     <p className="text-on-surface-variant text-sm font-black uppercase tracking-widest opacity-40 flex items-center justify-center gap-2">
                       <MaterialIcon name="location_on" className="text-secondary text-base" />
-                      {nanny.location}
+                      {nanny.location || "Location pending"}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap justify-center gap-2">
                     <span className="bg-surface-container-low text-on-surface-variant text-[10px] font-black px-4 py-1.5 rounded-xl border border-outline-variant/15 uppercase tracking-widest">
-                      {nanny.experience}
+                      {nanny.experienceYears}+ Years Exp.
                     </span>
-                    {nanny.hasGlobalCare && (
-                      <div className="flex items-center gap-2 bg-primary text-on-primary text-[10px] font-black px-4 py-1.5 rounded-xl uppercase tracking-widest">
-                        <MaterialIcon name="public" className="text-sm" />
-                        <span>Global Care</span>
-                      </div>
-                    )}
                   </div>
 
                   <div className="pt-4 flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-black text-primary tracking-tighter italic">{nanny.rate}</span>
+                    <span className="text-4xl font-black text-primary tracking-tighter italic">${nanny.hourlyRate}</span>
                     <span className="text-slate-400 font-black text-[10px] uppercase tracking-widest">/hr</span>
                   </div>
 
@@ -201,7 +179,13 @@ export default function BrowseNannies() {
                   </Link>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="col-span-full py-40 flex flex-col items-center justify-center text-center opacity-30 italic">
+                <MaterialIcon name="search_off" className="text-8xl mb-6" />
+                <h3 className="text-3xl font-black font-headline text-primary">No Caregivers Found</h3>
+                <p className="text-xl">Try adjusting your filters or search keywords.</p>
+              </div>
+            )}
           </div>
 
           {/* CTA Banner */}
@@ -215,10 +199,6 @@ export default function BrowseNannies() {
                 <p className="text-on-primary-container text-xl leading-relaxed font-medium opacity-80 italic">
                   Let the right care come to you. Post a custom job listing and allow our top-tier nannies to apply directly.
                 </p>
-                <div className="flex items-center gap-3 text-secondary-fixed-dim font-black text-[10px] uppercase tracking-[0.2em] pt-4">
-                  <MaterialIcon name="info" className="text-xl" fill />
-                  <span>85% of parents find a match within 48 hours.</span>
-                </div>
               </div>
               <div className="flex flex-col gap-6 min-w-[280px]">
                 <Link 

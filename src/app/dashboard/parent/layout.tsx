@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { id: "search", label: "Search", icon: "search", href: "/browse" },
   { id: "my-nannies", label: "My Nannies", icon: "diversity_1", href: "/dashboard/parent/nannies" },
   { id: "messages", label: "Messages", icon: "chat_bubble", href: "/dashboard/parent/messages" },
+  { id: "bookings", label: "Bookings", icon: "calendar_today", href: "/dashboard/parent/bookings" },
   { id: "jobs", label: "Job Postings", icon: "work_history", href: "/dashboard/parent/jobs" },
   { id: "verification", label: "Verification", icon: "verified_user", href: "/dashboard/parent/verification" },
   { id: "account", label: "Account", icon: "settings_account_box", href: "/dashboard/parent" },

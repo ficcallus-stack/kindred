@@ -1,0 +1,53 @@
+"use server";
+
+import { currentUser } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { children } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+import { createChildSchema, updateChildSchema, type CreateChildInput } from "@/lib/validations";
+import { rateLimit } from "@/lib/rate-limit";
+
+export async function getChildren() {
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Unauthorized");
+
+  return db.query.children.findMany({
+    where: eq(children.parentId, clerkUser.id),
+  });
+}
+
+export async function addChild(data: CreateChildInput) {
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Unauthorized");
+
+  const { success } = rateLimit(`addChild:${clerkUser.id}`, { limit: 10, windowSeconds: 60 });
+  if (!success) throw new Error("Too many requests");
+
+  const parsed = createChildSchema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
+  }
+
+  await db.insert(children).values({
+    parentId: clerkUser.id,
+    name: parsed.data.name,
+    age: parsed.data.age,
+    type: parsed.data.type,
+    specialNeeds: JSON.stringify(parsed.data.specialNeeds),
+  });
+
+  revalidatePath("/dashboard/parent");
+}
+
+export async function removeChild(childId: string) {
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Unauthorized");
+
+  // Only delete own children
+  await db.delete(children).where(
+    and(eq(children.id, childId), eq(children.parentId, clerkUser.id))
+  );
+
+  revalidatePath("/dashboard/parent");
+}

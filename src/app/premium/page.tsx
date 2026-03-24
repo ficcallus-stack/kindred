@@ -186,22 +186,6 @@ export default function PremiumPage() {
           </div>
         </section>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-slate-50 w-full py-20 px-8 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-12">
-          <div className="font-black text-2xl text-blue-900 font-headline italic tracking-tighter">KindredCare US</div>
-          <div className="flex flex-wrap justify-center gap-10 font-headline text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-            <Link className="hover:text-primary transition-colors" href="#">Privacy Policy</Link>
-            <Link className="hover:text-primary transition-colors" href="#">Terms of Service</Link>
-            <Link className="hover:text-primary transition-colors" href="#">Safety Center</Link>
-            <Link className="hover:text-primary transition-colors" href="#">Contact Us</Link>
-          </div>
-          <div className="font-headline text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">
-            © 2024 KindredCare US. All rights reserved.
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

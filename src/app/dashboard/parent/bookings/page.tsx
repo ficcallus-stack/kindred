@@ -1,113 +1,234 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
-import BookingStep1 from "@/components/bookings/BookingStep1";
+import { StripeProvider } from "@/components/StripeProvider";
 import BookingStep2 from "@/components/bookings/BookingStep2";
 import BookingStep3 from "@/components/bookings/BookingStep3";
 
 export default function BookingsPage() {
   const [step, setStep] = useState(1);
+  const [isCreating, setIsCreating] = useState(false);
+  const [bookingResult, setBookingResult] = useState<{
+    bookingId: string;
+    clientSecret: string;
+  } | null>(null);
+  const [bookingDetails, setBookingDetails] = useState({
+    nannyName: "",
+    schedule: "Mon - Fri, 8am - 4pm",
+    hoursPerDay: 8,
+    hourlyRate: 25,
+    totalDays: 5,
+    caregiverId: "",
+  });
+  const [existingBookings, setExistingBookings] = useState<any[]>([]);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
+  // Load existing bookings
+  useEffect(() => {
+    fetch("/api/bookings")
+      .then((r) => r.json())
+      .then((data) => setExistingBookings(data))
+      .catch(() => {});
+  }, []);
+
+  // If coming from accepted applicant
+  useEffect(() => {
+    const caregiverId = searchParams.get("caregiverId");
+    if (caregiverId) {
+      setBookingDetails((prev) => ({ ...prev, caregiverId }));
+      // Fetch nanny name
+      fetch(`/api/nannies/${caregiverId}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.fullName) {
+            setBookingDetails((prev) => ({
+              ...prev,
+              nannyName: data.fullName,
+              hourlyRate: data.hourlyRate ? parseFloat(data.hourlyRate) : 25,
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [searchParams]);
+
+  const handleCreateBooking = async () => {
+    setIsCreating(true);
+    try {
+      const totalAmount = bookingDetails.hoursPerDay * bookingDetails.totalDays * bookingDetails.hourlyRate;
+
+      const res = await fetch("/api/bookings/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          caregiverId: bookingDetails.caregiverId,
+          startDate: new Date().toISOString(),
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+          hoursPerDay: bookingDetails.hoursPerDay,
+          totalAmount,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.bookingId && data.clientSecret) {
+        setBookingResult(data);
+        setStep(2);
+      }
+    } catch (err) {
+      console.error("Failed to create booking:", err);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const goToDashboard = () => router.push("/dashboard/parent");
   const nextStep = () => setStep((s) => Math.min(s + 1, 3));
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
-  const goToDashboard = () => router.push("/dashboard/parent");
+
+  const totalAmount =
+    bookingDetails.hoursPerDay * bookingDetails.totalDays * bookingDetails.hourlyRate * 100;
 
   return (
-    <div className={cn("bg-surface font-body text-on-surface min-h-screen", step === 3 ? "bg-[radial-gradient(circle_at_20%_30%,#ffdfc4_0%,transparent_40%),radial-gradient(circle_at_80%_70%,#d5e3ff_0%,transparent_40%)]" : "")}>
-      {/* Top Navigation Bar */}
-      <header className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm border-b border-outline-variant/10">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div
-            className="text-2xl font-bold tracking-tight text-primary font-headline cursor-pointer italic"
-            onClick={goToDashboard}
-          >
-            KindredCare US
-          </div>
-          <nav className="hidden md:flex items-center space-x-8">
-            <button onClick={goToDashboard} className="text-slate-600 font-medium hover:text-primary transition-colors font-headline">Find a Nanny</button>
-            <button className="text-slate-600 font-medium hover:text-primary transition-colors font-headline">How it Works</button>
-            <button className="text-slate-600 font-medium hover:text-primary transition-colors font-headline">Safety</button>
-            <button className="text-slate-600 font-medium hover:text-primary transition-colors font-headline">Pricing</button>
-          </nav>
-          <div className="flex items-center space-x-6">
-            <button className="text-primary font-medium hover:text-secondary transition-colors">Messages</button>
-            <button className="text-primary font-bold border-b-2 border-primary pb-1">My Bookings</button>
-            <div className="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden border border-outline-variant/20">
-              <img
-                alt="Parent Profile"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIIYapeORFBnEnCjm8cORKG4azkrByov8vaJutGwL5_9-8QBXhg0rHD-MFahYTckZfRweIICfKbjj94ITa_ahbg1FHWLXRXh585n1cdUbX4DbXr3FxT1SzjLaDxqi8BAjub1vm6yCKOq6E_eLc3cCIwBCGbn85H4ZBlzpqB0E8tjBTfqCDECfa_Py7dMpF3OzR-OGWPDi03LvqIqUSeFqIptyqcKU0WjHtmc-JLo3j_2VOqt9BrogHtGKx5_MiSi0WtHGOWFC3j-A"
-              />
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <main className={cn("pt-32 pb-24 px-6 max-w-7xl mx-auto relative", step === 3 ? "overflow-hidden" : "")}>
-        {step < 3 && (
-          <div className="mb-12">
-            {/* Breadcrumb / Progress for Step 2 */}
-            {step === 2 && (
-              <div className="flex items-center space-x-2 mb-8 text-on-surface-variant font-bold uppercase tracking-widest text-[10px]">
-                <span className="cursor-pointer hover:text-primary" onClick={() => setStep(1)}>Select Care</span>
-                <MaterialIcon name="chevron_right" className="text-sm" />
-                <span className="text-primary">Secure Payment</span>
-              </div>
-            )}
-            
-            <div className="mb-12">
+    <div className={cn(
+      "bg-surface font-body text-on-surface min-h-screen",
+      step === 3
+        ? "bg-[radial-gradient(circle_at_20%_30%,#ffdfc4_0%,transparent_40%),radial-gradient(circle_at_80%_70%,#d5e3ff_0%,transparent_40%)]"
+        : ""
+    )}>
+      <main className={cn("pt-8 pb-24 px-6 max-w-7xl mx-auto relative", step === 3 ? "overflow-hidden" : "")}>
+        {step === 1 && (
+          <div className="space-y-10">
+            <header>
               <span className="text-secondary font-bold tracking-[0.2em] uppercase text-xs font-label">
-                {step === 1 ? "New Booking Request" : "Step 2 of 2"}
+                Bookings
               </span>
               <h1 className="text-4xl md:text-5xl font-extrabold text-primary font-headline mt-2 mb-4 leading-tight tracking-tight">
-                {step === 1 ? "Review Invitation from Sarah" : "Complete Payment"}
+                {bookingDetails.caregiverId ? `Book ${bookingDetails.nannyName || "Caregiver"}` : "My Bookings"}
               </h1>
-              <p className="text-on-surface-variant text-lg max-w-2xl leading-relaxed">
-                {step === 1 
-                  ? "A KindredCare caregiver has sent you a proposed schedule for your upcoming childcare needs."
-                  : "Your booking with Sarah is almost confirmed. All transactions are encrypted and secure."
-                }
-              </p>
+            </header>
+
+            {/* New Booking Form (if caregiverId provided) */}
+            {bookingDetails.caregiverId && (
+              <div className="bg-white rounded-3xl p-8 shadow-sm border border-outline-variant/10 max-w-2xl space-y-6">
+                <h2 className="font-headline text-xl font-bold text-primary">Create New Booking</h2>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-primary mb-2">Hours per Day</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={bookingDetails.hoursPerDay}
+                      onChange={(e) => setBookingDetails((p) => ({ ...p, hoursPerDay: parseInt(e.target.value) || 8 }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/40 focus:border-primary/40 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-primary mb-2">Total Days</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={30}
+                      value={bookingDetails.totalDays}
+                      onChange={(e) => setBookingDetails((p) => ({ ...p, totalDays: parseInt(e.target.value) || 5 }))}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/40 focus:border-primary/40 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-2xl p-6 space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Rate</span>
+                    <span className="font-bold text-primary">${bookingDetails.hourlyRate}/hr</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Duration</span>
+                    <span className="font-bold text-primary">{bookingDetails.hoursPerDay}hrs × {bookingDetails.totalDays} days</span>
+                  </div>
+                  <div className="pt-3 border-t flex justify-between">
+                    <span className="font-bold text-primary text-lg">Total</span>
+                    <span className="font-black text-2xl text-primary">
+                      ${(bookingDetails.hoursPerDay * bookingDetails.totalDays * bookingDetails.hourlyRate).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCreateBooking}
+                  disabled={isCreating}
+                  className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                >
+                  <MaterialIcon name="payments" />
+                  {isCreating ? "Setting up payment..." : "Proceed to Payment"}
+                </button>
+              </div>
+            )}
+
+            {/* Existing Bookings List */}
+            <div className="space-y-4">
+              <h2 className="font-headline text-xl font-bold text-primary">
+                {existingBookings.length > 0 ? "Active Bookings" : ""}
+              </h2>
+              {existingBookings.map((booking: any) => (
+                <div key={booking.id} className="bg-white rounded-2xl p-6 shadow-sm border border-outline-variant/10 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <span className="font-black text-lg text-primary">
+                        {booking.caregiver?.fullName?.charAt(0) || "?"}
+                      </span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-primary">{booking.caregiver?.fullName || "Caregiver"}</h4>
+                      <p className="text-xs text-slate-500">
+                        ${(booking.totalAmount / 100).toFixed(2)} · {booking.hoursPerDay}hrs/day
+                      </p>
+                    </div>
+                  </div>
+                  <span className={cn(
+                    "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
+                    booking.status === "confirmed" ? "bg-green-100 text-green-700"
+                    : booking.status === "pending" ? "bg-yellow-100 text-yellow-700"
+                    : booking.status === "completed" ? "bg-blue-100 text-blue-700"
+                    : "bg-red-50 text-red-500"
+                  )}>
+                    {booking.status}
+                  </span>
+                </div>
+              ))}
+              {existingBookings.length === 0 && !bookingDetails.caregiverId && (
+                <div className="py-20 flex flex-col items-center justify-center text-center opacity-30">
+                  <MaterialIcon name="event_note" className="text-6xl mb-4" />
+                  <p className="font-headline font-bold text-xl text-primary">No bookings yet</p>
+                  <p className="text-sm italic mt-2">Accept an applicant to start a booking.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Step Rendering */}
-        {step === 1 && <BookingStep1 onNext={nextStep} onDecline={goToDashboard} />}
-        {step === 2 && <BookingStep2 onNext={nextStep} onBack={prevStep} />}
+        {step === 2 && bookingResult && (
+          <StripeProvider clientSecret={bookingResult.clientSecret}>
+            <BookingStep2
+              onNext={nextStep}
+              onBack={prevStep}
+              clientSecret={bookingResult.clientSecret}
+              amount={totalAmount}
+              nannyName={bookingDetails.nannyName}
+              schedule={bookingDetails.schedule}
+              hoursPerDay={bookingDetails.hoursPerDay}
+              hourlyRate={bookingDetails.hourlyRate}
+              bookingId={bookingResult.bookingId}
+            />
+          </StripeProvider>
+        )}
+
         {step === 3 && <BookingStep3 onDone={goToDashboard} />}
       </main>
-
-      {/* Background Editorial Elements for Step 3 */}
-      {step === 3 && (
-        <>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-secondary-fixed opacity-10 rounded-full blur-[100px] pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-primary-fixed opacity-10 rounded-full blur-[100px] pointer-events-none"></div>
-        </>
-      )}
-
-      {/* Mobile Nav Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-6 pt-3 bg-white/90 backdrop-blur-xl border-t border-outline-variant/10 shadow-[0_-4px_24px_rgba(3,31,65,0.06)] z-50 rounded-t-3xl">
-        <button className="flex flex-col items-center justify-center text-slate-500 px-5 py-2">
-          <MaterialIcon name="search" />
-          <span className="text-[10px] font-bold tracking-wide uppercase mt-1">Search</span>
-        </button>
-        <button className="flex flex-col items-center justify-center text-primary bg-primary-fixed/30 rounded-2xl px-5 py-2">
-          <MaterialIcon name="calendar_today" fill />
-          <span className="text-[10px] font-bold tracking-wide uppercase mt-1">Bookings</span>
-        </button>
-        <button className="flex flex-col items-center justify-center text-slate-500 px-5 py-2">
-          <MaterialIcon name="payments" />
-          <span className="text-[10px] font-bold tracking-wide uppercase mt-1">Payments</span>
-        </button>
-        <button className="flex flex-col items-center justify-center text-slate-500 px-5 py-2">
-          <MaterialIcon name="person" />
-          <span className="text-[10px] font-bold tracking-wide uppercase mt-1">Profile</span>
-        </button>
-      </nav>
     </div>
   );
 }
