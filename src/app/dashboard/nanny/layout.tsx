@@ -11,9 +11,11 @@ interface DashboardLayoutProps {
 
 const NAV_ITEMS = [
   { id: "home", label: "Dashboard Home", icon: "dashboard", href: "/dashboard/nanny" },
+  { id: "wallet", label: "Wallet", icon: "account_balance_wallet", href: "/dashboard/nanny/wallet" },
   { id: "profile", label: "Profile", icon: "person", href: "/dashboard/nanny/profile" },
   { id: "messages", label: "Messages", icon: "mail", href: "/dashboard/messages" },
-  { id: "certifications", label: "Certifications", icon: "verified_user", href: "/dashboard/nanny/certifications" },
+  { id: "verification", label: "Verification", icon: "verified_user", href: "/dashboard/nanny/verification" },
+  { id: "certifications", label: "Certifications", icon: "workspace_premium", href: "/dashboard/nanny/certifications" },
 ];
 
 export default function NannyDashboardLayout({ children }: DashboardLayoutProps) {

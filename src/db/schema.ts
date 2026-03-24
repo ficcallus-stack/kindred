@@ -9,6 +9,9 @@ export const bookingStatusEnum = pgEnum("booking_status", ["pending", "confirmed
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "authorized", "captured", "refunded", "failed"]);
 export const certificationTypeEnum = pgEnum("certification_type", ["registration", "elite_bundle", "standards_program"]);
 export const certificationStatusEnum = pgEnum("certification_status", ["pending_payment", "enrolled", "in_progress", "completed", "expired"]);
+export const verificationStatusEnum = pgEnum("verification_status", ["none", "draft", "pending", "verified", "rejected"]);
+export const walletTransactionTypeEnum = pgEnum("wallet_transaction_type", ["earning", "withdrawal"]);
+export const walletTransactionStatusEnum = pgEnum("wallet_transaction_status", ["pending", "completed", "failed"]);
 
 // ── Users ──────────────────────────────────────────────────
 export const users = pgTable("users", {
@@ -28,6 +31,7 @@ export const nannyProfiles = pgTable("nanny_profiles", {
   hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).default("0"),
   location: text("location"),
   isVerified: boolean("is_verified").default(false).notNull(),
+  stripeConnectId: text("stripe_connect_id"),
 });
 
 // ── Children ───────────────────────────────────────────────
@@ -150,6 +154,47 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Wallets ────────────────────────────────────────────────
+export const wallets = pgTable("wallets", {
+  id: text("id").primaryKey().references(() => users.id),
+  balance: integer("balance").default(0).notNull(), // in cents
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  walletId: text("wallet_id").notNull().references(() => wallets.id),
+  amount: integer("amount").notNull(), // in cents
+  type: walletTransactionTypeEnum("type").notNull(),
+  status: walletTransactionStatusEnum("status").default("pending").notNull(),
+  description: text("description"),
+  stripeTransferId: text("stripe_transfer_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Caregiver Verifications ────────────────────────────────
+export const caregiverVerifications = pgTable("caregiver_verifications", {
+  id: text("id").primaryKey().references(() => users.id),
+  currentStep: integer("current_step").default(1).notNull(),
+  
+  // Step 1: Identity
+  idFrontUrl: text("id_front_url"),
+  idBackUrl: text("id_back_url"),
+  
+  // Step 2: Background Auth
+  backgroundAuth: boolean("background_auth").default(false).notNull(),
+  backgroundAuthTimestamp: timestamp("background_auth_timestamp"),
+  
+  // Step 3: References (JSONB equivalent or structured text)
+  references: text("references"), // Stored as JSON string for flexibility
+  
+  status: verificationStatusEnum("status").default("none").notNull(),
+  adminNotes: text("admin_notes"),
+  
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ── Relations ──────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many, one }) => ({
   nannyProfile: one(nannyProfiles, { fields: [users.id], references: [nannyProfiles.id] }),
@@ -165,10 +210,16 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   notifications: many(notifications),
   conversationMemberships: many(conversationMembers),
   payments: many(payments),
+  verification: one(caregiverVerifications),
+  wallet: one(wallets),
 }));
 
 export const nannyProfilesRelations = relations(nannyProfiles, ({ one }) => ({
   user: one(users, { fields: [nannyProfiles.id], references: [users.id] }),
+}));
+
+export const caregiverVerificationsRelations = relations(caregiverVerifications, ({ one }) => ({
+  user: one(users, { fields: [caregiverVerifications.id], references: [users.id] }),
 }));
 
 export const childrenRelations = relations(children, ({ one }) => ({
@@ -226,4 +277,13 @@ export const certificationsRelations = relations(certifications, ({ one }) => ({
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
   user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+export const walletsRelations = relations(wallets, ({ one, many }) => ({
+  user: one(users, { fields: [wallets.id], references: [users.id] }),
+  transactions: many(walletTransactions),
+}));
+
+export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
+  wallet: one(wallets, { fields: [walletTransactions.walletId], references: [wallets.id] }),
 }));

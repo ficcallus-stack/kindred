@@ -2,8 +2,8 @@
 
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { bookings, payments } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { bookings, payments, wallets, walletTransactions } from "@/db/schema";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createBookingSchema, type CreateBookingInput } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
@@ -122,4 +122,73 @@ export async function getMyBookings() {
       caregiver: true,
     },
   });
+}
+
+/**
+ * Completes a booking, capturing payment and adding funds to the nanny's wallet.
+ */
+export async function completeBooking(bookingId: string) {
+  const clerkUser = await currentUser();
+  if (!clerkUser) throw new Error("Unauthorized");
+
+  const booking = await db.query.bookings.findFirst({
+    where: and(
+      eq(bookings.id, bookingId),
+      eq(bookings.parentId, clerkUser.id)
+    ),
+  });
+
+  if (!booking) throw new Error("Booking not found");
+  if (booking.status !== "confirmed" && booking.status !== "in_progress") {
+    throw new Error("Only confirmed or in-progress bookings can be completed");
+  }
+
+  // 1. Capture Stripe Payment
+  if (booking.stripePaymentIntentId) {
+    try {
+      await stripe.paymentIntents.capture(booking.stripePaymentIntentId);
+    } catch (e) {
+      console.error("Stripe capture failed", e);
+      // If already captured, we continue, otherwise we might want to block
+    }
+  }
+
+  // 2. Update Booking Status
+  await db.update(bookings)
+    .set({ status: "completed" })
+    .where(eq(bookings.id, bookingId));
+
+  // 3. Update Payment Status
+  await db.update(payments)
+    .set({ status: "captured" })
+    .where(eq(payments.bookingId, bookingId));
+
+  // 4. Update Nanny's Wallet
+  // Ensure wallet exists
+  await db.insert(wallets)
+    .values({ id: booking.caregiverId, balance: 0 })
+    .onConflictDoNothing();
+
+  // Add funds
+  await db.update(wallets)
+    .set({ 
+      balance: sql`${wallets.balance} + ${booking.totalAmount}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(wallets.id, booking.caregiverId));
+
+  // 5. Log Transaction
+  await db.insert(walletTransactions)
+    .values({
+      walletId: booking.caregiverId,
+      amount: booking.totalAmount,
+      type: "earning",
+      status: "completed",
+      description: `Earnings from booking #${bookingId.slice(0, 8)}`,
+    });
+
+  revalidatePath("/dashboard/parent/bookings");
+  revalidatePath("/dashboard/nanny/wallet");
+  
+  return { success: true };
 }

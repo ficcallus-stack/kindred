@@ -4,7 +4,7 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { syncUser } from "@/lib/user-sync";
 import { cn } from "@/lib/utils";
 import { db } from "@/db";
-import { applications, jobs, users, bookings, messages, reviews, conversationMembers, conversations } from "@/db/schema";
+import { applications, jobs, users, bookings, messages, reviews, conversationMembers, conversations, caregiverVerifications } from "@/db/schema";
 import { eq, desc, sql, and, count, avg } from "drizzle-orm";
 
 export default async function NannyDashboardHome() {
@@ -61,6 +61,11 @@ export default async function NannyDashboardHome() {
     day: 'numeric'
   });
 
+  // Fetch verification status for banner
+  const verification = await db.query.caregiverVerifications.findFirst({
+    where: eq(caregiverVerifications.id, user.id),
+  });
+
   const stats = [
     { label: "Bookings", value: String(bookingStats?.total || 0), icon: "assignment", color: "bg-blue-100 text-blue-600" },
     { label: "Earnings", value: `$${((bookingStats?.totalEarnings || 0) / 100).toFixed(0)}`, icon: "payments", color: "bg-green-100 text-green-600" },
@@ -74,6 +79,24 @@ export default async function NannyDashboardHome() {
         <h1 className="font-headline text-3xl font-extrabold text-primary">Welcome, {firstName}!</h1>
         <p className="text-on-surface-variant text-sm font-medium">{today}</p>
       </div>
+
+      {/* Verification Banner */}
+      {(!verification || verification.status === "none" || verification.status === "draft") && (
+        <div className="bg-terracotta/5 border border-terracotta/20 rounded-[2rem] p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-terracotta/10 rounded-2xl flex items-center justify-center">
+              <MaterialIcon name="verified_user" className="text-3xl text-terracotta" />
+            </div>
+            <div>
+              <h3 className="font-headline font-bold text-navy text-xl">Complete Your Elite Verification</h3>
+              <p className="text-on-surface-variant text-sm font-medium mt-1">Unlock trust badges and priority job listings by verifying your credentials.</p>
+            </div>
+          </div>
+          <Link href="/dashboard/nanny/verification" className="bg-navy text-white px-8 py-3 rounded-xl font-bold hover:scale-[1.02] transition-all whitespace-nowrap uppercase tracking-widest text-xs">
+            {verification?.status === "draft" ? "Continue Verification" : "Start Verification"}
+          </Link>
+        </div>
+      )}
 
       {/* Quick Stats — LIVE */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

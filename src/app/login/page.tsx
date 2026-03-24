@@ -1,36 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSignIn, useClerk } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
+import { useToast } from "@/components/Toast";
 
 export default function LoginPage() {
   const { isLoaded, signIn } = useSignIn() as any;
   const { setActive } = useClerk();
+  const { showToast } = useToast();
+  
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [initializingHang, setInitializingHang] = useState(false);
   const router = useRouter();
 
-  if (!isLoaded) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-          <p className="font-headline font-bold text-primary animate-pulse">Initializing Kindred Security...</p>
-        </div>
-      </div>
-    );
-  }
+  // Handle initialization hang
+  useEffect(() => {
+    if (!isLoaded) {
+      const timer = setTimeout(() => {
+        setInitializingHang(true);
+        showToast("Authentication provider is taking longer than usual. Please check your connection.", "info");
+      }, 5000);
+      return () => clearTimeout(timer);
+    } else {
+      setInitializingHang(false);
+    }
+  }, [isLoaded, showToast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoaded) return;
+    
     setLoading(true);
-    setError("");
-
     try {
       const result = await (signIn as any).create({
         identifier: email,
@@ -39,23 +44,29 @@ export default function LoginPage() {
 
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
+        showToast("Welcome back to Kindred!", "success");
         router.push("/");
       } else {
         console.log(result);
       }
     } catch (err: any) {
-      setError(err.errors?.[0]?.message || "Something went wrong.");
+      showToast(err.errors?.[0]?.message || "Login failed. Please check your credentials.", "error");
     } finally {
       setLoading(false);
     }
   };
 
   const signInWith = (strategy: "oauth_google" | "oauth_apple") => {
-    return (signIn as any).authenticateWithStrategy({
-      strategy,
-      redirectUrl: "/sso-callback",
-      redirectUrlComplete: "/",
-    });
+    if (!isLoaded) return;
+    try {
+      return (signIn as any).authenticateWithStrategy({
+        strategy,
+        redirectUrl: "/sso-callback",
+        redirectUrlComplete: "/",
+      });
+    } catch (err: any) {
+      showToast("Social login failed. Please try email login.", "error");
+    }
   };
 
   return (
@@ -87,7 +98,7 @@ export default function LoginPage() {
           <div className="absolute bottom-[-10%] left-[-5%] w-[600px] h-[600px] bg-primary/5 rounded-full blur-3xl opacity-40"></div>
         </div>
 
-        <div className="relative z-10 w-full max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12 lg:gap-20">
+        <div className="relative z-10 w-full max-w-6xl mx-auto flex flex-col md:flex-row items-center gap-12 lg:gap-20 pt-16 md:pt-0">
           {/* Left Side: Editorial Content */}
           <div className="hidden md:flex flex-1 flex-col gap-8">
             <div className="flex items-center gap-3">
@@ -123,7 +134,17 @@ export default function LoginPage() {
 
           {/* Right Side: Login Card */}
           <div className="w-full max-w-md">
-            <div className="bg-white p-8 md:p-10 rounded-xl shadow-2xl shadow-primary/10 border border-outline-variant/30">
+            <div className="bg-white p-8 md:p-10 rounded-xl shadow-2xl shadow-primary/10 border border-outline-variant/30 relative">
+              
+              {!isLoaded && !initializingHang && (
+                <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 rounded-xl flex items-center justify-center">
+                   <div className="flex flex-col items-center gap-4">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse">Initializing Kindred Security...</p>
+                   </div>
+                </div>
+              )}
+
               <div className="md:hidden flex justify-center mb-8">
                 <span className="text-xl font-extrabold tracking-tighter text-primary font-headline">Kindred Core</span>
               </div>
@@ -131,24 +152,20 @@ export default function LoginPage() {
                 <h2 className="font-headline text-3xl font-bold text-primary mb-2">Welcome Back</h2>
                 <p className="text-on-surface-variant text-sm font-medium">Please enter your details to access your account</p>
               </div>
+              
               <form onSubmit={handleSubmit} className="space-y-5">
-                {error && (
-                  <div className="bg-red-50 text-red-600 p-4 rounded-xl text-xs font-bold flex items-center gap-2 border border-red-100">
-                    <MaterialIcon name="error" className="text-lg" />
-                    {error}
-                  </div>
-                )}
                 <div className="space-y-1">
                   <label className="block text-xs font-bold font-label uppercase tracking-widest text-primary/60 mb-2 ml-1" htmlFor="email">Email</label>
                   <input 
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium disabled:opacity-50" 
                     id="email" 
                     name="email" 
                     placeholder="hello@kindredcore.com" 
                     type="email"
+                    disabled={!isLoaded}
                   />
                 </div>
                 <div className="space-y-1">
@@ -161,11 +178,12 @@ export default function LoginPage() {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium" 
+                      className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium disabled:opacity-50" 
                       id="password" 
                       name="password" 
                       placeholder="••••••••" 
                       type="password"
+                      disabled={!isLoaded}
                     />
                   </div>
                 </div>
@@ -174,8 +192,8 @@ export default function LoginPage() {
                   <label className="text-sm text-on-surface-variant font-semibold" htmlFor="remember-me">Remember Me</label>
                 </div>
                 <button 
-                  disabled={loading}
-                  className="w-full py-5 bg-primary hover:bg-primary/95 text-white font-headline font-black rounded-xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs" 
+                  disabled={loading || !isLoaded}
+                  className="w-full py-5 bg-primary hover:bg-primary/95 text-white font-headline font-black rounded-xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] disabled:opacity-50" 
                   type="submit"
                 >
                   {loading ? "Logging in..." : "Login"}
@@ -193,15 +211,17 @@ export default function LoginPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button 
                   type="button"
+                  disabled={!isLoaded}
                   onClick={() => signInWith("oauth_google")}
-                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm"
+                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm disabled:opacity-30"
                 >
                   <img alt="Google" className="w-5 h-5 grayscale opacity-50" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzl_awn8TETYvPD_AIds-P1a8Vf-rM2Cvm9pAY0bT7ssIi6W_80DjKUSVTBgz3-NT-iEJgKuKZzPzoKneVa81CrBjbm_1wJVILIkz3mCvVANhEOyXOzRWtFUhq7MdGKcnNzyGMLel-ubBE5uSIsbDKesSC0OqVbO-B9q3XPNUYPVo1gksGcSVCmSiyuPA9poiE5ss2iNAOc65Ml91fYoastaHfsKrsHK6cGlcsSS8yih6pBLBhqb16JbsjvHBUSNeMCiWoaOhGvNo" />
                 </button>
                 <button 
                   type="button"
+                  disabled={!isLoaded}
                   onClick={() => signInWith("oauth_apple")}
-                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm"
+                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm disabled:opacity-30"
                 >
                   <img alt="Apple" className="w-5 h-5 grayscale opacity-50" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAo2DC1ia8gJjetVls-9cTO0P-Ja9vONSHOjfPIHK5bFGs9Dj_derNuj40IX6PXXV_jpThJ4L-AcYqquXAEj6-1YcfDheJNGYqTv3W4BZ0S8dGwpdtrYy8sqq-Kxvttd0mroh0Zn-3mVHG0kiL3ieTl6F4PYNpWIvAH7bu-s-nH7kH34yMhwql313RoVjd3oh71WiKUx4Hcv9pl8NM4Bu8lTa8W58sZ4zP65YFWd2isfu27HuIjn5Mtv4VPIRJv7Wg9fvx1olrS7v4" />
                 </button>

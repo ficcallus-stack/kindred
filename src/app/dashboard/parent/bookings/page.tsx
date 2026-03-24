@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { StripeProvider } from "@/components/StripeProvider";
 import BookingStep2 from "@/components/bookings/BookingStep2";
 import BookingStep3 from "@/components/bookings/BookingStep3";
+import { completeBooking } from "./actions";
 
 export default function BookingsPage() {
   const [step, setStep] = useState(1);
@@ -82,6 +83,21 @@ export default function BookingsPage() {
       console.error("Failed to create booking:", err);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleCompleteBooking = async (bookingId: string) => {
+    if (!confirm("Are you sure you want to complete this booking? This will capture the payment and transfer funds to the caregiver.")) return;
+
+    try {
+      await completeBooking(bookingId);
+      // Refresh list
+      const r = await fetch("/api/bookings");
+      const data = await r.json();
+      setExistingBookings(data);
+    } catch (err) {
+      console.error("Failed to complete booking:", err);
+      alert(err instanceof Error ? err.message : "Completion failed");
     }
   };
 
@@ -189,15 +205,26 @@ export default function BookingsPage() {
                       </p>
                     </div>
                   </div>
-                  <span className={cn(
-                    "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
-                    booking.status === "confirmed" ? "bg-green-100 text-green-700"
-                    : booking.status === "pending" ? "bg-yellow-100 text-yellow-700"
-                    : booking.status === "completed" ? "bg-blue-100 text-blue-700"
-                    : "bg-red-50 text-red-500"
-                  )}>
-                    {booking.status}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest",
+                      booking.status === "confirmed" ? "bg-green-100 text-green-700"
+                      : booking.status === "pending" ? "bg-yellow-100 text-yellow-700"
+                      : booking.status === "completed" ? "bg-blue-100 text-blue-700"
+                      : "bg-red-50 text-red-500"
+                    )}>
+                      {booking.status}
+                    </span>
+                    {(booking.status === "confirmed" || booking.status === "in_progress") && (
+                      <button
+                        onClick={() => handleCompleteBooking(booking.id)}
+                        className="p-2 hover:bg-navy/5 rounded-lg text-navy transition-all"
+                        title="Complete & Pay"
+                      >
+                        <MaterialIcon name="check_circle" className="text-xl" />
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
               {existingBookings.length === 0 && !bookingDetails.caregiverId && (

@@ -1,10 +1,11 @@
+import { db } from "@/db";
+import { users, nannyProfiles } from "@/db/schema";
+import { eq, and, sql, gte, lte } from "drizzle-orm";
+import BrowseFilters from "@/components/BrowseFilters";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { db } from "@/db";
-import { users, nannyProfiles } from "@/db/schema";
-import { eq, and, sql, gte, lte } from "drizzle-orm";
 
 export default async function BrowseNannies({ searchParams }: { searchParams: Promise<{ location?: string, rate?: string }> }) {
   const params = await searchParams;
@@ -40,74 +41,11 @@ export default async function BrowseNannies({ searchParams }: { searchParams: Pr
         {/* Side Filter Shell */}
         <aside className="h-[calc(100vh-5rem)] w-80 sticky top-20 left-0 hidden lg:flex flex-col p-8 space-y-10 bg-surface-container-low border-r border-outline-variant/10 overflow-y-auto">
           <div>
-            <h2 className="text-primary font-headline text-2xl font-black tracking-tighter">Filters</h2>
+            <h2 className="text-primary font-headline text-2xl font-black tracking-tighter italic">Filters</h2>
             <p className="text-on-surface-variant text-[10px] font-black uppercase tracking-widest opacity-60">Refine your search</p>
           </div>
           
-          <div className="space-y-10">
-            {/* Location (Simple Text for now) */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-                <MaterialIcon name="location_on" className="text-secondary" />
-                <span>Location</span>
-              </div>
-              <form action="/browse" method="get">
-                <input 
-                  name="location"
-                  defaultValue={locationFilter}
-                  placeholder="Enter city..."
-                  className="w-full bg-white border-2 border-transparent rounded-[1.5rem] shadow-sm py-4 px-6 text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 outline-none" 
-                />
-              </form>
-            </div>
-
-            {/* Rate Range */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-                <MaterialIcon name="payments" className="text-secondary" />
-                <span>Max Rate (${maxRateFilter}/hr)</span>
-              </div>
-              <div className="px-2">
-                <Link href={`/browse?rate=${maxRateFilter}`} scroll={false}>
-                  <input 
-                    className="w-full accent-primary h-2 rounded-full cursor-pointer" 
-                    max="100" min="15" step="5" type="range" 
-                    value={maxRateFilter}
-                    onChange={() => {}} // Controlled by URL in Next.js usually, but let's keep it simple for now
-                  />
-                </Link>
-                <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 uppercase tracking-wider">
-                  <span>$15/hr</span>
-                  <span>$100/hr</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Experience */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-                <MaterialIcon name="stars" className="text-primary" />
-                <span>Experience</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {["1-3 yrs", "4-7 yrs", "8-12 yrs", "12+ yrs"].map((years, i) => (
-                  <button 
-                    key={years} 
-                    className={cn(
-                      "rounded-2xl p-3 text-xs font-black transition-all",
-                      i === 2 ? "bg-white text-primary shadow-sm" : "bg-transparent text-on-surface-variant/40 hover:bg-white/50"
-                    )}
-                  >
-                    {years}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <Link href="/browse" className="mt-auto py-6 text-primary font-black uppercase tracking-widest text-[10px] hover:underline underline-offset-8 text-center opacity-60 hover:opacity-100 transition-all">
-            Reset All Filters
-          </Link>
+          <BrowseFilters initialLocation={locationFilter} initialRate={maxRateFilter} />
         </aside>
 
         {/* Main Content Area */}

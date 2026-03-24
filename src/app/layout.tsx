@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import Footer from "@/components/Footer";
+import { ToastProvider } from "@/components/Toast";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -48,9 +49,11 @@ export default function RootLayout({
           />
         </head>
         <body className="antialiased bg-surface text-on-surface font-body min-h-screen flex flex-col">
-          <main className="flex-grow">
-            {children}
-          </main>
+          <ToastProvider>
+            <main className="flex-grow">
+              {children}
+            </main>
+          </ToastProvider>
           <Footer />
         </body>
       </html>
