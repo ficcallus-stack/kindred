@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 
 export default function LoginPage() {
-  const { isLoaded, signIn } = useSignIn();
+  const { isLoaded, signIn } = useSignIn() as any;
   const { setActive } = useClerk();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

@@ -8,7 +8,7 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 
 export default function SignUpPage() {
-  const { isLoaded, signUp } = useSignUp();
+  const { isLoaded, signUp } = useSignUp() as any;
   const { setActive } = useClerk();
   const [role, setRole] = useState<"parent" | "caregiver" | null>(null);
   const [emailAddress, setEmailAddress] = useState("");
