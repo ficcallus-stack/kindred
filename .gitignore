@@ -25,3 +25,10 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# diagnostics
+tmp/
+push-schema-http.ts
+test-db.ts
+db-push-full.txt
+db-push-error.txt

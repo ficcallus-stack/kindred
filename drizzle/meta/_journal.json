@@ -8,6 +8,13 @@
       "when": 1774259362465,
       "tag": "0000_lethal_morgan_stark",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774356135601,
+      "tag": "0001_unknown_sebastian_shaw",
+      "breakpoints": true
     }
   ]
 }

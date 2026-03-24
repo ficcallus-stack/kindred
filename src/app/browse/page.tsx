@@ -29,7 +29,7 @@ export default async function BrowseNannies({ searchParams }: { searchParams: Pr
     and(
       eq(users.role, "caregiver"),
       locationFilter ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationFilter + '%'})` : undefined,
-      params.rate ? lte(nannyProfiles.hourlyRate, sql`${maxRateFilter}`) : undefined
+      params.rate ? lte(nannyProfiles.hourlyRate, maxRateFilter.toString()) : undefined
     )
   );
 
