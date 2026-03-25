@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import MyChildren from "@/components/dashboard/MyChildren";
 import Link from "next/link";
 import { redirect } from "next/navigation";

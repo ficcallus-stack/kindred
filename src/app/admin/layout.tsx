@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { ReactNode } from "react";
 import { requireAdmin } from "@/lib/auth";
 import AdminShell from "@/components/AdminShell";
@@ -15,7 +16,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   return (
     <AdminShell
       adminName={admin.fullName || "Admin"}
-      adminInitial={admin.firstName?.charAt(0) || "A"}
+      adminInitial={(admin.fullName || "A").charAt(0)}
     >
       {children}
     </AdminShell>

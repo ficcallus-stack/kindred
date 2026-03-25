@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
