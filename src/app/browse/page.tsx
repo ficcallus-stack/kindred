@@ -1,16 +1,28 @@
 import { db } from "@/db";
 import { users, nannyProfiles } from "@/db/schema";
-import { eq, and, sql, gte, lte } from "drizzle-orm";
+import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
 import BrowseFilters from "@/components/BrowseFilters";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
-export default async function BrowseNannies({ searchParams }: { searchParams: Promise<{ location?: string, rate?: string }> }) {
+export default async function BrowseNannies({ searchParams }: { searchParams: Promise<{ location?: string, rate?: string, lat?: string, lng?: string }> }) {
   const params = await searchParams;
   const locationFilter = params.location || "";
+  const lat = params.lat ? parseFloat(params.lat) : undefined;
+  const lng = params.lng ? parseFloat(params.lng) : undefined;
   const maxRateFilter = params.rate ? parseInt(params.rate) : 100;
+
+  const distanceSql = (lat && lng) 
+    ? sql`
+        (3959 * acos(
+          cos(radians(${lat})) * cos(radians(${nannyProfiles.latitude})) *
+          cos(radians(${nannyProfiles.longitude}) - radians(${lng})) +
+          sin(radians(${lat})) * sin(radians(${nannyProfiles.latitude}))
+        ))
+      `
+    : undefined;
 
   // Fetch nannies with profiles
   const nannies = await db.select({
@@ -22,16 +34,19 @@ export default async function BrowseNannies({ searchParams }: { searchParams: Pr
     hourlyRate: nannyProfiles.hourlyRate,
     isVerified: nannyProfiles.isVerified,
     bio: nannyProfiles.bio,
+    // Add distance cast to number for TypeScript safety in rendering
+    distance: distanceSql ? sql<number>`${distanceSql}`.as('distance') : sql<number>`0`.as('distance'),
   })
   .from(users)
   .innerJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
   .where(
     and(
       eq(users.role, "caregiver"),
-      locationFilter ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationFilter + '%'})` : undefined,
+      distanceSql ? lte(distanceSql, 50) : (locationFilter ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationFilter + '%'})` : undefined),
       params.rate ? lte(nannyProfiles.hourlyRate, maxRateFilter.toString()) : undefined
     )
-  );
+  )
+  .orderBy(distanceSql ? sql`${distanceSql} ASC` : desc(nannyProfiles.experienceYears));
 
   return (
     <div className="bg-surface min-h-screen">
@@ -93,8 +108,9 @@ export default async function BrowseNannies({ searchParams }: { searchParams: Pr
                   <div>
                     <h3 className="text-3xl font-black text-primary font-headline tracking-tighter leading-none mb-2">{nanny.name}</h3>
                     <p className="text-on-surface-variant text-sm font-black uppercase tracking-widest opacity-40 flex items-center justify-center gap-2">
-                      <MaterialIcon name="location_on" className="text-secondary text-base" />
-                      {nanny.location || "Location pending"}
+                       <MaterialIcon name="location_on" className="text-secondary text-base" />
+                       {nanny.location || "Location pending"}
+                       {nanny.distance > 0 && <span className="ml-1 text-primary">({nanny.distance.toFixed(1)} mi)</span>}
                     </p>
                   </div>
 

@@ -19,12 +19,22 @@ export const ticketCategoryEnum = pgEnum("ticket_category", ["general", "safety"
 
 // ── Users ──────────────────────────────────────────────────
 export const users = pgTable("users", {
-  id: text("id").primaryKey(), // Clerk User ID
+  id: text("id").primaryKey(), // Firebase UID
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
   role: userRoleEnum("role").notNull(),
+  emailVerified: boolean("email_verified").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ── Email OTPs ─────────────────────────────────────────────
+export const emailOtps = pgTable("email_otps", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email: text("email").notNull(),
+  code: text("code").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ── Nanny Profiles ─────────────────────────────────────────
@@ -34,6 +44,8 @@ export const nannyProfiles = pgTable("nanny_profiles", {
   experienceYears: integer("experience_years").default(0),
   hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).default("0"),
   location: text("location"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
   isVerified: boolean("is_verified").default(false).notNull(),
   stripeConnectId: text("stripe_connect_id"),
   photos: jsonb("photos").$type<string[]>().default([]),
@@ -132,6 +144,9 @@ export const reviews = pgTable("reviews", {
   revieweeId: text("reviewee_id").notNull().references(() => users.id),
   rating: integer("rating").notNull(), // 1-5
   comment: text("comment"),
+  images: jsonb("images").$type<string[]>().default([]),
+  replyText: text("reply_text"),
+  replyCreatedAt: timestamp("reply_created_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

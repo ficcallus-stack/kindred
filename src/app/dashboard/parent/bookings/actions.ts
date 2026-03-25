@@ -1,19 +1,19 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { bookings, payments, wallets, walletTransactions } from "@/db/schema";
+import { bookings, payments, wallets, walletTransactions, users } from "@/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createBookingSchema, type CreateBookingInput } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import { stripe } from "@/lib/stripe";
+import { sendBookingEmail } from "@/lib/email";
 
 export async function createBooking(data: CreateBookingInput) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
-  const { success } = await rateLimit(`createBooking:${clerkUser.id}`, "strict");
+  const { success } = await rateLimit(`createBooking:${clerkUser.uid}`, "strict");
   if (!success) throw new Error("Too many requests");
 
   const parsed = createBookingSchema.safeParse(data);
@@ -31,7 +31,7 @@ export async function createBooking(data: CreateBookingInput) {
     capture_method: "manual",
     description: `KindredCare Booking`,
     metadata: {
-      userId: clerkUser.id,
+      userId: clerkUser.uid,
       caregiverId,
     },
   });
@@ -40,7 +40,7 @@ export async function createBooking(data: CreateBookingInput) {
   const bookingId = crypto.randomUUID();
   await db.insert(bookings).values({
     id: bookingId,
-    parentId: clerkUser.id,
+    parentId: clerkUser.uid,
     caregiverId,
     jobId: jobId || null,
     startDate: new Date(startDate),
@@ -55,7 +55,7 @@ export async function createBooking(data: CreateBookingInput) {
   // Create payment record
   await db.insert(payments).values({
     bookingId,
-    userId: clerkUser.id,
+    userId: clerkUser.uid,
     amount: amountInCents,
     stripePaymentIntentId: paymentIntent.id,
     status: "pending",
@@ -65,6 +65,14 @@ export async function createBooking(data: CreateBookingInput) {
   revalidatePath("/dashboard/parent");
   revalidatePath("/dashboard/parent/bookings");
 
+  // Notify nanny about booking
+  try {
+    const nanny = await db.query.users.findFirst({ where: eq(users.id, caregiverId) });
+    if (nanny?.email) {
+      await sendBookingEmail(nanny.email, nanny.fullName, "confirmed", { bookingId, amount: amountInCents });
+    }
+  } catch (e) { console.error("Booking email failed:", e); }
+
   return {
     bookingId,
     clientSecret: paymentIntent.client_secret,
@@ -72,13 +80,12 @@ export async function createBooking(data: CreateBookingInput) {
 }
 
 export async function cancelBooking(bookingId: string) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   const booking = await db.query.bookings.findFirst({
     where: and(
       eq(bookings.id, bookingId),
-      eq(bookings.parentId, clerkUser.id)
+      eq(bookings.parentId, clerkUser.uid)
     ),
   });
 
@@ -109,14 +116,21 @@ export async function cancelBooking(bookingId: string) {
 
   revalidatePath("/dashboard/parent");
   revalidatePath("/dashboard/parent/bookings");
+
+  // Notify nanny about cancellation
+  try {
+    const nanny = await db.query.users.findFirst({ where: eq(users.id, booking.caregiverId) });
+    if (nanny?.email) {
+      await sendBookingEmail(nanny.email, nanny.fullName, "cancelled", { bookingId, amount: booking.totalAmount });
+    }
+  } catch (e) { console.error("Booking email failed:", e); }
 }
 
 export async function getMyBookings() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   return db.query.bookings.findMany({
-    where: eq(bookings.parentId, clerkUser.id),
+    where: eq(bookings.parentId, clerkUser.uid),
     orderBy: [desc(bookings.createdAt)],
     with: {
       caregiver: true,
@@ -128,13 +142,12 @@ export async function getMyBookings() {
  * Completes a booking, capturing payment and adding funds to the nanny's wallet.
  */
 export async function completeBooking(bookingId: string) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   const booking = await db.query.bookings.findFirst({
     where: and(
       eq(bookings.id, bookingId),
-      eq(bookings.parentId, clerkUser.id)
+      eq(bookings.parentId, clerkUser.uid)
     ),
   });
 
@@ -189,6 +202,14 @@ export async function completeBooking(bookingId: string) {
 
   revalidatePath("/dashboard/parent/bookings");
   revalidatePath("/dashboard/nanny/wallet");
+
+  // Notify nanny about completion + earnings
+  try {
+    const nanny = await db.query.users.findFirst({ where: eq(users.id, booking.caregiverId) });
+    if (nanny?.email) {
+      await sendBookingEmail(nanny.email, nanny.fullName, "completed", { bookingId, amount: booking.totalAmount });
+    }
+  } catch (e) { console.error("Booking email failed:", e); }
   
   return { success: true };
 }

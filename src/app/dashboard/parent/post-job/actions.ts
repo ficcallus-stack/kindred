@@ -1,6 +1,6 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -10,13 +10,12 @@ import { rateLimit } from "@/lib/rate-limit";
 import { syncUser } from "@/lib/user-sync";
 
 export async function createJob(data: CreateJobInput) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   await syncUser();
 
   // Rate limit: 5 jobs per minute per user
-  const { success } = await rateLimit(`createJob:${clerkUser.id}`, "strict");
+  const { success } = await rateLimit(`createJob:${clerkUser.uid}`, "strict");
   if (!success) throw new Error("Too many requests. Please try again later.");
 
   // Validate input
@@ -37,7 +36,7 @@ export async function createJob(data: CreateJobInput) {
 
   await db.insert(jobs).values({
     id: crypto.randomUUID(),
-    parentId: clerkUser.id,
+    parentId: clerkUser.uid,
     title,
     description,
     budget,

@@ -25,6 +25,8 @@ export default async function NannyProfilePage() {
   const initialData = {
     fullName: user.fullName,
     location: profileDetails?.location || "",
+    latitude: profileDetails?.latitude ? Number(profileDetails.latitude) : undefined,
+    longitude: profileDetails?.longitude ? Number(profileDetails.longitude) : undefined,
     hourlyRate: profileDetails?.hourlyRate || "0",
     experienceYears: profileDetails?.experienceYears || 0,
     bio: profileDetails?.bio || "",

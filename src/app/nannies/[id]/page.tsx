@@ -2,14 +2,15 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import { db } from "@/db";
-import { users, nannyProfiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, nannyProfiles, reviews } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import { Metadata } from "next";
+import { cache } from "react";
+import Breadcrumbs from "@/components/Breadcrumbs";
+import { ReviewsSection } from "@/components/reviews/ReviewsSection";
 
-export default async function NannyPublicProfile({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-
-  // Fetch nanny with profile
+const getNanny = cache(async (id: string) => {
   const result = await db.select({
     id: users.id,
     name: users.fullName,
@@ -24,21 +25,109 @@ export default async function NannyPublicProfile({ params }: { params: Promise<{
   .innerJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
   .where(eq(users.id, id))
   .limit(1);
+  return result[0];
+});
 
-  if (result.length === 0) {
+const getNannyReviews = cache(async (id: string) => {
+  return await db.query.reviews.findMany({
+    where: eq(reviews.revieweeId, id),
+    orderBy: [desc(reviews.createdAt)],
+    with: {
+      reviewer: true,
+    },
+  });
+});
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const nanny = await getNanny(id);
+  
+  if (!nanny) return { title: 'Not Found' };
+  
+  const title = `${nanny.name} - Nanny in ${nanny.location || 'US'} | KindredCare`;
+  const description = nanny.bio || `Hire ${nanny.name}, a vetted caregiver with ${nanny.experienceYears} years of experience. Rate: $${nanny.hourlyRate}/hr`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: 'profile',
+      images: [`https://api.dicebear.com/7.x/avataaars/svg?seed=${nanny.name}`],
+    }
+  };
+}
+
+export default async function NannyPublicProfile({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const nanny = await getNanny(id);
+
+  if (!nanny) {
     notFound();
   }
 
-  const nanny = result[0];
+  const nannyReviews = await getNannyReviews(id);
+  const avgRating = nannyReviews.length > 0 
+    ? (nannyReviews.reduce((acc, r) => acc + r.rating, 0) / nannyReviews.length).toFixed(1)
+    : "0";
+
+  const jsonLd: any = {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": nanny.name,
+    "jobTitle": "Nanny",
+    "description": nanny.bio,
+    "image": `https://api.dicebear.com/7.x/avataaars/svg?seed=${nanny.name}`,
+    "homeLocation": {
+      "@type": "Place",
+      "name": nanny.location || "United States"
+    },
+    "makesOffer": {
+      "@type": "Offer",
+      "price": nanny.hourlyRate,
+      "priceCurrency": "USD",
+      "description": "Hourly babysitting/nannying rate"
+    }
+  };
+
+  if (nannyReviews.length > 0) {
+    jsonLd.aggregateRating = {
+      "@type": "AggregateRating",
+      "ratingValue": avgRating,
+      "reviewCount": nannyReviews.length,
+      "bestRating": "5",
+      "worstRating": "1"
+    };
+    
+    jsonLd.review = nannyReviews.map(r => ({
+      "@type": "Review",
+      "author": {
+        "@type": "Person",
+        "name": r.reviewer.fullName
+      },
+      "datePublished": r.createdAt.toISOString(),
+      "reviewBody": r.comment,
+      "reviewRating": {
+        "@type": "Rating",
+        "bestRating": "5",
+        "ratingValue": r.rating,
+        "worstRating": "1"
+      }
+    }));
+  }
 
   return (
     <div className="bg-surface min-h-screen pb-32">
       <Navbar />
 
       <main className="pt-24 max-w-[1440px] mx-auto px-8 flex flex-col xl:flex-row gap-16 animate-in fade-in duration-1000">
-        
-        {/* Left Column: Content */}
-        <div className="flex-1 space-y-16">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+        <div className="flex-1 space-y-12">
+          <Breadcrumbs customName={nanny.name} />
           
           {/* Hero Section */}
           <section className="flex flex-col md:flex-row gap-12 items-end md:items-center relative">
@@ -130,6 +219,8 @@ export default async function NannyPublicProfile({ params }: { params: Promise<{
               ))}
             </div>
           </section>
+
+          <ReviewsSection nannyId={nanny.id} initialReviews={nannyReviews} />
         </div>
 
         {/* Sidebar: Sticky Actions */}

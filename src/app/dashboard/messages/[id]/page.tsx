@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { getConversationMessages, sendMessage } from "../actions";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@/lib/auth-context";
 import Link from "next/link";
 import { useChannel } from "ably/react";
 
@@ -30,7 +30,7 @@ function ChatWindow({ conversationId }: { conversationId: string }) {
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { user } = useUser();
+  const { user } = useAuth();
 
   useEffect(() => {
     loadMessages();
@@ -69,10 +69,10 @@ function ChatWindow({ conversationId }: { conversationId: string }) {
     const optimisticMsg = {
       id: tempId,
       conversationId,
-      senderId: user?.id,
+      senderId: user?.uid,
       content,
       createdAt: new Date().toISOString(),
-      sender: { id: user?.id, fullName: user?.fullName },
+      sender: { id: user?.uid, fullName: user?.displayName },
       isOptimistic: true,
     };
 
@@ -113,7 +113,7 @@ function ChatWindow({ conversationId }: { conversationId: string }) {
       <div className="flex-1 pt-28 pb-32 px-6 max-w-4xl mx-auto w-full overflow-y-auto">
         <div className="space-y-4">
           {messages.map((msg: any) => {
-            const isOwn = msg.senderId === user?.id;
+            const isOwn = msg.senderId === user?.uid;
             return (
               <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
                 <div className={`max-w-[70%] px-6 py-4 rounded-3xl ${

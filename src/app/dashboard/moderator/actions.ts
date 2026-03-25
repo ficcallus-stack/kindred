@@ -1,13 +1,12 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { caregiverVerifications, tickets, users } from "@/db/schema";
 import { eq, and, desc, count } from "drizzle-orm";
 
 export async function getModeratorStats() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   // Fetch pending verifications
   const [pendingVerifications] = await db
@@ -36,8 +35,7 @@ export async function getModeratorStats() {
 }
 
 export async function getHighPriorityQueue() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   const urgentQueue = await db.query.tickets.findMany({
     where: and(eq(tickets.status, "open"), eq(tickets.priority, "urgent")),
@@ -56,8 +54,7 @@ export async function getHighPriorityQueue() {
 }
 
 export async function getRecentActivity() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   // Fetch recently resolved tickets
   const recentTickets = await db.query.tickets.findMany({

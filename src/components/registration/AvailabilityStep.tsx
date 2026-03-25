@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import MapboxAutocomplete from "@/components/MapboxAutocomplete";
 
 interface AvailabilityStepProps {
   data: any;
@@ -17,6 +18,8 @@ export default function AvailabilityStep({ data, onBack, onSubmit }: Availabilit
   const [availability, setAvailability] = useState(data.times || {});
   const [rate, setRate] = useState(data.rate || "");
   const [locations, setLocations] = useState(data.locations || "");
+  const [lat, setLat] = useState<number | undefined>(data.lat);
+  const [lng, setLng] = useState<number | undefined>(data.lng);
   const [terms, setTerms] = useState(data.terms || "");
 
   const toggleSlot = (day: string, time: string) => {
@@ -29,7 +32,7 @@ export default function AvailabilityStep({ data, onBack, onSubmit }: Availabilit
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ rate, locations, times: availability, terms });
+    onSubmit({ rate, locations, times: availability, terms, lat, lng });
   };
 
   return (
@@ -62,12 +65,15 @@ export default function AvailabilityStep({ data, onBack, onSubmit }: Availabilit
           </div>
           <div className="space-y-2">
             <label className="block text-primary font-bold text-xs uppercase tracking-widest">Service Areas</label>
-            <input
-              value={locations}
-              onChange={(e) => setLocations(e.target.value)}
-              className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 transition-all font-medium"
-              placeholder="e.g. Austin, Round Rock, Downtown"
-              required
+            <MapboxAutocomplete
+              initialLocation={locations}
+              onSelect={(loc, selectedLat, selectedLng) => {
+                setLocations(loc);
+                setLat(selectedLat);
+                setLng(selectedLng);
+              }}
+              placeholder="e.g. Austin, Round Rock"
+              inputClassName="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 focus:ring-2 focus:ring-primary/20 transition-all font-medium"
             />
           </div>
         </div>

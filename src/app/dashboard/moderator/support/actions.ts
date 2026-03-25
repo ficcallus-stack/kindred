@@ -1,14 +1,13 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { tickets, users, ticketMessages } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function getSupportTickets(filter: "all" | "urgent" | "technical" = "all") {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
   
   // Here you can verify if the user is an admin/moderator
 
@@ -35,8 +34,7 @@ export async function getSupportTickets(filter: "all" | "urgent" | "technical" =
 }
 
 export async function submitSupportTicket(formData: FormData) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   const title = formData.get("title") as string;
   const description = formData.get("description") as string;
@@ -45,7 +43,7 @@ export async function submitSupportTicket(formData: FormData) {
   if (!title) throw new Error("Title is required");
 
   await db.insert(tickets).values({
-    userId: clerkUser.id,
+    userId: clerkUser.uid,
     title,
     description,
     category,
@@ -60,8 +58,7 @@ export async function submitSupportTicket(formData: FormData) {
 }
 
 export async function updateTicketStatus(ticketId: string, status: "open" | "in_progress" | "resolved" | "closed") {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   await db.update(tickets)
     .set({ status, updatedAt: new Date() })

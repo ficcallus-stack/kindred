@@ -99,6 +99,15 @@ export default function PostJobPage() {
               </div>
             ))}
           </nav>
+          <div className="mt-8 px-6 pb-6">
+            <div className="bg-secondary/10 p-4 rounded-2xl border border-secondary/20 flex flex-col gap-2">
+              <MaterialIcon name="shield_locked" className="text-secondary-fixed text-2xl" />
+              <p className="text-xs font-medium text-secondary-fixed leading-relaxed">
+                <strong className="block mb-1 font-bold">Privacy Protected</strong>
+                Only background-verified nannies will have access to your job details and location.
+              </p>
+            </div>
+          </div>
         </aside>
 
         {/* Main Content */}

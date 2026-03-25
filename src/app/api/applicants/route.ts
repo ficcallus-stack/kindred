@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { applications, jobs, users, nannyProfiles } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export async function GET() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) {
-    return NextResponse.json([], { status: 401 });
-  }
+  const clerkUser = await requireUser();
 
   const myApplicants = await db.select({
     id: applications.id,
@@ -25,7 +22,7 @@ export async function GET() {
   .innerJoin(jobs, eq(applications.jobId, jobs.id))
   .innerJoin(users, eq(applications.caregiverId, users.id))
   .leftJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
-  .where(eq(jobs.parentId, clerkUser.id))
+  .where(eq(jobs.parentId, clerkUser.uid))
   .orderBy(desc(applications.createdAt));
 
   return NextResponse.json(myApplicants);

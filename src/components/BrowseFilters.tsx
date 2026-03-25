@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import MapboxAutocomplete from "./MapboxAutocomplete";
 
 interface BrowseFiltersProps {
   initialLocation: string;
@@ -36,12 +37,14 @@ export default function BrowseFilters({ initialLocation, initialRate }: BrowseFi
           <span>Location</span>
         </div>
         <div className="relative">
-          <input 
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && updateFilters({ location })}
+          <MapboxAutocomplete
+            initialLocation={location}
+            onSelect={(loc, lat, lng) => {
+              setLocation(loc);
+              updateFilters({ location: loc, lat: lat.toString(), lng: lng.toString() });
+            }}
             placeholder="Enter city..."
-            className="w-full bg-white border-2 border-transparent rounded-[1.5rem] shadow-sm py-4 px-6 text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 outline-none" 
+            inputClassName="w-full bg-white border-2 border-transparent rounded-[1.5rem] shadow-sm py-4 pl-6 pr-12 text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 outline-none"
           />
           <button 
             onClick={() => updateFilters({ location })}

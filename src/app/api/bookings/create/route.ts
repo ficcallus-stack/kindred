@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { bookings, payments } from "@/db/schema";
 import { stripe } from "@/lib/stripe";
 import { createBookingSchema } from "@/lib/validations";
 
 export async function POST(req: NextRequest) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const clerkUser = await requireUser();
 
   const body = await req.json();
   const parsed = createBookingSchema.safeParse(body);
@@ -29,7 +28,7 @@ export async function POST(req: NextRequest) {
     capture_method: "manual",
     description: "KindredCare Booking",
     metadata: {
-      userId: clerkUser.id,
+      userId: clerkUser.uid,
       caregiverId,
     },
   });
@@ -37,7 +36,7 @@ export async function POST(req: NextRequest) {
   const bookingId = crypto.randomUUID();
   await db.insert(bookings).values({
     id: bookingId,
-    parentId: clerkUser.id,
+    parentId: clerkUser.uid,
     caregiverId,
     jobId: jobId || null,
     startDate: new Date(startDate || Date.now()),
@@ -51,7 +50,7 @@ export async function POST(req: NextRequest) {
 
   await db.insert(payments).values({
     bookingId,
-    userId: clerkUser.id,
+    userId: clerkUser.uid,
     amount: amountInCents,
     stripePaymentIntentId: paymentIntent.id,
     status: "pending",

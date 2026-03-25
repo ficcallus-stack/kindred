@@ -1,30 +1,29 @@
-import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { getServerUser } from "@/lib/get-server-user";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Server-side admin guard.
- * Checks Clerk publicMetadata for { role: "admin" }.
- * 
- * Usage in any server component or server action:
- *   const user = await requireAdmin();
- *
- * To set an admin, go to Clerk Dashboard → Users → [user] → Metadata
- * and set publicMetadata to: { "role": "admin" }
+ * Checks DB role for "admin".
  */
 export async function requireAdmin() {
-  const user = await currentUser();
+  const serverUser = await getServerUser();
 
-  if (!user) {
+  if (!serverUser) {
     redirect("/login");
   }
 
-  const role = (user.publicMetadata as { role?: string })?.role;
+  const dbUser = await db.query.users.findFirst({
+    where: eq(users.id, serverUser.uid),
+  });
 
-  if (role !== "admin") {
+  if (!dbUser || dbUser.role !== "admin") {
     redirect("/");
   }
 
-  return user;
+  return dbUser;
 }
 
 /**
@@ -32,9 +31,12 @@ export async function requireAdmin() {
  * Returns the user if admin, null otherwise.
  */
 export async function isAdmin() {
-  const user = await currentUser();
-  if (!user) return null;
+  const serverUser = await getServerUser();
+  if (!serverUser) return null;
 
-  const role = (user.publicMetadata as { role?: string })?.role;
-  return role === "admin" ? user : null;
+  const dbUser = await db.query.users.findFirst({
+    where: eq(users.id, serverUser.uid),
+  });
+
+  return dbUser?.role === "admin" ? dbUser : null;
 }

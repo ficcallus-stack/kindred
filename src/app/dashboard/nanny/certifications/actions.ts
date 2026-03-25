@@ -1,6 +1,6 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { certifications, payments } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -16,10 +16,9 @@ const CERTIFICATION_PRICES: Record<string, { amount: number; name: string }> = {
 };
 
 export async function enrollCertification(data: EnrollCertificationInput) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
-  const { success } = await rateLimit(`enroll:${clerkUser.id}`, "strict");
+  const { success } = await rateLimit(`enroll:${clerkUser.uid}`, "strict");
   if (!success) throw new Error("Too many requests");
 
   const parsed = enrollCertificationSchema.safeParse(data);
@@ -40,7 +39,7 @@ export async function enrollCertification(data: EnrollCertificationInput) {
     currency: "usd",
     description: `KindredCare ${priceInfo.name}`,
     metadata: {
-      userId: clerkUser.id,
+      userId: clerkUser.uid,
       certificationId: certId,
       type,
     },
@@ -48,7 +47,7 @@ export async function enrollCertification(data: EnrollCertificationInput) {
 
   await db.insert(certifications).values({
     id: certId,
-    caregiverId: clerkUser.id,
+    caregiverId: clerkUser.uid,
     type: type as any,
     status: "pending_payment",
     stripePaymentId: paymentIntent.id,
@@ -56,7 +55,7 @@ export async function enrollCertification(data: EnrollCertificationInput) {
 
   // Create payment record
   await db.insert(payments).values({
-    userId: clerkUser.id,
+    userId: clerkUser.uid,
     amount: priceInfo.amount,
     stripePaymentIntentId: paymentIntent.id,
     status: "pending",
@@ -72,11 +71,10 @@ export async function enrollCertification(data: EnrollCertificationInput) {
 }
 
 export async function getMyCertifications() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   return db.query.certifications.findMany({
-    where: eq(certifications.caregiverId, clerkUser.id),
+    where: eq(certifications.caregiverId, clerkUser.uid),
     orderBy: [desc(certifications.createdAt)],
   });
 }

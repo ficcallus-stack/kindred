@@ -5,8 +5,37 @@ import Link from "next/link";
 import { db } from "@/db";
 import { jobs, users } from "@/db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { syncUser } from "@/lib/user-sync";
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
+  const user = await syncUser();
+
+  if (!user || (user.role !== "caregiver" && user.role !== "admin")) {
+    return (
+      <div className="bg-surface min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+          <div className="bg-error-container text-on-error-container p-6 rounded-full mb-8 shadow-xl">
+             <MaterialIcon name="security" className="text-6xl" fill />
+          </div>
+          <h1 className="text-4xl font-headline font-black text-primary tracking-tight mb-4">Access Restricted</h1>
+          <p className="text-lg text-on-surface-variant max-w-lg mx-auto mb-10 leading-relaxed">
+            For the strict privacy and safety of our families, only rigorously vetted <strong>Caregivers</strong> and Admins can view available job listings and family details.
+          </p>
+          {!user ? (
+            <Link href="/login" className="bg-primary text-on-primary px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl hover:-translate-y-1 transition-transform">
+              Sign In to View Jobs
+            </Link>
+          ) : (
+             <Link href="/dashboard" className="bg-secondary text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl hover:-translate-y-1 transition-transform">
+              Return to Dashboard
+            </Link>
+          )}
+        </main>
+      </div>
+    );
+  }
+
   const params = await searchParams;
   const query = params.q || "";
 

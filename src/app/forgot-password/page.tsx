@@ -2,60 +2,30 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useSignIn } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase-client";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { useToast } from "@/components/Toast";
 
 export default function ForgotPasswordPage() {
-  const { isLoaded, signIn } = useSignIn() as any;
   const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [code, setCode] = useState("");
-  const [password, setPassword] = useState("");
-  const [successfulCreation, setSuccessfulCreation] = useState(false);
-  const router = useRouter();
+  const [sent, setSent] = useState(false);
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded) return;
     setLoading(true);
 
     try {
-      await signIn.create({
-        strategy: "reset_password_email_code",
-        identifier: email,
-      });
-      setSuccessfulCreation(true);
-      showToast("Check your email for the reset code!", "success");
+      await sendPasswordResetEmail(auth, email);
+      setSent(true);
+      showToast("Password reset link sent to your email!", "success");
     } catch (err: any) {
-      showToast(err.errors?.[0]?.message || "Something went wrong. Please try again.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!isLoaded) return;
-    setLoading(true);
-
-    try {
-      const result = await signIn.attemptFirstFactor({
-        strategy: "reset_password_email_code",
-        code,
-        password,
-      });
-
-      if (result.status === "complete") {
-        showToast("Password reset successful! Redirecting to login...", "success");
-        router.push("/login");
-      } else {
-        console.log(result);
-      }
-    } catch (err: any) {
-      showToast(err.errors?.[0]?.message || "Failed to reset password. Please check the code.", "error");
+      const msg = err.code === "auth/user-not-found"
+        ? "No account found with this email."
+        : "Something went wrong. Please try again.";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
@@ -78,8 +48,8 @@ export default function ForgotPasswordPage() {
             <p className="text-on-surface-variant text-sm font-medium">We'll help you get back into your account</p>
           </div>
 
-          {!successfulCreation ? (
-            <form onSubmit={handleCreate} className="space-y-6">
+          {!sent ? (
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label className="block text-xs font-black uppercase tracking-widest text-primary/40 px-1">Email Address</label>
                 <input
@@ -92,7 +62,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               <button
-                disabled={loading || !isLoaded}
+                disabled={loading}
                 type="submit"
                 className="w-full bg-primary text-white font-headline font-black py-5 rounded-xl shadow-xl shadow-primary/10 active:scale-95 transition-all uppercase tracking-widest text-[10px] disabled:opacity-50"
               >
@@ -100,37 +70,24 @@ export default function ForgotPasswordPage() {
               </button>
             </form>
           ) : (
-            <form onSubmit={handleReset} className="space-y-6">
-              <div className="space-y-2">
-                <label className="block text-xs font-black uppercase tracking-widest text-primary/40 px-1">Reset Code</label>
-                <input
-                  required
-                  type="text"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="123456"
-                  className="w-full bg-slate-50 border border-outline-variant rounded-xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all font-medium text-center tracking-[0.5em] text-2xl"
-                />
+            <div className="text-center space-y-6">
+              <div className="w-20 h-20 bg-green-50 rounded-3xl flex items-center justify-center mx-auto">
+                <MaterialIcon name="mark_email_read" className="text-4xl text-green-600" />
               </div>
-              <div className="space-y-2">
-                <label className="block text-xs font-black uppercase tracking-widest text-primary/40 px-1">New Password</label>
-                <input
-                  required
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-outline-variant rounded-xl py-4 px-5 focus:outline-none focus:ring-4 focus:ring-primary/5 transition-all font-medium"
-                />
+              <div>
+                <h3 className="font-headline text-xl font-bold text-primary mb-2">Check your inbox</h3>
+                <p className="text-sm text-on-surface-variant">
+                  We sent a password reset link to <span className="font-bold text-primary">{email}</span>. 
+                  Click the link to set a new password.
+                </p>
               </div>
               <button
-                disabled={loading || !isLoaded}
-                type="submit"
-                className="w-full bg-primary text-white font-headline font-black py-5 rounded-xl shadow-xl shadow-primary/10 active:scale-95 transition-all uppercase tracking-widest text-[10px] disabled:opacity-50"
+                onClick={() => setSent(false)}
+                className="text-xs font-bold text-accent-red hover:text-accent-orange transition-colors uppercase tracking-widest"
               >
-                {loading ? "Resetting..." : "Update Password"}
+                Didn't get it? Send again
               </button>
-            </form>
+            </div>
           )}
 
           <div className="mt-8 text-center">

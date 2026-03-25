@@ -2,70 +2,71 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSignIn, useClerk } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { signInWithEmailAndPassword, signInWithPopup, signInAnonymously } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase-client";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { useToast } from "@/components/Toast";
+import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
-  const { isLoaded, signIn } = useSignIn() as any;
-  const { setActive } = useClerk();
+  const { user, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [initializingHang, setInitializingHang] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get("redirect_url") || "/";
 
-  // Handle initialization hang
+  // Redirect if already logged in
   useEffect(() => {
-    if (!isLoaded) {
-      const timer = setTimeout(() => {
-        setInitializingHang(true);
-        showToast("Authentication provider is taking longer than usual. Please check your connection.", "info");
-      }, 5000);
-      return () => clearTimeout(timer);
-    } else {
-      setInitializingHang(false);
+    if (!authLoading && user && !user.isAnonymous) {
+      router.push(redirectUrl);
     }
-  }, [isLoaded, showToast]);
+  }, [user, authLoading, router, redirectUrl]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isLoaded) return;
-    
     setLoading(true);
     try {
-      const result = await (signIn as any).create({
-        identifier: email,
-        password,
-      });
-
-      if (result.status === "complete") {
-        await setActive({ session: result.createdSessionId });
-        showToast("Welcome back to Kindred!", "success");
-        router.push("/");
-      } else {
-        console.log(result);
-      }
+      await signInWithEmailAndPassword(auth, email, password);
+      showToast("Welcome back to Kindred!", "success");
+      router.push(redirectUrl);
     } catch (err: any) {
-      showToast(err.errors?.[0]?.message || "Login failed. Please check your credentials.", "error");
+      const msg = err.code === "auth/invalid-credential" 
+        ? "Invalid email or password. Please try again."
+        : err.code === "auth/user-not-found"
+        ? "No account found with this email."
+        : err.code === "auth/too-many-requests"
+        ? "Too many attempts. Please try again later."
+        : "Login failed. Please check your credentials.";
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const signInWith = (strategy: "oauth_google" | "oauth_apple") => {
-    if (!isLoaded) return;
+  const handleGoogleSignIn = async () => {
     try {
-      return (signIn as any).authenticateWithStrategy({
-        strategy,
-        redirectUrl: "/sso-callback",
-        redirectUrlComplete: "/",
-      });
+      await signInWithPopup(auth, googleProvider);
+      showToast("Welcome to Kindred!", "success");
+      router.push(redirectUrl);
     } catch (err: any) {
-      showToast("Social login failed. Please try email login.", "error");
+      if (err.code !== "auth/popup-closed-by-user") {
+        showToast("Google login failed. Please try email login.", "error");
+      }
+    }
+  };
+
+  const handleAnonymousSignIn = async () => {
+    try {
+      await signInAnonymously(auth);
+      showToast("Browsing as guest. Sign up anytime to save your progress!", "info");
+      router.push("/");
+    } catch {
+      showToast("Guest login failed. Please try again.", "error");
     }
   };
 
@@ -136,15 +137,6 @@ export default function LoginPage() {
           <div className="w-full max-w-md">
             <div className="bg-white p-8 md:p-10 rounded-xl shadow-2xl shadow-primary/10 border border-outline-variant/30 relative">
               
-              {!isLoaded && !initializingHang && (
-                <div className="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-50 rounded-xl flex items-center justify-center">
-                   <div className="flex flex-col items-center gap-4">
-                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                      <p className="text-[10px] font-black uppercase tracking-widest text-primary animate-pulse">Initializing Kindred Security...</p>
-                   </div>
-                </div>
-              )}
-
               <div className="md:hidden flex justify-center mb-8">
                 <span className="text-xl font-extrabold tracking-tighter text-primary font-headline">Kindred Core</span>
               </div>
@@ -160,12 +152,11 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium disabled:opacity-50" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium" 
                     id="email" 
                     name="email" 
                     placeholder="hello@kindredcore.com" 
                     type="email"
-                    disabled={!isLoaded}
                   />
                 </div>
                 <div className="space-y-1">
@@ -178,12 +169,11 @@ export default function LoginPage() {
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium disabled:opacity-50" 
+                      className="w-full px-4 py-3 bg-slate-50 border border-outline-variant rounded-lg focus:ring-4 focus:ring-accent-orange/10 focus:border-accent-orange transition-all outline-none text-on-surface placeholder:text-primary/30 font-medium" 
                       id="password" 
                       name="password" 
                       placeholder="••••••••" 
                       type="password"
-                      disabled={!isLoaded}
                     />
                   </div>
                 </div>
@@ -192,7 +182,7 @@ export default function LoginPage() {
                   <label className="text-sm text-on-surface-variant font-semibold" htmlFor="remember-me">Remember Me</label>
                 </div>
                 <button 
-                  disabled={loading || !isLoaded}
+                  disabled={loading}
                   className="w-full py-5 bg-primary hover:bg-primary/95 text-white font-headline font-black rounded-xl shadow-xl shadow-primary/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-[10px] disabled:opacity-50" 
                   type="submit"
                 >
@@ -211,19 +201,18 @@ export default function LoginPage() {
               <div className="grid grid-cols-2 gap-3">
                 <button 
                   type="button"
-                  disabled={!isLoaded}
-                  onClick={() => signInWith("oauth_google")}
-                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm disabled:opacity-30"
+                  onClick={handleGoogleSignIn}
+                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm"
                 >
                   <img alt="Google" className="w-5 h-5 grayscale opacity-50" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCzl_awn8TETYvPD_AIds-P1a8Vf-rM2Cvm9pAY0bT7ssIi6W_80DjKUSVTBgz3-NT-iEJgKuKZzPzoKneVa81CrBjbm_1wJVILIkz3mCvVANhEOyXOzRWtFUhq7MdGKcnNzyGMLel-ubBE5uSIsbDKesSC0OqVbO-B9q3XPNUYPVo1gksGcSVCmSiyuPA9poiE5ss2iNAOc65Ml91fYoastaHfsKrsHK6cGlcsSS8yih6pBLBhqb16JbsjvHBUSNeMCiWoaOhGvNo" />
                 </button>
                 <button 
                   type="button"
-                  disabled={!isLoaded}
-                  onClick={() => signInWith("oauth_apple")}
-                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm disabled:opacity-30"
+                  onClick={handleAnonymousSignIn}
+                  className="flex items-center justify-center py-4 border border-outline-variant/10 rounded-xl hover:bg-slate-50 transition-colors duration-300 shadow-sm gap-2"
                 >
-                  <img alt="Apple" className="w-5 h-5 grayscale opacity-50" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAo2DC1ia8gJjetVls-9cTO0P-Ja9vONSHOjfPIHK5bFGs9Dj_derNuj40IX6PXXV_jpThJ4L-AcYqquXAEj6-1YcfDheJNGYqTv3W4BZ0S8dGwpdtrYy8sqq-Kxvttd0mroh0Zn-3mVHG0kiL3ieTl6F4PYNpWIvAH7bu-s-nH7kH34yMhwql313RoVjd3oh71WiKUx4Hcv9pl8NM4Bu8lTa8W58sZ4zP65YFWd2isfu27HuIjn5Mtv4VPIRJv7Wg9fvx1olrS7v4" />
+                  <MaterialIcon name="person_outline" className="text-xl text-slate-400" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Guest</span>
                 </button>
               </div>
               <div className="mt-10 text-center">

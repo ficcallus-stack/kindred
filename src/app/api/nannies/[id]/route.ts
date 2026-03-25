@@ -1,31 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { users, nannyProfiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { bookings } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const { id } = await params;
+export async function GET() {
+  const clerkUser = await requireUser();
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, id),
-    with: { nannyProfile: true },
+  const result = await db.query.bookings.findMany({
+    where: eq(bookings.parentId, clerkUser.uid),
+    orderBy: [desc(bookings.createdAt)],
+    with: { caregiver: true },
   });
 
-  if (!user) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({
-    id: user.id,
-    fullName: user.fullName,
-    role: user.role,
-    hourlyRate: user.nannyProfile?.hourlyRate || null,
-    bio: user.nannyProfile?.bio || null,
-    location: user.nannyProfile?.location || null,
-    experienceYears: user.nannyProfile?.experienceYears || null,
-    isVerified: user.nannyProfile?.isVerified || false,
-  });
+  return NextResponse.json(result);
 }

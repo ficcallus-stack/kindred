@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import MapboxAutocomplete from "@/components/MapboxAutocomplete";
 import { updateNannyProfile, uploadProfilePhotos, deleteProfilePhoto } from "./actions";
 import { useRouter } from "next/navigation";
 
@@ -10,6 +11,8 @@ interface ProfileFormProps {
   initialData: {
     fullName: string;
     location: string | null;
+    latitude?: number;
+    longitude?: number;
     hourlyRate: string | null;
     experienceYears: number | null;
     bio: string | null;
@@ -39,6 +42,8 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
         hourlyRate: profile.hourlyRate ?? undefined,
         experienceYears: profile.experienceYears ?? undefined,
         location: profile.location ?? undefined,
+        latitude: profile.latitude,
+        longitude: profile.longitude,
       });
       setMessage("Profile updated successfully!");
     } catch (err) {
@@ -135,13 +140,16 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-on-surface-variant uppercase tracking-[0.2em] px-1 font-label">Location</label>
                 <div className="relative">
-                  <MaterialIcon name="location_on" className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60" />
-                  <input 
-                    className="w-full bg-surface-container-low border-none rounded-xl focus:ring-2 focus:ring-primary/20 pl-12 pr-5 py-4 text-primary font-bold font-headline shadow-inner" 
-                    type="text" 
-                    value={profile.location || ""}
+                  <MaterialIcon name="location_on" className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/60 z-10" />
+                  <MapboxAutocomplete 
+                    initialLocation={profile.location || ""}
+                    onSelect={(loc, lat, lng) => {
+                      handleUpdate("location", loc);
+                      handleUpdate("latitude", lat);
+                      handleUpdate("longitude", lng);
+                    }}
                     placeholder="City, State"
-                    onChange={(e) => handleUpdate("location", e.target.value)}
+                    inputClassName="w-full bg-surface-container-low border-none rounded-xl focus:ring-2 focus:ring-primary/20 pl-12 pr-5 py-4 text-primary font-bold font-headline shadow-inner relative z-0"
                   />
                 </div>
               </div>
@@ -241,6 +249,36 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
               </label>
             )}
           </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="bg-error-container/10 rounded-2xl p-8 shadow-sm border border-error/20">
+          <div className="flex items-center gap-3 mb-4">
+            <MaterialIcon name="warning" className="text-error" />
+            <h3 className="text-xl font-bold text-error font-headline">Danger Zone</h3>
+          </div>
+          <p className="text-on-surface-variant text-sm mb-6 max-w-2xl">
+            Permanently delete your KindredCare account and instantly purge all personally identifiable information, active job applications, and profile images from our servers. <strong>This action is irreversible.</strong>
+          </p>
+          <button 
+            type="button"
+            onClick={async () => {
+              if (window.confirm("Are you absolutely sure you want to permanently delete your account? This action cannot be undone.")) {
+                setIsSaving(true);
+                try {
+                  const { deleteNannyAccount } = await import('./actions');
+                  await deleteNannyAccount();
+                  window.location.href = "/";
+                } catch (e: any) {
+                  alert(e.message);
+                  setIsSaving(false);
+                }
+              }
+            }}
+            className="px-6 py-3 bg-error text-on-error rounded-xl font-bold text-sm shadow-sm hover:opacity-90 transition-opacity uppercase tracking-widest"
+          >
+            Permanently Delete Account
+          </button>
         </div>
 
         {/* Bottom Actions */}

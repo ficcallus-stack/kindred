@@ -24,6 +24,8 @@ export const updateNannyProfileSchema = z.object({
   hourlyRate: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid rate format").optional(),
   experienceYears: z.coerce.number().int().min(0).max(50).optional(),
   location: z.string().max(200).optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
 });
 
 export type UpdateNannyProfileInput = z.infer<typeof updateNannyProfileSchema>;
@@ -83,9 +85,17 @@ export const createReviewSchema = z.object({
   revieweeId: z.string().min(1),
   rating: z.coerce.number().int().min(1).max(5),
   comment: z.string().min(10, "Review must be at least 10 characters").max(2000),
+  images: z.array(z.string().url("Must be valid URL")).optional(),
 });
 
 export type CreateReviewInput = z.infer<typeof createReviewSchema>;
+
+export const replyToReviewSchema = z.object({
+  reviewId: z.string().uuid(),
+  replyText: z.string().min(5, "Reply must be at least 5 characters").max(2000),
+});
+
+export type ReplyToReviewInput = z.infer<typeof replyToReviewSchema>;
 
 // ── Certification Enrollment ───────────────────────────────
 export const enrollCertificationSchema = z.object({

@@ -1,6 +1,6 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { conversations, conversationMembers, messages, users } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -10,12 +10,11 @@ import { rateLimit } from "@/lib/rate-limit";
 import * as Ably from "ably";
 
 export async function getConversations() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   // Get all conversations the user is a member of
   const memberships = await db.query.conversationMembers.findMany({
-    where: eq(conversationMembers.userId, clerkUser.id),
+    where: eq(conversationMembers.userId, clerkUser.uid),
     with: {
       conversation: {
         with: {
@@ -36,21 +35,20 @@ export async function getConversations() {
   return memberships.map((m) => ({
     ...m.conversation,
     otherMembers: m.conversation.members
-      .filter((member) => member.userId !== clerkUser.id)
+      .filter((member) => member.userId !== clerkUser.uid)
       .map((member) => member.user),
     lastMessage: m.conversation.messages[0] || null,
   }));
 }
 
 export async function getConversationMessages(conversationId: string) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   // Verify user is a member
   const membership = await db.query.conversationMembers.findFirst({
     where: and(
       eq(conversationMembers.conversationId, conversationId),
-      eq(conversationMembers.userId, clerkUser.id)
+      eq(conversationMembers.userId, clerkUser.uid)
     ),
   });
 
@@ -73,10 +71,9 @@ export async function getConversationMessages(conversationId: string) {
 }
 
 export async function sendMessage(data: SendMessageInput) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
-  const { success } = await rateLimit(`sendMessage:${clerkUser.id}`, "relaxed");
+  const { success } = await rateLimit(`sendMessage:${clerkUser.uid}`, "relaxed");
   if (!success) throw new Error("Too many messages");
 
   const parsed = sendMessageSchema.safeParse(data);
@@ -90,14 +87,14 @@ export async function sendMessage(data: SendMessageInput) {
   const membership = await db.query.conversationMembers.findFirst({
     where: and(
       eq(conversationMembers.conversationId, conversationId),
-      eq(conversationMembers.userId, clerkUser.id)
+      eq(conversationMembers.userId, clerkUser.uid)
     ),
   });
   if (!membership) throw new Error("Not a member of this conversation");
 
   const [newMessage] = await db.insert(messages).values({
     conversationId,
-    senderId: clerkUser.id,
+    senderId: clerkUser.uid,
     content,
   }).returning();
 
@@ -113,7 +110,7 @@ export async function sendMessage(data: SendMessageInput) {
     const channel = ably.channels.get(`conversation:${conversationId}`);
     
     const sender = await db.query.users.findFirst({
-      where: eq(users.id, clerkUser.id),
+      where: eq(users.id, clerkUser.uid),
       columns: {
         id: true,
         fullName: true,
@@ -131,8 +128,7 @@ export async function sendMessage(data: SendMessageInput) {
 }
 
 export async function createConversation(data: CreateConversationInput) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   const parsed = createConversationSchema.safeParse(data);
   if (!parsed.success) {
@@ -143,7 +139,7 @@ export async function createConversation(data: CreateConversationInput) {
 
   // Check if a conversation already exists between these two users
   const existingMemberships = await db.query.conversationMembers.findMany({
-    where: eq(conversationMembers.userId, clerkUser.id),
+    where: eq(conversationMembers.userId, clerkUser.uid),
     with: {
       conversation: {
         with: {
@@ -166,7 +162,7 @@ export async function createConversation(data: CreateConversationInput) {
   await db.insert(conversations).values({ id: convoId });
   
   await db.insert(conversationMembers).values([
-    { conversationId: convoId, userId: clerkUser.id },
+    { conversationId: convoId, userId: clerkUser.uid },
     { conversationId: convoId, userId: recipientId },
   ]);
 

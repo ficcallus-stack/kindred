@@ -1,6 +1,6 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { caregiverVerifications, nannyProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -9,8 +9,7 @@ import { revalidatePath } from "next/cache";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function getVerificationData() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { uid: userId } = await requireUser();
 
   const data = await db.query.caregiverVerifications.findFirst({
     where: eq(caregiverVerifications.id, userId),
@@ -20,8 +19,7 @@ export async function getVerificationData() {
 }
 
 export async function updateVerificationStep(step: number) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { uid: userId } = await requireUser();
 
   await db
     .insert(caregiverVerifications)
@@ -35,8 +33,7 @@ export async function updateVerificationStep(step: number) {
 }
 
 export async function uploadIdentityDocs(formData: FormData) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { uid: userId } = await requireUser();
 
   const frontFile = formData.get("front") as File;
   const backFile = formData.get("back") as File;
@@ -89,8 +86,7 @@ export async function uploadIdentityDocs(formData: FormData) {
 }
 
 export async function submitBackgroundAuth() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { uid: userId } = await requireUser();
 
   await db
     .update(caregiverVerifications)
@@ -106,8 +102,7 @@ export async function submitBackgroundAuth() {
 }
 
 export async function submitReferences(referencesJson: string) {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { uid: userId } = await requireUser();
 
   await db
     .update(caregiverVerifications)
@@ -122,8 +117,7 @@ export async function submitReferences(referencesJson: string) {
 }
 
 export async function finalizeVerification() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
+  const { uid: userId } = await requireUser();
 
   await db
     .update(caregiverVerifications)

@@ -4,12 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
-import { SignInButton, SignUpButton, UserButton, useUser, Show } from "@clerk/nextjs";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { user, isLoaded, isSignedIn } = useUser();
-  const role = user?.publicMetadata?.role as "parent" | "caregiver" | undefined;
+  const { user, loading: isLoading, role, signOut } = useAuth();
+  const isSignedIn = !!user && !user.isAnonymous;
+  const isLoaded = !isLoading;
 
   const NavLink = ({ href, label, icon, secondaryIcon }: { href: string; label: string; icon: string; secondaryIcon?: string }) => (
     <Link href={href} className="hover:text-primary transition-all duration-300 py-2 flex items-center gap-1.5 px-3 rounded-xl hover:bg-primary/5 group">
@@ -53,6 +54,24 @@ export default function Navbar() {
                     <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
                   </>
                 )}
+
+                {/* ROLE: MODERATOR */}
+                {role === "moderator" && (
+                  <>
+                    <NavLink href="/dashboard/moderator" label="Mod Dashboard" icon="shield_person" />
+                    <NavLink href="/dashboard/moderator/verifications" label="Verifications" icon="verified" />
+                    <NavLink href="/dashboard/moderator/support" label="Support" icon="support_agent" />
+                  </>
+                )}
+
+                {/* ROLE: ADMIN */}
+                {role === "admin" && (
+                  <>
+                    <NavLink href="/dashboard/admin" label="Admin" icon="admin_panel_settings" />
+                    <NavLink href="/dashboard/moderator" label="Moderation" icon="shield_person" />
+                    <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
+                  </>
+                )}
               </>
             )}
 
@@ -69,28 +88,36 @@ export default function Navbar() {
 
           {/* Right Actions */}
           <div className="flex items-center gap-3">
-            <Show when="signed-out">
-              <Link href="/login" className="hidden sm:block text-slate-600 font-bold font-headline text-sm px-4 py-2 hover:text-primary transition-all">
-                Login
-              </Link>
-              <Link href="/signup" className="hidden sm:block bg-slate-900 text-white px-7 py-3 rounded-2xl font-black font-headline text-sm shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:-translate-y-0.5 active:scale-95 transition-all uppercase tracking-wider">
-                Join Now
-              </Link>
-            </Show>
+            {isLoaded && !isSignedIn && (
+              <>
+                <Link href="/login" className="hidden sm:block text-slate-600 font-bold font-headline text-sm px-4 py-2 hover:text-primary transition-all">
+                  Login
+                </Link>
+                <Link href="/signup" className="hidden sm:block bg-slate-900 text-white px-7 py-3 rounded-2xl font-black font-headline text-sm shadow-xl shadow-slate-900/10 hover:shadow-slate-900/20 hover:-translate-y-0.5 active:scale-95 transition-all uppercase tracking-wider">
+                  Join Now
+                </Link>
+              </>
+            )}
             
-            <Show when="signed-in">
+            {isLoaded && isSignedIn && (
               <div className="flex items-center gap-4 bg-slate-50 p-1.5 pr-3 rounded-2xl border border-slate-200/50">
-                <UserButton />
+                <button
+                  onClick={signOut}
+                  className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-all"
+                  title="Sign out"
+                >
+                  <MaterialIcon name="logout" className="text-lg text-primary" />
+                </button>
                 <div className="hidden sm:block">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
                     {role === "parent" ? "Family" : role === "caregiver" ? "Nanny" : "Member"}
                   </p>
                   <p className="text-[12px] font-bold text-slate-700 leading-none">
-                    {user?.firstName || "Account"}
+                    {user?.displayName || "Account"}
                   </p>
                 </div>
               </div>
-            </Show>
+            )}
 
             {/* Mobile hamburger */}
             <button 
@@ -138,19 +165,26 @@ export default function Navbar() {
             </nav>
 
             <div className="p-6 bg-slate-50/50 space-y-3">
-              <Show when="signed-out">
-                <Link href="/signup" className="w-full py-4 bg-primary text-white font-black text-sm rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center">Sign Up</Link>
-                <Link href="/login" className="w-full py-4 text-slate-600 font-bold text-sm hover:text-primary transition-all flex items-center justify-center">Login</Link>
-              </Show>
-              <Show when="signed-in">
+              {!isSignedIn && (
+                <>
+                  <Link href="/signup" className="w-full py-4 bg-primary text-white font-black text-sm rounded-2xl shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center">Sign Up</Link>
+                  <Link href="/login" className="w-full py-4 text-slate-600 font-bold text-sm hover:text-primary transition-all flex items-center justify-center">Login</Link>
+                </>
+              )}
+              {isSignedIn && (
                 <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-200/50 shadow-sm">
-                  <UserButton />
+                  <button
+                    onClick={signOut}
+                    className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center"
+                  >
+                    <MaterialIcon name="logout" className="text-lg text-primary" />
+                  </button>
                   <div>
                     <p className="text-xs font-black text-primary italic leading-none">{role?.toUpperCase() || "MEMBER"}</p>
-                    <p className="text-sm font-bold text-slate-700">{user?.fullName || user?.firstName}</p>
+                    <p className="text-sm font-bold text-slate-700">{user?.displayName || "Account"}</p>
                   </div>
                 </div>
-              </Show>
+              )}
             </div>
           </div>
         </div>
@@ -171,4 +205,3 @@ function MobileNavLink({ href, label, icon, onClick }: { href: string; label: st
     </Link>
   );
 }
-

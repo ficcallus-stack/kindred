@@ -2,31 +2,34 @@
 
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
-import { nannyProfiles, wallets, walletTransactions } from "@/db/schema";
+import { nannyProfiles, wallets, walletTransactions, users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { currentUser } from "@clerk/nextjs/server";
-import { redirect } from "next/navigation";
+import { requireUser } from "@/lib/get-server-user";
 
 /**
  * Creates or retrieves a Stripe Connect Express account and returns an onboarding link.
  */
 export async function getStripeConnectOnboarding() {
-  const user = await currentUser();
-  if (!user) throw new Error("Unauthorized");
+  const user = await requireUser();
 
   const [profile] = await db
     .select()
     .from(nannyProfiles)
-    .where(eq(nannyProfiles.id, user.id));
+    .where(eq(nannyProfiles.id, user.uid));
 
   let stripeId = profile?.stripeConnectId;
 
   // 1. Create account if not exists
   if (!stripeId) {
+    // Get email from DB since Firebase serverUser only has uid/email
+    const dbUser = await db.query.users.findFirst({
+      where: eq(users.id, user.uid),
+    });
+
     const account = await stripe.accounts.create({
       type: "express",
       country: "US",
-      email: user.emailAddresses[0].emailAddress,
+      email: dbUser?.email || user.email || "",
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
@@ -43,11 +46,11 @@ export async function getStripeConnectOnboarding() {
     await db
       .update(nannyProfiles)
       .set({ stripeConnectId: stripeId })
-      .where(eq(nannyProfiles.id, user.id));
+      .where(eq(nannyProfiles.id, user.uid));
     
     // Initialize wallet
     await db.insert(wallets).values({
-      id: user.id,
+      id: user.uid,
       balance: 0,
     }).onConflictDoNothing();
   }
@@ -65,16 +68,15 @@ export async function getStripeConnectOnboarding() {
 }
 
 /**
- * Fetches the connected Strype account details (bank name, last4).
+ * Fetches the connected Stripe account details (bank name, last4).
  */
 export async function getPayoutMethod() {
-  const user = await currentUser();
-  if (!user) return null;
+  const user = await requireUser();
 
   const [profile] = await db
     .select()
     .from(nannyProfiles)
-    .where(eq(nannyProfiles.id, user.id));
+    .where(eq(nannyProfiles.id, user.uid));
 
   if (!profile?.stripeConnectId) return null;
 
@@ -98,13 +100,12 @@ export async function getPayoutMethod() {
  * Initiates a manual withdrawal to the connected bank account.
  */
 export async function withdrawFunds(amountCents: number) {
-  const user = await currentUser();
-  if (!user) throw new Error("Unauthorized");
+  const user = await requireUser();
 
   const [wallet] = await db
     .select()
     .from(wallets)
-    .where(eq(wallets.id, user.id));
+    .where(eq(wallets.id, user.uid));
 
   if (!wallet || wallet.balance < amountCents) {
     throw new Error("Insufficient balance");
@@ -113,7 +114,7 @@ export async function withdrawFunds(amountCents: number) {
   const [profile] = await db
     .select()
     .from(nannyProfiles)
-    .where(eq(nannyProfiles.id, user.id));
+    .where(eq(nannyProfiles.id, user.uid));
 
   if (!profile?.stripeConnectId) {
     throw new Error("Payout method not configured");
@@ -127,7 +128,7 @@ export async function withdrawFunds(amountCents: number) {
 
   // 1. Log Withdrawal (Pending)
   const [txn] = await db.insert(walletTransactions).values({
-    walletId: user.id,
+    walletId: user.uid,
     amount: amountCents,
     type: "withdrawal",
     status: "pending",
@@ -136,8 +137,6 @@ export async function withdrawFunds(amountCents: number) {
 
   try {
     // 2. Trigger Stripe Payout
-    // Note: In Connect Express, we transfer funds from platform to connected account
-    // or payout from their balance. Assuming we handle platform funds:
     const payout = await stripe.payouts.create({
       amount: netAmount,
       currency: "usd",
@@ -148,7 +147,7 @@ export async function withdrawFunds(amountCents: number) {
     // 3. Update Wallet & Transaction
     await db.update(wallets)
       .set({ balance: wallet.balance - amountCents })
-      .where(eq(wallets.id, user.id));
+      .where(eq(wallets.id, user.uid));
 
     await db.update(walletTransactions)
       .set({ status: "completed", stripeTransferId: payout.id })
@@ -168,11 +167,10 @@ export async function withdrawFunds(amountCents: number) {
  * Fetches transaction history for the current user.
  */
 export async function getWalletData() {
-  const user = await currentUser();
-  if (!user) throw new Error("Unauthorized");
+  const user = await requireUser();
 
   const wallet = await db.query.wallets.findFirst({
-    where: eq(wallets.id, user.id),
+    where: eq(wallets.id, user.uid),
     with: {
       transactions: {
         orderBy: [desc(walletTransactions.createdAt)],

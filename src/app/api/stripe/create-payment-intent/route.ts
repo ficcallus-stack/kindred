@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { stripe } from "@/lib/stripe";
 
 export async function POST(req: NextRequest) {
   try {
-    const clerkUser = await currentUser();
-    if (!clerkUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const clerkUser = await requireUser();
 
     const body = await req.json();
     const { amount, description, metadata } = body;
@@ -22,7 +19,7 @@ export async function POST(req: NextRequest) {
       description: description || "KindredCare US Payment",
       metadata: {
         ...metadata,
-        userId: clerkUser.id,
+        userId: clerkUser.uid,
       },
       // Use manual capture for escrow-style hold
       capture_method: "manual",

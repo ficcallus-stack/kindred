@@ -1,6 +1,6 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { children } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -9,19 +9,17 @@ import { createChildSchema, updateChildSchema, type CreateChildInput } from "@/l
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function getChildren() {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   return db.query.children.findMany({
-    where: eq(children.parentId, clerkUser.id),
+    where: eq(children.parentId, clerkUser.uid),
   });
 }
 
 export async function addChild(data: CreateChildInput) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
-  const { success } = await rateLimit(`addChild:${clerkUser.id}`);
+  const { success } = await rateLimit(`addChild:${clerkUser.uid}`);
   if (!success) throw new Error("Too many requests");
 
   const parsed = createChildSchema.safeParse(data);
@@ -30,7 +28,7 @@ export async function addChild(data: CreateChildInput) {
   }
 
   await db.insert(children).values({
-    parentId: clerkUser.id,
+    parentId: clerkUser.uid,
     name: parsed.data.name,
     age: parsed.data.age,
     type: parsed.data.type,
@@ -41,12 +39,11 @@ export async function addChild(data: CreateChildInput) {
 }
 
 export async function removeChild(childId: string) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   // Only delete own children
   await db.delete(children).where(
-    and(eq(children.id, childId), eq(children.parentId, clerkUser.id))
+    and(eq(children.id, childId), eq(children.parentId, clerkUser.uid))
   );
 
   revalidatePath("/dashboard/parent");

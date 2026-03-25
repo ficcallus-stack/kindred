@@ -1,17 +1,17 @@
 "use server";
 
-import { currentUser } from "@clerk/nextjs/server";
+import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { applications, jobs, bookings, users, nannyProfiles } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { rateLimit } from "@/lib/rate-limit";
+import { sendApplicationStatusEmail } from "@/lib/email";
 
 export async function acceptApplication(applicationId: string) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
-  const { success } = await rateLimit(`acceptApp:${clerkUser.id}`);
+  const { success } = await rateLimit(`acceptApp:${clerkUser.uid}`);
   if (!success) throw new Error("Too many requests");
 
   // Get the application with its job
@@ -21,13 +21,21 @@ export async function acceptApplication(applicationId: string) {
   });
 
   if (!app) throw new Error("Application not found");
-  if (app.job.parentId !== clerkUser.id) throw new Error("Not your job posting");
+  if (app.job.parentId !== clerkUser.uid) throw new Error("Not your job posting");
   if (app.status !== "pending") throw new Error("Application is no longer pending");
 
   // Update application status to accepted
   await db.update(applications)
     .set({ status: "accepted" })
     .where(eq(applications.id, applicationId));
+
+  // Notify nanny via email
+  try {
+    const nanny = await db.query.users.findFirst({ where: eq(users.id, app.caregiverId) });
+    if (nanny?.email) {
+      await sendApplicationStatusEmail(nanny.email, nanny.fullName, app.job.title, "accepted");
+    }
+  } catch (e) { console.error("Email send failed:", e); }
 
   revalidatePath("/dashboard/parent/applicants");
   revalidatePath("/dashboard/parent");
@@ -41,10 +49,9 @@ export async function acceptApplication(applicationId: string) {
 }
 
 export async function rejectApplication(applicationId: string) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
-  const { success } = await rateLimit(`rejectApp:${clerkUser.id}`);
+  const { success } = await rateLimit(`rejectApp:${clerkUser.uid}`);
   if (!success) throw new Error("Too many requests");
 
   const app = await db.query.applications.findFirst({
@@ -53,11 +60,19 @@ export async function rejectApplication(applicationId: string) {
   });
 
   if (!app) throw new Error("Application not found");
-  if (app.job.parentId !== clerkUser.id) throw new Error("Not your job posting");
+  if (app.job.parentId !== clerkUser.uid) throw new Error("Not your job posting");
 
   await db.update(applications)
     .set({ status: "rejected" })
     .where(eq(applications.id, applicationId));
+
+  // Notify nanny via email
+  try {
+    const nanny = await db.query.users.findFirst({ where: eq(users.id, app.caregiverId) });
+    if (nanny?.email) {
+      await sendApplicationStatusEmail(nanny.email, nanny.fullName, app.job.title, "rejected");
+    }
+  } catch (e) { console.error("Email send failed:", e); }
 
   revalidatePath("/dashboard/parent/applicants");
   revalidatePath("/dashboard/parent");
@@ -65,8 +80,7 @@ export async function rejectApplication(applicationId: string) {
 }
 
 export async function getApplicantDetails(applicationId: string) {
-  const clerkUser = await currentUser();
-  if (!clerkUser) throw new Error("Unauthorized");
+  const clerkUser = await requireUser();
 
   const app = await db.query.applications.findFirst({
     where: eq(applications.id, applicationId),
@@ -81,7 +95,7 @@ export async function getApplicantDetails(applicationId: string) {
   });
 
   if (!app) throw new Error("Application not found");
-  if (app.job.parentId !== clerkUser.id) throw new Error("Not your job posting");
+  if (app.job.parentId !== clerkUser.uid) throw new Error("Not your job posting");
 
   return app;
 }

@@ -36,15 +36,16 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.com https://*.kindredcareus.com https://*.stripe.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.kindredcareus.com",
-              "img-src 'self' data: blob: https://*.googleusercontent.com https://api.dicebear.com https://*.clerk.com https://*.kindredcareus.com https://*.stripe.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              "connect-src 'self' https://*.clerk.com https://*.kindredcareus.com https://*.stripe.com wss://*.clerk.com wss://*.kindredcareus.com",
-              "frame-src 'self' https://*.stripe.com https://*.clerk.com https://*.kindredcareus.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.firebaseapp.com https://*.googleapis.com https://*.stripe.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+              "img-src 'self' data: blob: https://*.googleusercontent.com https://api.dicebear.com https://*.stripe.com",
+              "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com",
+              "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com wss://*.firebaseio.com https://*.stripe.com wss://*.ably.io https://*.ably.io https://realtime.ably.io",
+              "frame-src 'self' https://*.stripe.com https://*.firebaseapp.com",
+              "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'",
-              "form-action 'self' https://*.clerk.com https://*.kindredcareus.com"
+              "form-action 'self'"
             ].join("; ")
           }
         ],

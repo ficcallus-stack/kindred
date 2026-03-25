@@ -1,6 +1,7 @@
 import Navbar from "@/components/Navbar";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Link from "next/link";
+import HeroSearch from "@/components/HeroSearch";
 
 export default function Home() {
   return (
@@ -22,19 +23,7 @@ export default function Home() {
               {/* Primary Path Actions */}
               <div className="space-y-6">
                 {/* Search by State/Area */}
-                <div className="bg-surface-container-lowest p-2 rounded-2xl shadow-xl flex flex-col md:flex-row gap-2 max-w-2xl outline-variant/15 border border-outline-variant/15">
-                  <div className="flex-1 flex items-center px-4 py-3 gap-3">
-                    <MaterialIcon name="location_on" className="text-primary" />
-                    <input
-                      className="w-full border-none focus:ring-0 bg-transparent text-on-surface placeholder:text-on-surface-variant/60 font-medium"
-                      placeholder="Search by State and Area (e.g. Austin, TX)"
-                      type="text"
-                    />
-                  </div>
-                  <button className="bg-secondary-container text-on-secondary-container px-8 py-4 rounded-xl font-bold text-lg hover:brightness-95 transition-all shadow-lg shadow-secondary-container/20">
-                    Search
-                  </button>
-                </div>
+                <HeroSearch />
 
                 {/* Secondary Paths Buttons */}
                 <div className="flex flex-wrap gap-4">

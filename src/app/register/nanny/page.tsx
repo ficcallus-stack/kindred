@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 
-import { useUser, useClerk } from "@clerk/nextjs";
+import { useAuth } from "@/lib/auth-context";
+import { signOut as firebaseSignOut } from "firebase/auth";
+import { auth } from "@/lib/firebase-client";
 
 // Step Components
 import ProfileStep from "@/components/registration/ProfileStep";
@@ -19,8 +21,8 @@ const STEPS = [
 
 export default function NannyRegistration() {
   const router = useRouter();
-  const { user, isLoaded } = useUser();
-  const { signOut } = useClerk();
+  const { user, loading, role: authRole, signOut } = useAuth();
+  const isLoaded = !loading;
   
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
@@ -47,7 +49,7 @@ export default function NannyRegistration() {
     return (
       <div className="min-h-screen bg-surface flex flex-col items-center justify-center">
         <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-primary animate-pulse">Checking Access...</p>
+        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-primary animate-pulse">Checking access...</p>
       </div>
     );
   }
@@ -59,7 +61,7 @@ export default function NannyRegistration() {
   }
 
   // Check role conflict: parents cannot register as caregivers
-  const userRole = user.unsafeMetadata?.role as string;
+  const userRole = authRole;
   if (userRole === "parent") {
     return (
       <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
@@ -80,7 +82,7 @@ export default function NannyRegistration() {
                Return to Parent Dashboard
              </button>
              <button
-               onClick={() => signOut(() => router.push("/signup"))}
+               onClick={async () => { await signOut(); router.push("/signup"); }}
                className="w-full bg-white border border-outline-variant/20 text-navy font-bold py-4 rounded-xl hover:bg-slate-50 transition-colors"
              >
                Sign Out & Create Caregiver Account
@@ -92,11 +94,12 @@ export default function NannyRegistration() {
   }
 
   // Auto-fill using Clerk data if profile is empty
+  const nameParts = (user.displayName || "").split(" ");
   const prefilledProfile = {
     ...formData.profile,
-    firstName: (formData.profile as any).firstName || user.firstName || "",
-    lastName: (formData.profile as any).lastName || user.lastName || "",
-    email: (formData.profile as any).email || user.primaryEmailAddress?.emailAddress || "",
+    firstName: (formData.profile as any).firstName || nameParts[0] || "",
+    lastName: (formData.profile as any).lastName || nameParts.slice(1).join(" ") || "",
+    email: (formData.profile as any).email || user.email || "",
   };
 
   return (
