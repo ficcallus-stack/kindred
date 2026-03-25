@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { adminAuth } from "@/lib/firebase-admin";
 
 // POST â€” Create session cookie from ID token

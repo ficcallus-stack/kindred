@@ -2,6 +2,7 @@ import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
 const apps = getApps();
+let appInitialized = false;
 
 if (apps.length === 0) {
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -16,9 +17,22 @@ if (apps.length === 0) {
         private_key: privateKey,
       } as any),
     });
+    appInitialized = true;
   } else {
     console.warn("Firebase Admin credentials partially missing — skipping initialization (likely mid-build)");
   }
+} else {
+  appInitialized = true;
 }
 
-export const adminAuth = getAuth();
+// Proxy-based lazy export to prevent build-time crashes
+export const adminAuth = new Proxy({} as any, {
+  get(_, prop) {
+    if (!appInitialized) {
+      if (typeof prop === 'string' && prop === 'toJSON') return () => ({}); // Support JSON serialization if needed
+      throw new Error("Firebase Admin not initialized. Ensure environment variables are set.");
+    }
+    const auth = getAuth();
+    return (auth as any)[prop];
+  }
+}) as ReturnType<typeof getAuth>;

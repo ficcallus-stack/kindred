@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+export const dynamic = "force-dynamic";
 import { getServerUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { emailOtps, users } from "@/db/schema";
