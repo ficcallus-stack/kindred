@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncUser } from "@/lib/user-sync";
 import * as Ably from "ably";
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   const user = await syncUser();
