@@ -210,6 +210,9 @@ export default function SignUpPage() {
               >
                 {loading ? "Creating Account..." : "Create Account"}
               </button>
+              <p className="text-[10px] text-center text-on-surface-variant/60 font-medium px-4 leading-relaxed">
+                By creating an account, you agree to our <Link href="/terms" className="text-secondary font-bold hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-secondary font-bold hover:underline">Privacy Policy</Link>.
+              </p>
             </form>
 
             <div className="space-y-6 pt-6 border-t border-slate-100">

@@ -33,10 +33,10 @@ export default function Footer() {
         <div>
           <h4 className="text-slate-500 font-bold mb-8 text-xs uppercase tracking-[0.2em] font-headline">Legal</h4>
           <ul className="space-y-4 text-sm font-semibold">
-            <li><button className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Privacy Policy</button></li>
-            <li><button className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Terms of Service</button></li>
-            <li><button className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Cookie Settings</button></li>
-            <li><button className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Contact Us</button></li>
+            <li><Link href="/privacy" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Privacy Policy</Link></li>
+            <li><Link href="/terms" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Terms of Service</Link></li>
+            <li><Link href="/cookies" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Cookie Settings</Link></li>
+            <li><Link href="/safety" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Contact Us</Link></li>
           </ul>
         </div>
 
