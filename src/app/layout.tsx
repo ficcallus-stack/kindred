@@ -44,9 +44,6 @@ export default function RootLayout({
     <ClerkProvider 
       signInUrl="/login" 
       signUpUrl="/signup"
-      {...(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.includes("live") ? {
-        domain: "www.kindredcareus.com"
-      } : {})}
     >
       <html lang="en" className={`${plusJakartaSans.variable} ${inter.variable}`}>
         <head>
