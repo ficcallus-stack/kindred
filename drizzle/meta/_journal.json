@@ -15,6 +15,13 @@
       "when": 1774356135601,
       "tag": "0001_unknown_sebastian_shaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774419292852,
+      "tag": "0002_tired_red_skull",
+      "breakpoints": true
     }
   ]
 }

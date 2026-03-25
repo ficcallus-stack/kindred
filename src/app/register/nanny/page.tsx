@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 
+import { useUser, useClerk } from "@clerk/nextjs";
+
 // Step Components
 import ProfileStep from "@/components/registration/ProfileStep";
 import AvailabilityStep from "@/components/registration/AvailabilityStep";
@@ -17,6 +19,9 @@ const STEPS = [
 
 export default function NannyRegistration() {
   const router = useRouter();
+  const { user, isLoaded } = useUser();
+  const { signOut } = useClerk();
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     profile: {},
@@ -36,6 +41,63 @@ export default function NannyRegistration() {
   };
 
   const currentStepData = STEPS.find((s) => s.id === currentStep)!;
+
+  // Wait for Clerk to load
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center">
+        <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="mt-4 text-xs font-bold uppercase tracking-widest text-primary animate-pulse">Checking Access...</p>
+      </div>
+    );
+  }
+
+  // Prevent unauthenticated access
+  if (!user) {
+    router.push("/login");
+    return null;
+  }
+
+  // Check role conflict: parents cannot register as caregivers
+  const userRole = user.unsafeMetadata?.role as string;
+  if (userRole === "parent") {
+    return (
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-10 rounded-3xl shadow-xl text-center border border-outline-variant/10">
+          <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto text-terracotta mb-6">
+            <MaterialIcon name="manage_accounts" className="text-4xl" />
+          </div>
+          <h2 className="text-2xl font-headline font-bold text-navy mb-4">Account Role Conflict</h2>
+          <p className="text-on-surface-variant text-sm leading-relaxed mb-8">
+            You are currently registered as a <strong>Parent</strong>. 
+            To register as a Caregiver or Nanny, you must either create a new account with a different email address or contact support to convert your existing account.
+          </p>
+          <div className="space-y-3 flex flex-col items-center">
+             <button
+               onClick={() => router.push("/dashboard/parent")}
+               className="w-full bg-navy text-white font-bold py-4 rounded-xl shadow-lg hover:opacity-90 transition-opacity"
+             >
+               Return to Parent Dashboard
+             </button>
+             <button
+               onClick={() => signOut(() => router.push("/signup"))}
+               className="w-full bg-white border border-outline-variant/20 text-navy font-bold py-4 rounded-xl hover:bg-slate-50 transition-colors"
+             >
+               Sign Out & Create Caregiver Account
+             </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Auto-fill using Clerk data if profile is empty
+  const prefilledProfile = {
+    ...formData.profile,
+    firstName: (formData.profile as any).firstName || user.firstName || "",
+    lastName: (formData.profile as any).lastName || user.lastName || "",
+    email: (formData.profile as any).email || user.primaryEmailAddress?.emailAddress || "",
+  };
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen">
@@ -84,7 +146,7 @@ export default function NannyRegistration() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             <div className="lg:col-span-8">
               {currentStep === 1 && (
-                <ProfileStep data={formData.profile} onNext={(data) => { updateFormData("profile", data); nextStep(); }} />
+                <ProfileStep data={prefilledProfile} onNext={(data) => { updateFormData("profile", data); nextStep(); }} />
               )}
               {currentStep === 2 && (
                 <AvailabilityStep 
