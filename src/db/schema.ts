@@ -1,8 +1,8 @@
-import { pgTable, text, timestamp, boolean, decimal, integer, pgEnum, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, decimal, integer, pgEnum, primaryKey, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ── Enums ──────────────────────────────────────────────────
-export const userRoleEnum = pgEnum("user_role", ["parent", "caregiver"]);
+export const userRoleEnum = pgEnum("user_role", ["parent", "caregiver", "admin", "moderator"]);
 export const jobStatusEnum = pgEnum("job_status", ["open", "closed", "completed"]);
 export const applicationStatusEnum = pgEnum("application_status", ["pending", "accepted", "rejected"]);
 export const bookingStatusEnum = pgEnum("booking_status", ["pending", "confirmed", "in_progress", "completed", "cancelled"]);
@@ -12,6 +12,10 @@ export const certificationStatusEnum = pgEnum("certification_status", ["pending_
 export const verificationStatusEnum = pgEnum("verification_status", ["none", "draft", "pending", "verified", "rejected"]);
 export const walletTransactionTypeEnum = pgEnum("wallet_transaction_type", ["earning", "withdrawal"]);
 export const walletTransactionStatusEnum = pgEnum("wallet_transaction_status", ["pending", "completed", "failed"]);
+
+export const ticketStatusEnum = pgEnum("ticket_status", ["open", "in_progress", "resolved", "closed"]);
+export const ticketPriorityEnum = pgEnum("ticket_priority", ["low", "medium", "high", "urgent"]);
+export const ticketCategoryEnum = pgEnum("ticket_category", ["general", "safety", "payment", "technical"]);
 
 // ── Users ──────────────────────────────────────────────────
 export const users = pgTable("users", {
@@ -32,6 +36,7 @@ export const nannyProfiles = pgTable("nanny_profiles", {
   location: text("location"),
   isVerified: boolean("is_verified").default(false).notNull(),
   stripeConnectId: text("stripe_connect_id"),
+  photos: jsonb("photos").$type<string[]>().default([]),
 });
 
 // ── Children ───────────────────────────────────────────────
@@ -41,7 +46,7 @@ export const children = pgTable("children", {
   name: text("name").notNull(),
   age: integer("age").notNull(),
   type: text("type").notNull(), // e.g., "toddler", "pre-schooler", "infant"
-  specialNeeds: text("special_needs").default("[]"), // JSON array stored as text
+  specialNeeds: jsonb("special_needs").$type<string[]>().default([]), // JSON array stored as jsonb
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -130,6 +135,28 @@ export const reviews = pgTable("reviews", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Support Tickets ────────────────────────────────────────
+export const tickets = pgTable("tickets", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: ticketStatusEnum("status").default("open").notNull(),
+  priority: ticketPriorityEnum("priority").default("medium").notNull(),
+  category: ticketCategoryEnum("category").default("general").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const ticketMessages = pgTable("ticket_messages", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  ticketId: text("ticket_id").notNull().references(() => tickets.id),
+  senderId: text("sender_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  isInternal: boolean("is_internal").default(false).notNull(), // for Moderator notes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ── Certifications ─────────────────────────────────────────
 export const certifications = pgTable("certifications", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -186,7 +213,7 @@ export const caregiverVerifications = pgTable("caregiver_verifications", {
   backgroundAuthTimestamp: timestamp("background_auth_timestamp"),
   
   // Step 3: References (JSONB equivalent or structured text)
-  references: text("references"), // Stored as JSON string for flexibility
+  references: jsonb("references").$type<any[]>(), // Stored as jsonb for flexible structs
   
   status: verificationStatusEnum("status").default("none").notNull(),
   adminNotes: text("admin_notes"),

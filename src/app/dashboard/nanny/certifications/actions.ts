@@ -19,7 +19,7 @@ export async function enrollCertification(data: EnrollCertificationInput) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Unauthorized");
 
-  const { success } = rateLimit(`enroll:${clerkUser.id}`, { limit: 3, windowSeconds: 60 });
+  const { success } = await rateLimit(`enroll:${clerkUser.id}`, "strict");
   if (!success) throw new Error("Too many requests");
 
   const parsed = enrollCertificationSchema.safeParse(data);

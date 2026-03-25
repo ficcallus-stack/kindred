@@ -13,7 +13,7 @@ export async function createBooking(data: CreateBookingInput) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Unauthorized");
 
-  const { success } = rateLimit(`createBooking:${clerkUser.id}`, { limit: 5, windowSeconds: 60 });
+  const { success } = await rateLimit(`createBooking:${clerkUser.id}`, "strict");
   if (!success) throw new Error("Too many requests");
 
   const parsed = createBookingSchema.safeParse(data);

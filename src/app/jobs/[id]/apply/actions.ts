@@ -13,7 +13,7 @@ export async function submitApplication(data: SubmitApplicationInput) {
   if (!clerkUser) throw new Error("Unauthorized");
 
   // Rate limit: 10 applications per minute
-  const { success } = rateLimit(`apply:${clerkUser.id}`, { limit: 10, windowSeconds: 60 });
+  const { success } = await rateLimit(`apply:${clerkUser.id}`);
   if (!success) throw new Error("Too many requests. Please try again later.");
 
   // Validate input

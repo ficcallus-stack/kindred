@@ -4,82 +4,142 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 
 interface Step1Props {
+  availableChildren?: any[];
   data: any;
   updateData: (data: any) => void;
   onNext: () => void;
   onCancel: () => void;
 }
 
-export default function Step1({ data, updateData, onNext, onCancel }: Step1Props) {
+export default function Step1({ availableChildren = [], data, updateData, onNext, onCancel }: Step1Props) {
+  const toggleChild = (child: any) => {
+    const selected = data.selectedChildrenIds || [];
+    const isIn = selected.includes(child.id);
+    const nextSelected = isIn ? selected.filter((id: string) => id !== child.id) : [...selected, child.id];
+    
+    const updates: any = {
+      selectedChildrenIds: nextSelected,
+      childCount: nextSelected.length > 0 ? nextSelected.length : 1
+    };
+
+    // Auto-fill existing manual structure so validation/review steps don't break!
+    nextSelected.forEach((id: string, index: number) => {
+      const c = availableChildren.find(x => x.id === id);
+      if (c) {
+        updates[`child${index + 1}Years`] = c.age;
+        updates[`child${index + 1}Months`] = 0;
+      }
+    });
+
+    updateData(updates);
+  };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Main Form Section */}
       <section className="lg:col-span-8 space-y-12">
-        {/* Number of Children */}
+        {/* Number of Children / Children Selector */}
         <div className="space-y-6">
           <label className="text-xl font-bold font-headline text-primary block">
-            How many children need care?
+            {availableChildren.length > 0 ? "Which children need care?" : "How many children need care?"}
           </label>
-          <div className="flex flex-wrap gap-4">
-            {[1, 2, 3, "4+"].map((num) => (
-              <button
-                key={num}
-                type="button"
-                onClick={() => updateData({ childCount: num })}
-                className={cn(
-                  "px-8 py-4 rounded-xl border-2 transition-all active:scale-95 shadow-sm",
-                  data.childCount === num
-                    ? "border-primary text-primary font-bold bg-surface-container-lowest"
-                    : "border-outline-variant text-on-surface-variant font-medium hover:border-primary-container hover:text-primary bg-surface-container-lowest"
-                )}
-              >
-                {num}
-              </button>
-            ))}
-          </div>
+          
+          {availableChildren.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availableChildren.map((child: any) => {
+                const isSelected = (data.selectedChildrenIds || []).includes(child.id);
+                return (
+                  <button
+                    key={child.id}
+                    type="button"
+                    onClick={() => toggleChild(child)}
+                    className={cn(
+                      "p-6 rounded-xl border-2 transition-all active:scale-95 shadow-sm text-left flex items-center gap-4",
+                      isSelected
+                        ? "border-primary bg-surface-container-lowest"
+                        : "border-outline-variant hover:border-primary-container bg-surface-container-lowest"
+                    )}
+                  >
+                    <div className="w-12 h-12 bg-primary/5 rounded-xl flex items-center justify-center text-primary">
+                      <MaterialIcon name={child.age < 2 ? "baby_changing_station" : "child_care"} className="text-2xl" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-headline font-bold text-primary">{child.name}</p>
+                      <p className="text-xs text-on-surface-variant font-medium">{child.age} years old • {child.type}</p>
+                    </div>
+                    <div className={cn(
+                      "w-6 h-6 rounded-full border-2 flex items-center justify-center",
+                      isSelected ? "border-primary bg-primary text-white" : "border-outline-variant"
+                    )}>
+                      {isSelected && <MaterialIcon name="check" className="text-sm" fill />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-4">
+              {[1, 2, 3, "4+"].map((num) => (
+                <button
+                  key={num}
+                  type="button"
+                  onClick={() => updateData({ childCount: num })}
+                  className={cn(
+                    "px-8 py-4 rounded-xl border-2 transition-all active:scale-95 shadow-sm",
+                    data.childCount === num
+                      ? "border-primary text-primary font-bold bg-surface-container-lowest"
+                      : "border-outline-variant text-on-surface-variant font-medium hover:border-primary-container hover:text-primary bg-surface-container-lowest"
+                  )}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Ages of Children */}
-        <div className="space-y-6">
-          <label className="text-xl font-bold font-headline text-primary block">
-            Ages of children
-          </label>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Array.from({ length: typeof data.childCount === 'number' ? data.childCount : 4 }).map((_, i) => (
-              <div key={i} className="bg-surface-container-lowest p-6 rounded-xl shadow-sm space-y-2 border border-black/5 animate-in fade-in zoom-in-95 duration-300">
-                <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
-                  Child {i + 1}
-                </span>
-                <div className="flex items-center gap-3">
-                  <input
-                    className="w-full bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary/40 py-3 px-4 font-medium"
-                    placeholder="Years"
-                    type="number"
-                    value={data[`child${i + 1}Years`] || ""}
-                    onChange={(e) => updateData({ [`child${i + 1}Years`]: e.target.value })}
-                  />
-                  <input
-                    className="w-full bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary/40 py-3 px-4 font-medium"
-                    placeholder="Months"
-                    type="number"
-                    value={data[`child${i + 1}Months`] || ""}
-                    onChange={(e) => updateData({ [`child${i + 1}Months`]: e.target.value })}
-                  />
+        {/* Ages of Children (only show if using manual count) */}
+        {availableChildren.length === 0 && (
+          <div className="space-y-6">
+            <label className="text-xl font-bold font-headline text-primary block">
+              Ages of children
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Array.from({ length: typeof data.childCount === 'number' ? data.childCount : 4 }).map((_, i) => (
+                <div key={i} className="bg-surface-container-lowest p-6 rounded-xl shadow-sm space-y-2 border border-black/5 animate-in fade-in zoom-in-95 duration-300">
+                  <span className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">
+                    Child {i + 1}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <input
+                      className="w-full bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary/40 py-3 px-4 font-medium"
+                      placeholder="Years"
+                      type="number"
+                      value={data[`child${i + 1}Years`] || ""}
+                      onChange={(e) => updateData({ [`child${i + 1}Years`]: e.target.value })}
+                    />
+                    <input
+                      className="w-full bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary/40 py-3 px-4 font-medium"
+                      placeholder="Months"
+                      type="number"
+                      value={data[`child${i + 1}Months`] || ""}
+                      onChange={(e) => updateData({ [`child${i + 1}Months`]: e.target.value })}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-            {(typeof data.childCount !== 'number' || data.childCount < 4) && (
-              <button
-                type="button"
-                onClick={() => updateData({ childCount: Math.min((typeof data.childCount === 'number' ? data.childCount : 4) + 1, 4) })}
-                className="flex items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary transition-colors group"
-              >
-                <MaterialIcon name="add_circle" className="group-hover:scale-110 transition-transform" />
-                <span className="font-bold">Add another child</span>
-              </button>
-            )}
+              ))}
+              {(typeof data.childCount !== 'number' || data.childCount < 4) && (
+                <button
+                  type="button"
+                  onClick={() => updateData({ childCount: Math.min((typeof data.childCount === 'number' ? data.childCount : 4) + 1, 4) })}
+                  className="flex items-center justify-center gap-2 p-6 rounded-xl border-2 border-dashed border-outline-variant text-on-surface-variant hover:text-primary hover:border-primary transition-colors group"
+                >
+                  <MaterialIcon name="add_circle" className="group-hover:scale-110 transition-transform" />
+                  <span className="font-bold">Add another child</span>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Location and Timing */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

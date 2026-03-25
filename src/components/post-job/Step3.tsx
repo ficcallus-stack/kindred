@@ -122,8 +122,8 @@ export default function Step3({ data, updateData, onNext, onBack }: Step3Props) 
             <textarea
               className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-xl px-4 py-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all font-body text-primary placeholder:text-outline/60 min-h-[160px]"
               placeholder="Our 4-year old loves dinosaurs and we encourage outdoor play..."
-              value={data.notes || ""}
-              onChange={(e) => updateData({ notes: e.target.value })}
+              value={data.description || ""}
+              onChange={(e) => updateData({ description: e.target.value })}
             ></textarea>
           </div>
         </div>

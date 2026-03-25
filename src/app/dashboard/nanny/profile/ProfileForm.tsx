@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
-import { updateNannyProfile } from "./actions";
+import { updateNannyProfile, uploadProfilePhotos, deleteProfilePhoto } from "./actions";
+import { useRouter } from "next/navigation";
 
 interface ProfileFormProps {
   initialData: {
@@ -12,13 +13,17 @@ interface ProfileFormProps {
     hourlyRate: string | null;
     experienceYears: number | null;
     bio: string | null;
+    photos: string[];
   };
 }
 
 export default function ProfileForm({ initialData }: ProfileFormProps) {
   const [profile, setProfile] = useState(initialData);
+  const [photos, setPhotos] = useState<string[]>(initialData.photos || []);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [message, setMessage] = useState("");
+  const router = useRouter();
 
   const handleUpdate = (field: string, value: any) => {
     setProfile(prev => ({ ...prev, [field]: value }));
@@ -42,6 +47,43 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
       setIsSaving(false);
     }
   };
+
+  const handleUploadPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setIsUploading(true);
+    const formData = new FormData();
+    for (let i = 0; i < e.target.files.length; i++) {
+        formData.append("photos", e.target.files[i]);
+    }
+    try {
+        await uploadProfilePhotos(formData);
+        router.refresh();
+        // Optimistically append local state just in case
+    } catch (err: any) {
+        alert(err.message);
+    } finally {
+        setIsUploading(false);
+    }
+  };
+
+  const handleDeletePhoto = async (url: string) => {
+      try {
+          await deleteProfilePhoto(url);
+          setPhotos(prev => prev.filter(p => p !== url));
+          router.refresh();
+      } catch (err: any) {
+          alert(err.message);
+      }
+  };
+
+  // Sync state if props change (Optimistic UI fallback)
+  const syncPhotosFromProps = initialData.photos;
+  useState(() => {
+    if (syncPhotosFromProps) {
+        setPhotos(syncPhotosFromProps);
+    }
+    return null;
+  });
 
   return (
     <div className="animate-in fade-in duration-700">
@@ -147,6 +189,58 @@ export default function ProfileForm({ initialData }: ProfileFormProps) {
             placeholder="Tell families about your experience, approach, and why you love childcare..."
             onChange={(e) => handleUpdate("bio", e.target.value)}
           ></textarea>
+        </div>
+
+        {/* Photo Gallery Gallery */}
+        <div className="bg-surface-container-lowest rounded-2xl p-8 shadow-sm border border-outline-variant/10">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-tertiary/10 rounded-lg">
+                <MaterialIcon name="photo_library" className="text-tertiary font-fill" fill />
+              </div>
+              <h3 className="text-2xl font-bold text-primary font-headline">Photo Gallery</h3>
+            </div>
+            <span className="text-xs font-bold text-outline-variant uppercase tracking-wider">
+              {photos.length} / 5 photos
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+            {photos.map((url, index) => (
+              <div key={index} className="relative group aspect-square rounded-xl overflow-hidden bg-surface-container-high border-2 border-transparent hover:border-primary/20 transition-all shadow-sm">
+                <img src={url} alt={`Profile Photo ${index + 1}`} className="w-full h-full object-cover" />
+                <button 
+                  onClick={() => handleDeletePhoto(url)}
+                  className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <MaterialIcon name="close" className="text-sm" />
+                </button>
+              </div>
+            ))}
+
+            {photos.length < 5 && (
+              <label 
+                className={cn(
+                  "relative aspect-square rounded-xl overflow-hidden bg-surface-container-low border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-primary/50 hover:bg-surface-container-high transition-all",
+                  isUploading && "opacity-50 pointer-events-none"
+                )}
+              >
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  multiple 
+                  onChange={handleUploadPhotos} 
+                  className="hidden" 
+                />
+                <div className="w-10 h-10 bg-surface-container-lowest rounded-full flex items-center justify-center shadow-sm">
+                  <MaterialIcon name="add" className="text-primary text-xl" />
+                </div>
+                <span className="text-xs font-bold text-on-surface-variant/70 uppercase tracking-widest">
+                  {isUploading ? "Uploading..." : "Add Photo"}
+                </span>
+              </label>
+            )}
+          </div>
         </div>
 
         {/* Bottom Actions */}

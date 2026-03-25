@@ -7,6 +7,7 @@ import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { sendMessageSchema, createConversationSchema, type SendMessageInput, type CreateConversationInput } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
+import * as Ably from "ably";
 
 export async function getConversations() {
   const clerkUser = await currentUser();
@@ -68,7 +69,7 @@ export async function sendMessage(data: SendMessageInput) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Unauthorized");
 
-  const { success } = rateLimit(`sendMessage:${clerkUser.id}`, { limit: 30, windowSeconds: 60 });
+  const { success } = await rateLimit(`sendMessage:${clerkUser.id}`, "relaxed");
   if (!success) throw new Error("Too many messages");
 
   const parsed = sendMessageSchema.safeParse(data);
@@ -87,16 +88,32 @@ export async function sendMessage(data: SendMessageInput) {
   });
   if (!membership) throw new Error("Not a member of this conversation");
 
-  await db.insert(messages).values({
+  const [newMessage] = await db.insert(messages).values({
     conversationId,
     senderId: clerkUser.id,
     content,
-  });
+  }).returning();
 
   // Update conversation timestamp
   await db.update(conversations)
     .set({ updatedAt: new Date() })
     .where(eq(conversations.id, conversationId));
+
+  // Publish to Ably channel in real-time
+  const apiKey = process.env.ABLY_API_KEY;
+  if (apiKey) {
+    const ably = new Ably.Rest({ key: apiKey });
+    const channel = ably.channels.get(`conversation:${conversationId}`);
+    
+    const sender = await db.query.users.findFirst({
+      where: eq(users.id, clerkUser.id),
+    });
+
+    await channel.publish("message", {
+      ...newMessage,
+      sender,
+    });
+  }
 
   revalidatePath(`/dashboard/messages/${conversationId}`);
   revalidatePath("/dashboard/messages");

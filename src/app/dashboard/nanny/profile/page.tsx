@@ -28,6 +28,7 @@ export default async function NannyProfilePage() {
     hourlyRate: profileDetails?.hourlyRate || "0",
     experienceYears: profileDetails?.experienceYears || 0,
     bio: profileDetails?.bio || "",
+    photos: (profileDetails?.photos as string[]) || [],
   };
 
   return <ProfileForm initialData={initialData} />;

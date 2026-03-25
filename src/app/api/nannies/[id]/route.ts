@@ -21,7 +21,6 @@ export async function GET(
   return NextResponse.json({
     id: user.id,
     fullName: user.fullName,
-    email: user.email,
     role: user.role,
     hourlyRate: user.nannyProfile?.hourlyRate || null,
     bio: user.nannyProfile?.bio || null,

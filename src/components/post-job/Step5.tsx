@@ -23,7 +23,7 @@ export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
             <h3 className="font-headline font-bold text-on-surface-variant text-sm uppercase tracking-wider">
               Job Title & Description
             </h3>
-            <button onClick={() => onEdit(1)} className="text-primary hover:underline text-sm font-semibold">
+            <button onClick={() => onEdit(3)} className="text-primary hover:underline text-sm font-semibold">
               Edit
             </button>
           </div>
@@ -31,7 +31,7 @@ export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
             Experienced Nanny for {data.childCount || 2} Active Child{data.childCount > 1 ? 'ren' : ''} in {data.location || 'Austin'}
           </h2>
           <p className="text-on-surface-variant leading-relaxed">
-            {data.notes || "Looking for a patient and energetic caregiver to engage our children in creative play, outdoor activities, and light educational tasks. Experience with early childhood development is a plus."}
+            {data.description || "Looking for a patient and energetic caregiver to engage our children in creative play, outdoor activities, and light educational tasks. Experience with early childhood development is a plus."}
           </p>
         </section>
 

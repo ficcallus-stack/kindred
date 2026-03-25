@@ -11,7 +11,7 @@ export async function acceptApplication(applicationId: string) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Unauthorized");
 
-  const { success } = rateLimit(`acceptApp:${clerkUser.id}`, { limit: 10, windowSeconds: 60 });
+  const { success } = await rateLimit(`acceptApp:${clerkUser.id}`);
   if (!success) throw new Error("Too many requests");
 
   // Get the application with its job
@@ -44,7 +44,7 @@ export async function rejectApplication(applicationId: string) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Unauthorized");
 
-  const { success } = rateLimit(`rejectApp:${clerkUser.id}`, { limit: 10, windowSeconds: 60 });
+  const { success } = await rateLimit(`rejectApp:${clerkUser.id}`);
   if (!success) throw new Error("Too many requests");
 
   const app = await db.query.applications.findFirst({

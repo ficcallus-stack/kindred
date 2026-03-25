@@ -6,6 +6,7 @@ import { caregiverVerifications, nannyProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { uploadToR2 } from "@/lib/r2";
 import { revalidatePath } from "next/cache";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function getVerificationData() {
   const { userId } = await auth();
@@ -39,6 +40,15 @@ export async function uploadIdentityDocs(formData: FormData) {
 
   const frontFile = formData.get("front") as File;
   const backFile = formData.get("back") as File;
+
+  // Rate Limiting
+  const { success } = await rateLimit(`uploadIdentity:${userId}`);
+  if (!success) throw new Error("Too many requests. Please try again later.");
+
+  // Size limit (10MB)
+  const MAX_SIZE = 10 * 1024 * 1024;
+  if (frontFile && frontFile.size > MAX_SIZE) throw new Error("Front ID file is too large (max 10MB)");
+  if (backFile && backFile.size > MAX_SIZE) throw new Error("Back ID file is too large (max 10MB)");
 
   let frontUrl = "";
   let backUrl = "";
@@ -102,7 +112,7 @@ export async function submitReferences(referencesJson: string) {
   await db
     .update(caregiverVerifications)
     .set({
-      references: referencesJson,
+      references: JSON.parse(referencesJson),
       currentStep: 4,
       updatedAt: new Date(),
     })

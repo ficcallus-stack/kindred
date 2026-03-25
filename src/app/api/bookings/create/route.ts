@@ -3,17 +3,22 @@ import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { bookings, payments } from "@/db/schema";
 import { stripe } from "@/lib/stripe";
+import { createBookingSchema } from "@/lib/validations";
 
 export async function POST(req: NextRequest) {
   const clerkUser = await currentUser();
   if (!clerkUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { caregiverId, startDate, endDate, hoursPerDay, totalAmount, jobId, notes } = body;
-
-  if (!caregiverId || !hoursPerDay || !totalAmount) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  const parsed = createBookingSchema.safeParse(body);
+  
+  if (!parsed.success) {
+    return NextResponse.json({ 
+      error: parsed.error.issues.map((e) => e.message).join(", ") 
+    }, { status: 400 });
   }
+
+  const { caregiverId, startDate, endDate, hoursPerDay, totalAmount, jobId, notes } = parsed.data;
 
   const amountInCents = Math.round(totalAmount * 100);
 

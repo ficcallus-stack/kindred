@@ -1,7 +1,8 @@
-"use client";
-
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import { useState, useEffect } from "react";
+import { useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js";
+import { StripeProvider } from "@/components/StripeProvider";
 
 interface Step4Props {
   data: any;
@@ -9,13 +10,37 @@ interface Step4Props {
   onBack: () => void;
 }
 
-export default function Step4({ data, onNext, onBack }: Step4Props) {
-  // Mock data for display based on Step 2
+function Step4Inner({ data, onNext, total }: { data: any, onNext: () => void, total: number }) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  const handlePay = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+
+    setIsProcessing(true);
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/dashboard/parent`,
+      },
+      redirect: "if_required", // redirect only on 3DS authorization triggers
+    });
+
+    if (error) {
+      setErrorMessage(error.message || "Something went wrong with your payment.");
+      setIsProcessing(false);
+    } else {
+      onNext(); // Advance step count securely Node
+    }
+  };
+
   const minRate = data.minRate || 25;
-  const hours = 4; // Mock for demo
+  const hours = 4;
   const subtotal = minRate * hours;
   const fee = 5.0;
-  const total = subtotal + fee;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -73,55 +98,9 @@ export default function Step4({ data, onNext, onBack }: Step4Props) {
               <MaterialIcon name="credit_card" className="text-outline-variant" />
             </div>
           </div>
-          <form className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label">Cardholder Name</label>
-              <input 
-                className="w-full bg-surface-container-low border-none rounded-xl p-4 focus:ring-2 focus:ring-primary/20 transition-all font-medium" 
-                placeholder="Sarah Jenkins" 
-                type="text"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label">Card Number</label>
-              <div className="relative">
-                <input 
-                  className="w-full bg-surface-container-low border-none rounded-xl p-4 focus:ring-2 focus:ring-primary/20 transition-all font-medium tracking-widest" 
-                  placeholder="0000 0000 0000 0000" 
-                  type="text"
-                />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-2">
-                  <div className="w-8 h-5 bg-white shadow-sm rounded-sm"></div>
-                  <div className="w-8 h-5 bg-white shadow-sm rounded-sm"></div>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label">Expiry Date</label>
-                <input 
-                  className="w-full bg-surface-container-low border-none rounded-xl p-4 focus:ring-2 focus:ring-primary/20 transition-all font-medium" 
-                  placeholder="MM / YY" 
-                  type="text"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant font-label">CVC</label>
-                <input 
-                  className="w-full bg-surface-container-low border-none rounded-xl p-4 focus:ring-2 focus:ring-primary/20 transition-all font-medium" 
-                  placeholder="123" 
-                  type="text"
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-3 pt-4">
-              <input 
-                className="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary/20 transition-all" 
-                id="save-card" 
-                type="checkbox"
-              />
-              <label className="text-sm font-medium text-on-surface-variant cursor-pointer" htmlFor="save-card">Save card for future bookings</label>
-            </div>
+          <form className="space-y-6" onSubmit={handlePay}>
+            <PaymentElement />
+            {errorMessage && <p className="text-sm text-error font-medium">{errorMessage}</p>}
           </form>
         </div>
       </div>
@@ -169,10 +148,11 @@ export default function Step4({ data, onNext, onBack }: Step4Props) {
             </div>
 
             <button 
-              onClick={onNext}
-              className="w-full mt-10 bg-secondary-container hover:bg-secondary text-on-secondary-container hover:text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all scale-100 active:scale-95 shadow-xl shadow-black/10 flex items-center justify-center gap-3"
+              onClick={handlePay}
+              disabled={isProcessing || !stripe || !elements}
+              className="w-full mt-10 bg-secondary-container hover:bg-secondary text-on-secondary-container hover:text-white font-black uppercase tracking-widest text-xs py-5 rounded-2xl transition-all scale-100 active:scale-95 shadow-xl shadow-black/10 flex items-center justify-center gap-3 disabled:opacity-50"
             >
-              Authorize Escrow Deposit
+              {isProcessing ? "Processing..." : "Authorize Escrow Deposit"}
               <MaterialIcon name="chevron_right" />
             </button>
             
@@ -215,5 +195,42 @@ export default function Step4({ data, onNext, onBack }: Step4Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function Step4({ data, onNext, onBack }: Step4Props) {
+  const [clientSecret, setClientSecret] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  const minRate = data.minRate || 25;
+  const hours = 4;
+  const subtotal = minRate * hours;
+  const fee = 5.0;
+  const total = subtotal + fee;
+
+  useEffect(() => {
+    setIsLoading(true);
+    fetch("/api/stripe/create-payment-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: Math.round(total * 100),
+        description: "KindredCare Booking Escrow",
+      }),
+    })
+      .then((res) => res.json())
+      .then((resData) => setClientSecret(resData.clientSecret))
+      .catch(console.error)
+      .finally(() => setIsLoading(false));
+  }, [total]);
+
+  if (isLoading) {
+    return <div className="py-20 text-center font-bold text-primary">Loading secure payment portal...</div>;
+  }
+
+  return (
+    <StripeProvider clientSecret={clientSecret}>
+      <Step4Inner data={data} onNext={onNext} total={total} />
+    </StripeProvider>
   );
 }

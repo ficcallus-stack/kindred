@@ -5,9 +5,27 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { getConversationMessages, sendMessage } from "../actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { useChannel } from "@ably/react";
 
 export default function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const [conversationId, setConversationId] = useState<string>("");
+
+  useEffect(() => {
+    params.then((p) => setConversationId(p.id));
+  }, [params]);
+
+  if (!conversationId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-slate-400">
+        Loading conversation...
+      </div>
+    );
+  }
+
+  return <ChatWindow conversationId={conversationId} />;
+}
+
+function ChatWindow({ conversationId }: { conversationId: string }) {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
@@ -15,40 +33,37 @@ export default function ConversationPage({ params }: { params: Promise<{ id: str
   const { user } = useUser();
 
   useEffect(() => {
-    params.then((p) => {
-      setConversationId(p.id);
-      loadMessages(p.id);
-    });
-  }, [params]);
+    loadMessages();
+  }, [conversationId]);
 
-  async function loadMessages(id: string) {
+  async function loadMessages() {
     try {
-      const msgs = await getConversationMessages(id);
+      const msgs = await getConversationMessages(conversationId);
       setMessages(msgs);
     } catch (e) {
       console.error("Failed to load messages:", e);
     }
   }
 
+  // Subscribe to Ably channel for Real-time updates
+  useChannel(`conversation:${conversationId}`, (message) => {
+    setMessages((prev) => {
+      if (prev.some((m) => m.id === message.data.id)) return prev;
+      return [...prev, message.data];
+    });
+  });
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Poll for new messages every 5 seconds
-  useEffect(() => {
-    if (!conversationId) return;
-    const interval = setInterval(() => loadMessages(conversationId), 5000);
-    return () => clearInterval(interval);
-  }, [conversationId]);
-
   async function handleSend() {
-    if (!newMessage.trim() || sending || !conversationId) return;
+    if (!newMessage.trim() || sending) return;
 
     setSending(true);
     try {
       await sendMessage({ conversationId, content: newMessage.trim() });
       setNewMessage("");
-      await loadMessages(conversationId);
     } catch (e: any) {
       alert(e.message || "Failed to send");
     } finally {

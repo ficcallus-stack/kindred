@@ -9,11 +9,19 @@ import Step2 from "@/components/post-job/Step2";
 import Step3 from "@/components/post-job/Step3";
 import Step4 from "@/components/post-job/Step4";
 import Step5 from "@/components/post-job/Step5";
+import { useEffect } from "react";
 import { createJob } from "./actions";
+import { getChildren } from "@/app/dashboard/parent/children/actions";
 
 export default function PostJobPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableChildren, setAvailableChildren] = useState<any[]>([]);
+
+  useEffect(() => {
+    getChildren().then(setAvailableChildren).catch(console.error);
+  }, []);
+
   const [formData, setFormData] = useState({
     childCount: 2,
     location: "Austin, TX",
@@ -123,7 +131,7 @@ export default function PostJobPage() {
 
             {/* Step Content */}
             <div className="pb-32">
-              {step === 1 && <Step1 data={formData} updateData={updateData} onNext={nextStep} onCancel={() => router.push("/dashboard/parent")} />}
+              {step === 1 && <Step1 availableChildren={availableChildren} data={formData} updateData={updateData} onNext={nextStep} onCancel={() => router.push("/dashboard/parent")} />}
               {step === 2 && <Step2 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
               {step === 3 && <Step3 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
               {step === 4 && <Step4 data={formData} onNext={nextStep} onBack={prevStep} />}

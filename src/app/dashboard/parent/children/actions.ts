@@ -21,7 +21,7 @@ export async function addChild(data: CreateChildInput) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Unauthorized");
 
-  const { success } = rateLimit(`addChild:${clerkUser.id}`, { limit: 10, windowSeconds: 60 });
+  const { success } = await rateLimit(`addChild:${clerkUser.id}`);
   if (!success) throw new Error("Too many requests");
 
   const parsed = createChildSchema.safeParse(data);
@@ -34,7 +34,7 @@ export async function addChild(data: CreateChildInput) {
     name: parsed.data.name,
     age: parsed.data.age,
     type: parsed.data.type,
-    specialNeeds: JSON.stringify(parsed.data.specialNeeds),
+    specialNeeds: parsed.data.specialNeeds,
   });
 
   revalidatePath("/dashboard/parent");

@@ -12,7 +12,7 @@ export async function createReview(data: CreateReviewInput) {
   const clerkUser = await currentUser();
   if (!clerkUser) throw new Error("Unauthorized");
 
-  const { success } = rateLimit(`createReview:${clerkUser.id}`, { limit: 5, windowSeconds: 60 });
+  const { success } = await rateLimit(`createReview:${clerkUser.id}`, "strict");
   if (!success) throw new Error("Too many requests");
 
   const parsed = createReviewSchema.safeParse(data);

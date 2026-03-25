@@ -22,7 +22,7 @@ export default function GlobalError({
           <p className="text-on-surface-variant text-lg font-medium italic leading-relaxed">
             We encountered an unexpected error. Please try again or contact support if the problem persists.
           </p>
-          {error && (
+          {error && process.env.NODE_ENV === "development" && (
             <div className="mt-6 p-4 bg-slate-50 border border-slate-100 rounded-xl text-left font-mono text-[10px] text-slate-500 overflow-auto max-h-32">
               <p className="font-bold text-red-400 mb-1 capitalize">Error Detail:</p>
               <p>{error.message || "Unknown error"}</p>

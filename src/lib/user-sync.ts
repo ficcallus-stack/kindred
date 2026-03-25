@@ -12,10 +12,21 @@ export async function syncUser() {
     where: eq(users.id, clerkUser.id),
   });
 
-  if (existingUser) return existingUser;
+  if (existingUser) {
+    const clerkRole = (clerkUser.publicMetadata?.role || clerkUser.unsafeMetadata?.role) as "parent" | "caregiver" | "admin" | "moderator";
+    if (clerkRole && clerkRole !== existingUser.role) {
+      const [updated] = await db
+        .update(users)
+        .set({ role: clerkRole })
+        .where(eq(users.id, clerkUser.id))
+        .returning();
+      return updated;
+    }
+    return existingUser;
+  }
 
-  // Get role from metadata (set during our custom signup)
-  const role = (clerkUser.unsafeMetadata.role as "parent" | "caregiver") || "parent";
+  // Get role from metadata (check public first, then unsafe)
+  const role = (clerkUser.publicMetadata?.role || clerkUser.unsafeMetadata?.role || "parent") as "parent" | "caregiver" | "admin" | "moderator";
   const email = clerkUser.emailAddresses[0]?.emailAddress || "";
   const fullName = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || "Kindred User";
 

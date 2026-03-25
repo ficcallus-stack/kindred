@@ -21,8 +21,8 @@ export async function POST(req: NextRequest) {
       currency: "usd",
       description: description || "KindredCare US Payment",
       metadata: {
-        userId: clerkUser.id,
         ...metadata,
+        userId: clerkUser.id,
       },
       // Use manual capture for escrow-style hold
       capture_method: "manual",
