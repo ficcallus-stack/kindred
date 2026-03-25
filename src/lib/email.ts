@@ -1,4 +1,4 @@
-const ZEPTO_API_URL = "https://api.zeptomail.com/v1.1/email";
+const ZEPTO_API_URL = "https://api.zeptomail.eu/v1.1/email";
 
 interface EmailOptions {
   to: { email: string; name?: string }[];
@@ -47,7 +47,7 @@ export async function sendEmail(options: EmailOptions) {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        Authorization: `Zoho-enczapikey ${apiKey}`,
+        Authorization: apiKey.startsWith("Zoho-enczapikey") ? apiKey : `Zoho-enczapikey ${apiKey}`,
       },
       body: JSON.stringify(payload),
     });
