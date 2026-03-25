@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import Footer from "@/components/Footer";
 import { ToastProvider } from "@/components/Toast";
+import SupportWidget from "@/components/SupportWidget";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -59,6 +60,7 @@ export default function RootLayout({
             <main className="flex-grow">
               {children}
             </main>
+            <SupportWidget />
           </ToastProvider>
           <Footer />
         </body>

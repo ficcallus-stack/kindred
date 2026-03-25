@@ -239,6 +239,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   payments: many(payments),
   verification: one(caregiverVerifications),
   wallet: one(wallets),
+  tickets: many(tickets),
 }));
 
 export const nannyProfilesRelations = relations(nannyProfiles, ({ one }) => ({
@@ -313,4 +314,14 @@ export const walletsRelations = relations(wallets, ({ one, many }) => ({
 
 export const walletTransactionsRelations = relations(walletTransactions, ({ one }) => ({
   wallet: one(wallets, { fields: [walletTransactions.walletId], references: [wallets.id] }),
+}));
+
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
+  user: one(users, { fields: [tickets.userId], references: [users.id] }),
+  messages: many(ticketMessages),
+}));
+
+export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({
+  ticket: one(tickets, { fields: [ticketMessages.ticketId], references: [tickets.id] }),
+  sender: one(users, { fields: [ticketMessages.senderId], references: [users.id] }),
 }));

@@ -1,6 +1,6 @@
 "use client";
 
-import { AblyProvider } from "@ably/react";
+import { AblyProvider as ReactAblyProvider } from "ably/react";
 import * as Ably from "ably";
 import { useMemo } from "react";
 
@@ -14,5 +14,5 @@ export default function AblyClientProvider({ children }: { children: React.React
 
   if (!client) return <>{children}</>;
 
-  return <AblyProvider client={client as any}>{children}</AblyProvider>;
+  return <ReactAblyProvider client={client as any}>{children}</ReactAblyProvider>;
 }

@@ -56,13 +56,20 @@ export async function getConversationMessages(conversationId: string) {
 
   if (!membership) throw new Error("Not a member of this conversation");
 
-  return db.query.messages.findMany({
+  const msgs = await db.query.messages.findMany({
     where: eq(messages.conversationId, conversationId),
-    orderBy: [messages.createdAt],
+    orderBy: [desc(messages.createdAt)],
+    limit: 100,
     with: {
-      sender: true,
+      sender: {
+        columns: {
+          id: true,
+          fullName: true,
+        }
+      },
     },
   });
+  return msgs.reverse();
 }
 
 export async function sendMessage(data: SendMessageInput) {
@@ -107,6 +114,10 @@ export async function sendMessage(data: SendMessageInput) {
     
     const sender = await db.query.users.findFirst({
       where: eq(users.id, clerkUser.id),
+      columns: {
+        id: true,
+        fullName: true,
+      }
     });
 
     await channel.publish("message", {

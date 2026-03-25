@@ -5,7 +5,7 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { getConversationMessages, sendMessage } from "../actions";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
-import { useChannel } from "@ably/react";
+import { useChannel } from "ably/react";
 
 export default function ConversationPage({ params }: { params: Promise<{ id: string }> }) {
   const [conversationId, setConversationId] = useState<string>("");
@@ -39,17 +39,21 @@ function ChatWindow({ conversationId }: { conversationId: string }) {
   async function loadMessages() {
     try {
       const msgs = await getConversationMessages(conversationId);
-      setMessages(msgs);
+      setMessages((prev) => {
+        const combined = [...msgs, ...prev];
+        const unique = combined.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
+        return unique.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      });
     } catch (e) {
       console.error("Failed to load messages:", e);
     }
   }
 
-  // Subscribe to Ably channel for Real-time updates
   useChannel(`conversation:${conversationId}`, (message) => {
     setMessages((prev) => {
       if (prev.some((m) => m.id === message.data.id)) return prev;
-      return [...prev, message.data];
+      const withoutOptimistic = prev.filter(m => !(m.isOptimistic && m.content === message.data.content && m.senderId === message.data.senderId));
+      return [...withoutOptimistic, message.data];
     });
   });
 
@@ -60,12 +64,28 @@ function ChatWindow({ conversationId }: { conversationId: string }) {
   async function handleSend() {
     if (!newMessage.trim() || sending) return;
 
+    const content = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      id: tempId,
+      conversationId,
+      senderId: user?.id,
+      content,
+      createdAt: new Date().toISOString(),
+      sender: { id: user?.id, fullName: user?.fullName },
+      isOptimistic: true,
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setNewMessage("");
     setSending(true);
+
     try {
-      await sendMessage({ conversationId, content: newMessage.trim() });
-      setNewMessage("");
+      await sendMessage({ conversationId, content });
     } catch (e: any) {
       alert(e.message || "Failed to send");
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
+      setNewMessage(content);
     } finally {
       setSending(false);
     }
@@ -100,7 +120,7 @@ function ChatWindow({ conversationId }: { conversationId: string }) {
                   isOwn
                     ? "bg-primary text-white rounded-br-lg"
                     : "bg-surface-container-lowest text-on-surface rounded-bl-lg shadow-sm border border-outline-variant/10"
-                }`}>
+                } ${msg.isOptimistic ? "opacity-70" : ""}`}>
                   {!isOwn && (
                     <p className="text-[10px] font-black uppercase tracking-widest mb-1 opacity-60">
                       {msg.sender?.fullName || "Unknown"}
