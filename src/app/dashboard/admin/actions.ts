@@ -158,7 +158,7 @@ export async function approvePayoutRequest(transactionId: string) {
   // 2. Perform the actual Stripe transfer (this would call the stripe-payouts.ts logic)
   // For now, we'll mark as completed in DB
   await db.update(walletTransactions)
-    .set({ status: "completed", updatedAt: new Date() })
+    .set({ status: "completed" })
     .where(eq(walletTransactions.id, transactionId));
 
   // 3. Log the audit event
@@ -177,7 +177,7 @@ export async function flagPayoutRequest(transactionId: string, reason: string) {
   const caller = await requireAdmin();
 
   await db.update(walletTransactions)
-    .set({ status: "failed", updatedAt: new Date(), metadata: { flagReason: reason } })
+    .set({ status: "failed", description: `Flagged: ${reason}` })
     .where(eq(walletTransactions.id, transactionId));
 
   await db.insert(auditLogs).values({
