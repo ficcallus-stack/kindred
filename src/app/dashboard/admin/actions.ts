@@ -167,7 +167,7 @@ export async function approvePayoutRequest(transactionId: string) {
     action: "payout_approved",
     entityType: "transaction",
     entityId: transactionId,
-    metadata: { amount: tx.amount, userId: tx.userId },
+    metadata: { amount: tx.amount, walletId: tx.walletId },
   });
 
   return { success: true };
