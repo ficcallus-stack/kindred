@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { acceptApplication, rejectApplication } from "./actions";
+import { useToast } from "@/components/Toast";
 
 interface Applicant {
   id: string;
@@ -22,7 +23,7 @@ export default function ApplicantsPage() {
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
-  const [actionFeedback, setActionFeedback] = useState<{ id: string; type: "accepted" | "rejected" } | null>(null);
+  const { showToast } = useToast();
 
   useEffect(() => {
     fetch("/api/applicants")
@@ -41,10 +42,9 @@ export default function ApplicantsPage() {
         setApplicants((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: "accepted" } : a))
         );
-        setActionFeedback({ id, type: "accepted" });
-        setTimeout(() => setActionFeedback(null), 3000);
+        showToast("Application accepted!", "success");
       } catch (err: any) {
-        alert(err.message || "Failed to accept");
+        showToast(err.message || "Failed to accept", "error");
       }
     });
   };
@@ -56,10 +56,9 @@ export default function ApplicantsPage() {
         setApplicants((prev) =>
           prev.map((a) => (a.id === id ? { ...a, status: "rejected" } : a))
         );
-        setActionFeedback({ id, type: "rejected" });
-        setTimeout(() => setActionFeedback(null), 3000);
+        showToast("Application rejected", "info");
       } catch (err: any) {
-        alert(err.message || "Failed to reject");
+        showToast(err.message || "Failed to reject", "error");
       }
     });
   };
@@ -84,16 +83,7 @@ export default function ApplicantsPage() {
         <p className="text-on-surface-variant text-sm font-medium mt-2">{applicants.length} total applications</p>
       </header>
 
-      {/* Feedback Toast */}
-      {actionFeedback && (
-        <div className={cn(
-          "fixed top-24 right-6 z-50 px-6 py-4 rounded-2xl shadow-2xl text-white font-bold text-sm flex items-center gap-3 animate-in slide-in-from-right duration-300",
-          actionFeedback.type === "accepted" ? "bg-green-600" : "bg-red-500"
-        )}>
-          <MaterialIcon name={actionFeedback.type === "accepted" ? "check_circle" : "cancel"} fill />
-          Application {actionFeedback.type}!
-        </div>
-      )}
+      {/* Feedback Toast - This section is removed as showToast is now used for all feedback */}
 
       <div className="space-y-6">
         {applicants.length > 0 ? applicants.map((app) => (

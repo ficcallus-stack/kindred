@@ -5,27 +5,51 @@ import { relations } from "drizzle-orm";
 export const userRoleEnum = pgEnum("user_role", ["parent", "caregiver", "admin", "moderator"]);
 export const jobStatusEnum = pgEnum("job_status", ["open", "closed", "completed"]);
 export const applicationStatusEnum = pgEnum("application_status", ["pending", "accepted", "rejected"]);
-export const bookingStatusEnum = pgEnum("booking_status", ["pending", "confirmed", "in_progress", "completed", "cancelled"]);
+export const bookingStatusEnum = pgEnum("booking_status", ["pending", "paid", "confirmed", "in_progress", "completed", "cancelled"]);
 export const paymentStatusEnum = pgEnum("payment_status", ["pending", "authorized", "captured", "refunded", "failed"]);
 export const certificationTypeEnum = pgEnum("certification_type", ["registration", "elite_bundle", "standards_program"]);
 export const certificationStatusEnum = pgEnum("certification_status", ["pending_payment", "enrolled", "in_progress", "completed", "expired"]);
 export const verificationStatusEnum = pgEnum("verification_status", ["none", "draft", "pending", "verified", "rejected"]);
 export const walletTransactionTypeEnum = pgEnum("wallet_transaction_type", ["earning", "withdrawal"]);
 export const walletTransactionStatusEnum = pgEnum("wallet_transaction_status", ["pending", "completed", "failed"]);
+export const examStatusEnum = pgEnum("exam_status", ["started", "submitted", "marking", "passed", "failed"]);
+export const referralStatusEnum = pgEnum("referral_status", ["pending", "signed_up", "reviewing", "completed", "failed"]);
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "past_due", "canceled", "incomplete", "trialing"]);
+
 
 export const ticketStatusEnum = pgEnum("ticket_status", ["open", "in_progress", "resolved", "closed"]);
 export const ticketPriorityEnum = pgEnum("ticket_priority", ["low", "medium", "high", "urgent"]);
 export const ticketCategoryEnum = pgEnum("ticket_category", ["general", "safety", "payment", "technical"]);
+export const supportStatusEnum = pgEnum("support_status", ["open", "closed"]);
 
 // ── Users ──────────────────────────────────────────────────
 export const users = pgTable("users", {
   id: text("id").primaryKey(), // Firebase UID
   email: text("email").notNull().unique(),
   fullName: text("full_name").notNull(),
+  profileImageUrl: text("profile_image_url"),
   role: userRoleEnum("role").notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
+  referralCode: text("referral_code").unique().$defaultFn(() => Math.random().toString(36).substring(2, 8).toUpperCase()),
+  referredBy: text("referred_by").references(() => users.id),
+  referralBalance: integer("referral_balance").default(0).notNull(), // points/cents
+  stripeConnectId: text("stripe_connect_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: subscriptionStatusEnum("subscription_status"),
+  isPremium: boolean("is_premium").default(false).notNull(),
+  stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const referrals = pgTable("referrals", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  referrerId: text("referrer_id").notNull().references(() => users.id),
+  refereeId: text("referee_id").notNull().references(() => users.id),
+  status: referralStatusEnum("status").default("pending").notNull(),
+  rewardAmount: integer("reward_amount").default(0).notNull(),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ── Email OTPs ─────────────────────────────────────────────
@@ -47,8 +71,23 @@ export const nannyProfiles = pgTable("nanny_profiles", {
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   isVerified: boolean("is_verified").default(false).notNull(),
-  stripeConnectId: text("stripe_connect_id"),
   photos: jsonb("photos").$type<string[]>().default([]),
+  availability: jsonb("availability").$type<Record<string, any>>().default({}),
+  terms: text("terms"),
+  
+  // New fields for premium design
+  education: text("education"),
+  responseTime: text("response_time").default("15 mins"),
+  lastActive: timestamp("last_active").defaultNow(),
+  activeJobsCount: integer("active_jobs_count").default(0),
+  specializations: jsonb("specializations").$type<string[]>().default([]),
+  logistics: jsonb("logistics").$type<string[]>().default([]),
+  coreSkills: jsonb("core_skills").$type<string[]>().default([]),
+  certifications: jsonb("certifications").$type<string[]>().default([]),
+  videoUrl: text("video_url"),
+  isOccupied: boolean("is_occupied").default(false).notNull(),
+  maxTravelDistance: integer("max_travel_distance").default(25).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ── Children ───────────────────────────────────────────────
@@ -58,8 +97,21 @@ export const children = pgTable("children", {
   name: text("name").notNull(),
   age: integer("age").notNull(),
   type: text("type").notNull(), // e.g., "toddler", "pre-schooler", "infant"
+  bio: text("bio"),
+  photoUrl: text("photo_url"),
   specialNeeds: jsonb("special_needs").$type<string[]>().default([]), // JSON array stored as jsonb
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Parent Profiles ────────────────────────────────────────
+export const parentProfiles = pgTable("parent_profiles", {
+  id: text("id").primaryKey().references(() => users.id),
+  familyName: text("family_name"),
+  familyPhoto: text("family_photo"),
+  location: text("location"),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ── Jobs ───────────────────────────────────────────────────
@@ -72,6 +124,10 @@ export const jobs = pgTable("jobs", {
   minRate: integer("min_rate"),
   maxRate: integer("max_rate"),
   status: jobStatusEnum("status").default("open").notNull(),
+  scheduleType: text("schedule_type").default("recurring").notNull(), // recurring, one_time
+  schedule: jsonb("schedule").$type<Record<string, boolean>>().default({}), // The weekly grid
+  specificDates: jsonb("specific_dates").$type<string[]>().default([]), // For one_time jobs
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -96,8 +152,17 @@ export const bookings = pgTable("bookings", {
   hoursPerDay: integer("hours_per_day").notNull(),
   totalAmount: integer("total_amount").notNull(), // in cents
   notes: text("notes"),
+  refinedSchedule: jsonb("refined_schedule").$type<Record<string, { start: string; end: string }>>().default({}),
   status: bookingStatusEnum("status").default("pending").notNull(),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  
+  // New fields for overtime/lateness logic
+  checkInTime: timestamp("check_in_time"),
+  checkOutTime: timestamp("check_out_time"),
+  overtimeMinutes: integer("overtime_minutes").default(0).notNull(),
+  latenessMinutes: integer("lateness_minutes").default(0).notNull(),
+  overtimeAmount: integer("overtime_amount").default(0).notNull(), // in cents
+
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -116,6 +181,9 @@ export const payments = pgTable("payments", {
 // ── Conversations ──────────────────────────────────────────
 export const conversations = pgTable("conversations", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  isSupport: boolean("is_support").default(false).notNull(), // To distinguish peer vs mod chats
+  supportStatus: supportStatusEnum("support_status").default("open").notNull(),
+  assignedModeratorId: text("assigned_moderator_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -123,6 +191,7 @@ export const conversations = pgTable("conversations", {
 export const conversationMembers = pgTable("conversation_members", {
   conversationId: text("conversation_id").notNull().references(() => conversations.id),
   userId: text("user_id").notNull().references(() => users.id),
+  isArchived: boolean("is_archived").default(false).notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
 }));
@@ -133,6 +202,7 @@ export const messages = pgTable("messages", {
   conversationId: text("conversation_id").notNull().references(() => conversations.id),
   senderId: text("sender_id").notNull().references(() => users.id),
   content: text("content").notNull(),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -161,6 +231,8 @@ export const tickets = pgTable("tickets", {
   category: ticketCategoryEnum("category").default("general").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  moderatorId: text("moderator_id").references(() => users.id),
+  conversationId: text("conversation_id").references(() => conversations.id),
 });
 
 export const ticketMessages = pgTable("ticket_messages", {
@@ -181,6 +253,48 @@ export const certifications = pgTable("certifications", {
   stripePaymentId: text("stripe_payment_id"),
   enrolledAt: timestamp("enrolled_at"),
   completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Certification Exams ────────────────────────────────────
+export const certificationExams = pgTable("certification_exams", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  certificationType: certificationTypeEnum("certification_type").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  totalMarks: integer("total_marks").default(100).notNull(),
+  passPercentage: integer("pass_percentage").default(75).notNull(),
+  timeLimit: integer("time_limit").default(60).notNull(), // in minutes
+  price: integer("price").notNull(), // in cents (e.g., 4500)
+  retakePrice: integer("retake_price").notNull(), // in cents (e.g., 500)
+  version: integer("version").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const examQuestions = pgTable("exam_questions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  examId: text("exam_id").notNull().references(() => certificationExams.id),
+  text: text("text").notNull(),
+  marks: integer("marks").notNull(),
+  page: integer("page").notNull(),
+  order: integer("order").notNull(),
+  version: integer("version").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const examSubmissions = pgTable("exam_submissions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  examId: text("exam_id").notNull().references(() => certificationExams.id),
+  caregiverId: text("caregiver_id").notNull().references(() => users.id),
+  answers: jsonb("answers").$type<Record<string, string>>().default({}).notNull(),
+  score: integer("score"),
+  status: examStatusEnum("status").default("started").notNull(),
+  examVersion: integer("exam_version").default(1).notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  submittedAt: timestamp("submitted_at"),
+  markedAt: timestamp("marked_at"),
+  moderatorId: text("moderator_id").references(() => users.id),
+  moderatorNotes: text("moderator_notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -214,6 +328,23 @@ export const walletTransactions = pgTable("wallet_transactions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ── Processed Webhook Events (Idempotency) ────────────────
+export const processedWebhookEvents = pgTable("processed_webhook_events", {
+  eventId: text("event_id").primaryKey(), // Stripe event ID (evt_xxx)
+  eventType: text("event_type").notNull(),
+  processedAt: timestamp("processed_at").defaultNow().notNull(),
+});
+
+export const auditLogs = pgTable("audit_logs", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  actorId: text("actor_id").notNull().references(() => users.id),
+  action: text("action").notNull(), // e.g., "VERIFY_NANNY", "RESOLVE_TICKET", "MARK_EXAM"
+  entityType: text("entity_type").notNull(), // e.g., "caregiver_verification", "ticket", "exam_submission"
+  entityId: text("entity_id").notNull(),
+  metadata: jsonb("metadata"), // details like { oldStatus: "pending", newStatus: "verified" }
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // ── Caregiver Verifications ────────────────────────────────
 export const caregiverVerifications = pgTable("caregiver_verifications", {
   id: text("id").primaryKey().references(() => users.id),
@@ -222,6 +353,7 @@ export const caregiverVerifications = pgTable("caregiver_verifications", {
   // Step 1: Identity
   idFrontUrl: text("id_front_url"),
   idBackUrl: text("id_back_url"),
+  selfieUrl: text("selfie_url"),
   
   // Step 2: Background Auth
   backgroundAuth: boolean("background_auth").default(false).notNull(),
@@ -235,11 +367,30 @@ export const caregiverVerifications = pgTable("caregiver_verifications", {
   
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  moderatorId: text("moderator_id").references(() => users.id),
+});
+
+// ── Parent Verifications ───────────────────────────────────
+export const parentVerifications = pgTable("parent_verifications", {
+  id: text("id").primaryKey().references(() => users.id),
+  status: verificationStatusEnum("status").default("none").notNull(),
+  
+  // Step 1: Identity
+  stripeIdentitySessionId: text("stripe_identity_session_id"),
+  identityVerified: boolean("identity_verified").default(false).notNull(),
+  
+  // Step 2: Home Safety
+  homeSafetyStatus: verificationStatusEnum("home_safety_status").default("none").notNull(),
+  homeSafetyAdminNotes: text("home_safety_admin_notes"),
+  
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  moderatorId: text("moderator_id").references(() => users.id),
 });
 
 // ── Relations ──────────────────────────────────────────────
 export const usersRelations = relations(users, ({ many, one }) => ({
-  nannyProfile: one(nannyProfiles, { fields: [users.id], references: [nannyProfiles.id] }),
+  nannyProfile: one(nannyProfiles),
   children: many(children),
   jobs: many(jobs),
   applications: many(applications),
@@ -253,6 +404,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   conversationMemberships: many(conversationMembers),
   payments: many(payments),
   verification: one(caregiverVerifications),
+  parentVerification: one(parentVerifications),
+  parentProfile: one(parentProfiles),
   wallet: one(wallets),
   tickets: many(tickets),
 }));
@@ -263,6 +416,14 @@ export const nannyProfilesRelations = relations(nannyProfiles, ({ one }) => ({
 
 export const caregiverVerificationsRelations = relations(caregiverVerifications, ({ one }) => ({
   user: one(users, { fields: [caregiverVerifications.id], references: [users.id] }),
+}));
+
+export const parentVerificationsRelations = relations(parentVerifications, ({ one }) => ({
+  user: one(users, { fields: [parentVerifications.id], references: [users.id] }),
+}));
+
+export const parentProfilesRelations = relations(parentProfiles, ({ one }) => ({
+  user: one(users, { fields: [parentProfiles.id], references: [users.id] }),
 }));
 
 export const childrenRelations = relations(children, ({ one }) => ({
@@ -283,6 +444,7 @@ export const applicationsRelations = relations(applications, ({ one }) => ({
 export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   parent: one(users, { fields: [bookings.parentId], references: [users.id], relationName: "parentBookings" }),
   caregiver: one(users, { fields: [bookings.caregiverId], references: [users.id], relationName: "caregiverBookings" }),
+  caregiverProfile: one(nannyProfiles, { fields: [bookings.caregiverId], references: [nannyProfiles.id] }),
   job: one(jobs, { fields: [bookings.jobId], references: [jobs.id] }),
   payments: many(payments),
   reviews: many(reviews),
@@ -314,8 +476,24 @@ export const reviewsRelations = relations(reviews, ({ one }) => ({
   reviewee: one(users, { fields: [reviews.revieweeId], references: [users.id], relationName: "reviewee" }),
 }));
 
-export const certificationsRelations = relations(certifications, ({ one }) => ({
+export const certificationsRelations = relations(certifications, ({ one, many }) => ({
   caregiver: one(users, { fields: [certifications.caregiverId], references: [users.id] }),
+  exams: many(certificationExams),
+}));
+
+export const certificationExamsRelations = relations(certificationExams, ({ many }) => ({
+  questions: many(examQuestions),
+  submissions: many(examSubmissions),
+}));
+
+export const examQuestionsRelations = relations(examQuestions, ({ one }) => ({
+  exam: one(certificationExams, { fields: [examQuestions.examId], references: [certificationExams.id] }),
+}));
+
+export const examSubmissionsRelations = relations(examSubmissions, ({ one }) => ({
+  exam: one(certificationExams, { fields: [examSubmissions.examId], references: [certificationExams.id] }),
+  caregiver: one(users, { fields: [examSubmissions.caregiverId], references: [users.id] }),
+  moderator: one(users, { fields: [examSubmissions.moderatorId], references: [users.id] }),
 }));
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
@@ -339,4 +517,13 @@ export const ticketsRelations = relations(tickets, ({ one, many }) => ({
 export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({
   ticket: one(tickets, { fields: [ticketMessages.ticketId], references: [tickets.id] }),
   sender: one(users, { fields: [ticketMessages.senderId], references: [users.id] }),
+}));
+
+export const referralsRelations = relations(referrals, ({ one }) => ({
+  referrer: one(users, { fields: [referrals.referrerId], references: [users.id], relationName: "referrer" }),
+  referee: one(users, { fields: [referrals.refereeId], references: [users.id], relationName: "referee" }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  actor: one(users, { fields: [auditLogs.actorId], references: [users.id] }),
 }));

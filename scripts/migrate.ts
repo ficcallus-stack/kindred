@@ -1,46 +1,45 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { sql as drizzleSql } from "drizzle-orm";
+import { migrate } from "drizzle-orm/neon-http/migrator";
+import postgres from "postgres";
+import { drizzle as drizzlePg } from "drizzle-orm/postgres-js";
+import { migrate as migratePg } from "drizzle-orm/postgres-js/migrator";
 import * as dotenv from "dotenv";
-import fs from "fs";
 import path from "path";
 
 dotenv.config({ path: ".env.local" });
+dotenv.config();
 
-const sqlUrl = process.env.DATABASE_URL;
-if (!sqlUrl) {
-  throw new Error("DATABASE_URL is missing");
+const url = process.env.DATABASE_URL;
+if (!url) {
+  throw new Error("DATABASE_URL is not set");
 }
 
-const sqlDb = neon(sqlUrl);
-const db = drizzle(sqlDb);
+const migrationsFolder = path.join(process.cwd(), "drizzle");
 
 async function main() {
-  console.log("Starting manual SQL execution...");
-  const sqlFile = fs.readFileSync(path.join(process.cwd(), "drizzle", "0002_tired_red_skull.sql"), "utf-8");
-  
-  const queries = sqlFile.split("--> statement-breakpoint");
-  for (const q of queries) {
-    const trimmed = q.trim();
-    if (trimmed) {
-      console.log("Executing:", trimmed);
-      try {
-        await db.execute(drizzleSql.raw(trimmed));
-      } catch (e: any) {
-        if (e.cause?.code === '42710' || e.cause?.code === '42P07' || e.cause?.code === '42711') {
-          console.log("-> Ignored (already exists)");
-        } else {
-          throw e;
-        }
-      }
-    }
+  console.log("🚀 Running migrations...");
+  console.log(`   Database: ${url!.split("@")[1]?.split("/")[0] || "***"}`);
+  console.log(`   Folder:   ${migrationsFolder}\n`);
+
+  if (url!.includes("neon.tech")) {
+    // Production: Neon serverless
+    const sql = neon(url!);
+    const db = drizzle(sql);
+    await migrate(db, { migrationsFolder });
+  } else {
+    // Local: postgres-js
+    const sql = postgres(url!, { max: 1 });
+    const db = drizzlePg(sql);
+    await migratePg(db, { migrationsFolder });
+    await sql.end();
   }
 
-  console.log("Migration complete");
+  console.log("✅ Migrations applied successfully");
   process.exit(0);
 }
 
 main().catch((err) => {
-  console.error("Migration failed:", err);
+  console.error("❌ Migration failed:", err);
   process.exit(1);
 });

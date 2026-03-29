@@ -143,23 +143,26 @@ export function welcomeEmailText(name: string, role: string) {
 
 // ─── 3. Password Reset ───
 
-export function passwordResetTemplate(name: string, resetLink: string) {
+export function passwordResetTemplate(email: string, resetLink: string) {
   return layout(`
     <td>
-      <h1 style="margin:0 0 8px;font-size:28px;font-weight:800;color:${BRAND.color};">Reset your password</h1>
-      <p style="margin:0 0 24px;font-size:15px;color:${BRAND.textSecondary};line-height:1.7;">
-        Hi ${name}, we received a request to reset your password. Click the button below to create a new one.
+      <h1 style="margin:0 0 16px;font-size:24px;font-weight:800;color:${BRAND.color};">Reset your password</h1>
+      <p style="margin:0 0 32px;font-size:15px;color:${BRAND.textSecondary};line-height:1.7;">
+        Follow this link to reset your <strong>${BRAND.name}</strong> password for your <strong>${email}</strong> account.
       </p>
       ${btn("Reset Password", resetLink)}
-      <p style="margin:0;font-size:13px;color:#999;line-height:1.6;">
-        If you didn't request this, you can safely ignore this email. The link expires in 1 hour.
+      <p style="margin:32px 0 0;font-size:13px;color:#999;line-height:1.6;">
+        If you didn't ask to reset your password, you can ignore this email.
+      </p>
+      <p style="margin:16px 0 0;font-size:13px;color:#999;font-weight:700;">
+        Thanks,<br/>Your ${BRAND.name} team
       </p>
     </td>
   `);
 }
 
-export function passwordResetText(name: string, resetLink: string) {
-  return `Hi ${name},\n\nReset your password here: ${resetLink}\n\nIf you didn't request this, ignore this email.\n\n— KindredCare US`;
+export function passwordResetText(email: string, resetLink: string) {
+  return `Follow this link to reset your KindredCareUS password for your ${email} account.\n\n${resetLink}\n\nIf you didn't ask to reset your password, you can ignore this email.\n\nThanks,\nYour KindredCareUS team`;
 }
 
 // ─── 4. New Application ───
@@ -265,3 +268,86 @@ export function bookingEmailText(
   }[type];
   return `Hi ${name},\n\n${msg}\n\nBooking ID: #${details.bookingId.slice(0, 8)}\n${details.amount ? `Amount: $${(details.amount / 100).toFixed(2)}` : ""}\n\nView at: ${BRAND.url}/dashboard\n\n— KindredCare US`;
 }
+
+// ─── 10. Premium Subscription ───
+
+export function subscriptionSuccessTemplate(name: string) {
+  return layout(`
+    <td>
+      <div style="width:64px;height:64px;background-color:#fff8e1;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <span style="font-size:28px;">💎</span>
+      </div>
+      <h1 style="margin:0 0 12px;font-size:28px;font-weight:800;color:${BRAND.color};">Welcome to Kindred Premium!</h1>
+      <p style="margin:0 0 24px;font-size:16px;color:${BRAND.textSecondary};line-height:1.7;">
+        Hi ${name}, your family is now a <strong>Premium Member</strong> of KindredCare US.
+      </p>
+      <div style="background-color:#f9f9f9;border-radius:12px;padding:24px;margin-bottom:24px;border:1px solid #ffcc80;">
+        <p style="margin:0 0 12px;font-size:14px;color:${BRAND.textPrimary};font-weight:700;">Your Unlocked Benefits:</p>
+        <ul style="margin:0;padding-left:20px;font-size:14px;color:${BRAND.textSecondary};line-height:1.8;">
+          <li><strong>Unlimited Messaging</strong>: Chat with nannies before hiring them.</li>
+          <li><strong>Premium Badge</strong>: Your profile stands out to the top caregivers.</li>
+          <li><strong>Priority Support</strong>: Direct access to our dedicated family support team.</li>
+        </ul>
+      </div>
+      <p style="margin:0 0 24px;font-size:14px;color:${BRAND.textSecondary};line-height:1.6;">
+        Ready to find the perfect care match? Start messaging verified caregivers today.
+      </p>
+      ${btn("Explore Caregivers", `${BRAND.url}/browse`)}
+      <p style="margin:24px 0 0;font-size:12px;color:#999;text-align:center;">
+        You can manage your subscription and view billing details anytime in your dashboard settings.
+      </p>
+    </td>
+  `);
+}
+
+export function subscriptionSuccessText(name: string) {
+  return `Hi ${name},\n\nWelcome to Kindred Premium! Your family is now a Premium Member.\n\nBenefits Unlocked:\n- Unlimited Messaging with nannies\n- Premium Badge\n- Priority Support\n\nGet started at: ${BRAND.url}/browse\n\n— KindredCare US`;
+}
+
+// ─── 8. Escrow Receipt ───
+
+export function escrowReceiptTemplate(name: string, details: { amount: number; hours: number; rate: number; fee: number; transactionId: string }) {
+  return layout(`
+    <td align="left">
+      <div style="background-color:${BRAND.color};border-radius:12px;padding:24px;margin-bottom:32px;color:#ffffff;text-align:center;">
+        <span style="font-size:32px;margin-bottom:12px;display:block;">🛡️</span>
+        <h2 style="margin:0;font-size:20px;font-weight:800;letter-spacing:-0.5px;color:#ffffff;">Secure Escrow Authorization</h2>
+      </div>
+      <h1 style="margin:0 0 16px;font-size:24px;font-weight:800;color:${BRAND.color};letter-spacing:-0.5px;">Deposit Receipt</h1>
+      <p style="margin:0 0 24px;font-size:15px;color:${BRAND.textSecondary};line-height:1.6;">
+        Hi ${name}, your secure deposit has been authorized and is now held in **Kindred Escrow**.
+      </p>
+      
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f9f9f9;border-radius:12px;padding:20px;margin-bottom:32px;border:1px solid #eeeeee;">
+        <tr>
+          <td style="padding-bottom:12px;font-size:14px;color:${BRAND.textSecondary};">Care Hours (${details.hours}h @ $${details.rate}/hr)</td>
+          <td align="right" style="padding-bottom:12px;font-size:14px;font-weight:700;color:${BRAND.color};">$${(details.hours * details.rate).toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding-bottom:12px;font-size:14px;color:${BRAND.textSecondary};">Service Fee</td>
+          <td align="right" style="padding-bottom:12px;font-size:14px;font-weight:700;color:${BRAND.color};">$${details.fee.toFixed(2)}</td>
+        </tr>
+        <tr>
+          <td style="padding-top:12px;border-top:1px solid #dddddd;font-size:16px;font-weight:800;color:${BRAND.color};">Total Authorized</td>
+          <td align="right" style="padding-top:12px;border-top:1px solid #dddddd;font-size:18px;font-weight:800;color:${BRAND.color};">$${details.amount.toFixed(2)}</td>
+        </tr>
+      </table>
+
+      <div style="margin-bottom:32px;padding:16px;border-left:4px solid ${BRAND.accent};background-color:#fffdf5;">
+        <p style="margin:0;font-size:13px;color:${BRAND.textSecondary};line-height:1.5;">
+          <strong>Escrow Protection:</strong> Funds are held securely and only released after you approve completed work. If the job is cancelled or no match is found, your deposit is returned in full.
+        </p>
+      </div>
+
+      <p style="margin:0 0 8px;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Transaction Reference</p>
+      <p style="margin:0;font-size:14px;font-family:monospace;color:${BRAND.textSecondary};font-weight:bold;">${details.transactionId.toUpperCase()}</p>
+
+      ${btn("View Job Posting", `${BRAND.url}/dashboard/parent`)}
+    </td>
+  `);
+}
+
+export function escrowReceiptText(name: string, details: { amount: number; hours: number; rate: number; fee: number; transactionId: string }) {
+  return `Hi ${name},\n\nYour secure deposit of $${details.amount.toFixed(2)} has been authorized for Kindred Escrow.\n\nCare Hours: ${details.hours}h @ $${details.rate}/hr ($${(details.hours * details.rate).toFixed(2)})\nService Fee: $${details.fee.toFixed(2)}\n\nTransaction ID: ${details.transactionId.toUpperCase()}\n\nFunds are held securely and only released after you approve completed work.\n\nView details: ${BRAND.url}/dashboard/parent`;
+}
+

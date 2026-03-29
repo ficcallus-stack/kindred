@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword, signInWithPopup, updateProfile } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase-client";
-import { useRouter } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/Toast";
+import { useEffect } from "react";
 
 export default function SignUpPage() {
   const { showToast } = useToast();
@@ -16,8 +17,39 @@ export default function SignUpPage() {
   const [emailAddress, setEmailAddress] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [referralCode, setReferralCode] = useState("");
+  const [isCodeValid, setIsCodeValid] = useState<boolean | null>(null);
+  const [checkingCode, setCheckingCode] = useState(false);
+  const [showRefPopup, setShowRefPopup] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Initialize referral code from URL
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      setReferralCode(ref);
+      validateCode(ref);
+    }
+  }, [searchParams]);
+
+  const validateCode = async (code: string) => {
+    if (!code || code.length < 4) {
+      setIsCodeValid(null);
+      return;
+    }
+    setCheckingCode(true);
+    try {
+      const res = await fetch(`/api/referral/validate?code=${code}`);
+      const data = await res.json();
+      setIsCodeValid(data.valid);
+    } catch {
+      setIsCodeValid(false);
+    } finally {
+      setCheckingCode(false);
+    }
+  };
 
   // Handle the signup submission
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,7 +70,7 @@ export default function SignUpPage() {
       await fetch("/api/auth/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, fullName }),
+        body: JSON.stringify({ role, fullName, referralCode }),
       });
 
       showToast("Check your email for a verification code!", "success");
@@ -56,22 +88,42 @@ export default function SignUpPage() {
   };
 
   const signUpWithGoogle = async () => {
+    if (!role) {
+      showToast("Pick a role (Parent/Caregiver) before signing up with Google.", "error");
+      return;
+    }
     try {
       await signInWithPopup(auth, googleProvider);
       
-      // Sync to DB (role might be set later for Google users)
-      await fetch("/api/auth/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: role || "parent" }),
-      });
+      // If no referral code was entered, show the post-signup popup
+      if (!referralCode) {
+         setShowRefPopup(true);
+         return;
+      }
 
-      showToast("Welcome to the Kindred family!", "success");
-      router.push("/");
+      await completeSync();
     } catch (err: any) {
       if (err.code !== "auth/popup-closed-by-user") {
         showToast("Social signup failed. Please try email signup.", "error");
       }
+    }
+  };
+
+  const completeSync = async (codeToUse?: string) => {
+    try {
+      await fetch("/api/auth/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+           role: role || "parent", 
+           referralCode: codeToUse || referralCode 
+        }),
+      });
+      showToast("Welcome to the Kindred family!", "success");
+      router.push("/");
+    } catch (error) {
+       console.error("Sync error:", error);
+       showToast("Account sync failed. Please contact support.", "error");
     }
   };
 
@@ -95,6 +147,53 @@ export default function SignUpPage() {
       </nav>
 
       <main className="min-h-screen pt-32 pb-16 flex items-center justify-center px-4 relative">
+        {/* Referral Popup for Social Signup */}
+        {showRefPopup && (
+           <div className="fixed inset-0 z-[100] bg-primary/20 backdrop-blur-sm flex items-center justify-center p-6">
+              <div className="bg-white rounded-[2.5rem] p-12 max-w-md w-full shadow-2xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+                 <button onClick={() => { setShowRefPopup(false); completeSync(); }} className="absolute top-8 right-8 text-slate-300 hover:text-primary transition-colors">
+                    <MaterialIcon name="close" className="text-2xl" />
+                 </button>
+                 <div className="w-16 h-16 bg-secondary/10 rounded-2xl flex items-center justify-center text-secondary mb-8">
+                    <MaterialIcon name="loyalty" className="text-3xl" fill />
+                 </div>
+                 <h2 className="text-3xl font-black font-headline text-primary italic tracking-tighter mb-4">Got a Referral Code?</h2>
+                 <p className="text-on-surface-variant font-medium mb-8">Enter it now to unlock your welcome reward! If not, you can just skip this step.</p>
+                 
+                 <div className="space-y-4">
+                    <div className="relative">
+                       <input 
+                         value={referralCode}
+                         onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setReferralCode(val);
+                            validateCode(val);
+                         }}
+                         className="w-full bg-slate-50 border-none rounded-xl py-5 px-6 font-bold text-primary placeholder:opacity-30 tracking-widest"
+                         placeholder="KINDRED123"
+                       />
+                       {isCodeValid && (
+                         <div className="absolute right-5 top-1/2 -translate-y-1/2 text-green-500 animate-in fade-in zoom-in-50">
+                            <MaterialIcon name="verified" className="text-xl" fill />
+                         </div>
+                       )}
+                    </div>
+                    <button 
+                      onClick={() => { setShowRefPopup(false); completeSync(); }}
+                      className="w-full bg-primary text-white font-black py-5 rounded-xl uppercase tracking-widest text-[10px] shadow-xl shadow-primary/10 hover:-translate-y-0.5 transition-all"
+                    >
+                      Complete Signup
+                    </button>
+                    <button 
+                      onClick={() => { setShowRefPopup(false); completeSync(); }}
+                      className="w-full py-4 text-slate-400 font-bold uppercase tracking-widest text-[10px] hover:text-primary transition-colors"
+                    >
+                      Skip For Now
+                    </button>
+                 </div>
+              </div>
+           </div>
+        )}
 
         <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           {/* Branding & Welcome Column */}
@@ -200,6 +299,36 @@ export default function SignUpPage() {
                     placeholder="••••••••" 
                     type="password"
                   />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex justify-between items-center px-1">
+                   <label className="font-label text-xs font-black text-primary/40 uppercase tracking-widest">Referral Code (Optional)</label>
+                   {checkingCode && <span className="text-[9px] font-bold text-slate-400 animate-pulse uppercase">Verifying...</span>}
+                   {!checkingCode && isCodeValid && <span className="text-[9px] font-bold text-green-500 uppercase flex items-center gap-1"><MaterialIcon name="check" className="text-xs" /> Code Applied</span>}
+                   {!checkingCode && isCodeValid === false && <span className="text-[9px] font-bold text-red-400 uppercase">Invalid Code</span>}
+                </div>
+                <div className="relative">
+                   <input 
+                    value={referralCode}
+                    onChange={(e) => {
+                       const val = e.target.value.toUpperCase();
+                       setReferralCode(val);
+                       validateCode(val);
+                    }}
+                    className={cn(
+                       "w-full bg-white border rounded-xl py-4 px-5 transition-all font-black tracking-widest uppercase text-sm shadow-inner focus:outline-none focus:ring-4 ring-primary/5",
+                       isCodeValid ? "border-green-500 text-green-700 bg-green-50/10" : "border-outline-variant/15 focus:border-primary/20 text-primary"
+                    )}
+                    placeholder="FRIEND-2024" 
+                    type="text"
+                  />
+                  {isCodeValid && (
+                     <div className="absolute right-4 top-1/2 -translate-y-1/2 text-green-500">
+                        <MaterialIcon name="verified" className="text-xl" fill />
+                     </div>
+                  )}
                 </div>
               </div>
 

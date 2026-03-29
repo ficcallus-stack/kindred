@@ -1,5 +1,6 @@
 import { syncUser } from "@/lib/user-sync";
 import { redirect } from "next/navigation";
+import AdminDashboardLayoutClient from "./layout-client";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,5 +16,5 @@ export default async function AdminLayout({ children }: LayoutProps) {
     redirect("/");
   }
 
-  return <>{children}</>;
+  return <AdminDashboardLayoutClient user={user}>{children}</AdminDashboardLayoutClient>;
 }

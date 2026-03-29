@@ -33,6 +33,7 @@ export const adminAuth = new Proxy({} as any, {
       throw new Error("Firebase Admin not initialized. Ensure environment variables are set.");
     }
     const auth = getAuth();
-    return (auth as any)[prop];
+    const val = (auth as any)[prop];
+    return typeof val === 'function' ? val.bind(auth) : val;
   }
 }) as ReturnType<typeof getAuth>;

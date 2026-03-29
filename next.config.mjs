@@ -4,6 +4,7 @@ const nextConfig = {
     remotePatterns: [
       { protocol: "https", hostname: "lh3.googleusercontent.com" },
       { protocol: "https", hostname: "api.dicebear.com" },
+      { protocol: "https", hostname: "**" },
     ],
   },
   async redirects() {
@@ -36,11 +37,11 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.firebaseapp.com https://*.googleapis.com https://*.stripe.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "img-src 'self' data: blob: https://*.googleusercontent.com https://api.dicebear.com https://*.stripe.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.firebaseapp.com https://*.googleapis.com https://*.stripe.com https://api.mapbox.com",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com",
+              "img-src 'self' data: blob: https://*.googleusercontent.com https://api.dicebear.com https://*.stripe.com https://*.mapbox.com https://*.r2.dev https://*.cloudflarestorage.com",
               "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com",
-              "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com wss://*.firebaseio.com https://*.stripe.com wss://*.ably.io https://*.ably.io https://realtime.ably.io",
+              "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com wss://*.firebaseio.com https://*.stripe.com wss://*.ably.io https://*.ably.io https://realtime.ably.io https://*.mapbox.com",
               "frame-src 'self' https://*.stripe.com https://*.firebaseapp.com",
               "worker-src 'self' blob:",
               "object-src 'none'",

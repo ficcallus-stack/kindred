@@ -1,19 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import { getWalletData, getPayoutMethod, withdrawFunds } from "../actions";
+import Link from "next/link";
+
+const FEE_CENTS = 50;
+const MIN_WITHDRAWAL_CENTS = 5000; // $50.00 min
 
 export default function WithdrawPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [withdrawing, setWithdrawing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [wallet, setWallet] = useState<any>(null);
   const [payoutMethod, setPayoutMethod] = useState<any>(null);
-  const [amount, setAmount] = useState<string>("");
+  const [amountStr, setAmountStr] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
@@ -25,12 +29,12 @@ export default function WithdrawPage() {
         ]);
         setWallet(wData);
         setPayoutMethod(pMethod);
-        // Default to full balance
-        if (wData?.balance) {
-          setAmount((wData.balance / 100).toString());
+        if (!pMethod) {
+          setError("No payout method linked. Please connect your bank account first.");
         }
-      } catch (error) {
-        console.error("Failed to load data", error);
+      } catch (err) {
+        console.error("Init failed", err);
+        setError("Failed to load wallet data.");
       } finally {
         setLoading(false);
       }
@@ -38,189 +42,208 @@ export default function WithdrawPage() {
     init();
   }, []);
 
-  const handleWithdraw = async () => {
-    const amountCents = Math.round(parseFloat(amount) * 100);
-    if (!amountCents || amountCents <= 50) return;
+  const totalCents = Math.round(parseFloat(amountStr || "0") * 100);
+  const balanceCents = wallet?.balance || 0;
+  const netCents = Math.max(0, totalCents - FEE_CENTS);
 
-    setWithdrawing(true);
-    try {
-      await withdrawFunds(amountCents);
-      setSuccess(true);
-      setTimeout(() => router.push("/dashboard/nanny/wallet"), 3000);
-    } catch (error) {
-      console.error("Withdrawal failed", error);
-      alert(error instanceof Error ? error.message : "Withdrawal failed");
-    } finally {
-      setWithdrawing(false);
+  const handleWithdraw = async () => {
+    if (totalCents < MIN_WITHDRAWAL_CENTS) {
+      return setError("Minimum withdrawal is $50.00");
     }
+    if (totalCents > balanceCents) {
+      return setError("Insufficient balance");
+    }
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      await withdrawFunds(totalCents);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || "Withdrawal failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const setQuickAmount = (val: number) => {
+    setAmountStr(val.toFixed(2));
+    setError(null);
+  };
+
+  const setMaxAmount = () => {
+    setAmountStr((balanceCents / 100).toFixed(2));
+    setError(null);
   };
 
   if (loading) {
     return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-navy border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!payoutMethod) {
-    return (
-      <div className="max-w-md mx-auto py-20 text-center space-y-8">
-        <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto text-orange-600">
-           <MaterialIcon name="warning" className="text-4xl" />
-        </div>
-        <h1 className="text-2xl font-headline font-black text-navy">Payout Method Missing</h1>
-        <p className="text-on-surface-variant font-medium">You need to connect a bank account before you can withdraw funds.</p>
-        <button onClick={() => router.push("/dashboard/nanny/wallet")} className="bg-navy text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-xs">Return to Wallet</button>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (success) {
     return (
-      <div className="max-w-md mx-auto py-20 text-center space-y-8 animate-in fade-in zoom-in duration-500">
-        <div className="w-24 h-24 bg-green-50 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-xl shadow-green-600/10">
-           <MaterialIcon name="check_circle" className="text-5xl" />
+      <div className="max-w-xl mx-auto py-24 text-center animate-in fade-in zoom-in duration-700">
+        <div className="w-32 h-32 bg-green-50 rounded-[2.5rem] flex items-center justify-center mx-auto mb-10 shadow-2xl rotate-3">
+          <MaterialIcon name="check_circle" className="text-6xl text-green-600" fill />
         </div>
-        <div>
-          <h1 className="text-3xl font-headline font-black text-navy px-4 leading-tight mb-4">Transfer Initiated!</h1>
-          <p className="text-on-surface-variant font-medium text-sm max-w-xs mx-auto">Your funds are being securely processed via Stripe. Expect them in your bank in 1-2 business days.</p>
+        <h1 className="text-4xl md:text-5xl font-headline font-black text-primary mb-6 italic tracking-tight">Request Received!</h1>
+        <p className="text-on-surface-variant font-medium leading-relaxed mb-12 italic opacity-70">
+          We've received your withdrawal request for <span className="text-primary font-black">${(totalCents / 100).toFixed(2)}</span>. 
+          Your payout is now <span className="text-primary font-bold">Pending Administrative Approval</span> and will be processed within 24 hours.
+        </p>
+        <div className="flex flex-col gap-4">
+            <Link href="/dashboard/nanny/wallet" className="bg-primary text-white py-5 rounded-2xl font-headline font-black uppercase tracking-widest text-[10px] shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all italic">
+                Back to Wallet
+            </Link>
+            <button onClick={() => window.location.reload()} className="text-on-surface-variant font-black uppercase tracking-widest text-[9px] italic opacity-40 hover:opacity-100 transition-opacity">
+                Process another withdrawal
+            </button>
         </div>
-        <p className="text-[10px] font-black uppercase tracking-widest text-navy/40 animate-pulse">Redirecting to history...</p>
       </div>
     );
   }
 
-  const numericAmount = parseFloat(amount) || 0;
-  const fee = 0.50;
-  const netAmount = Math.max(0, numericAmount - fee);
-
   return (
-    <section className="flex-1 p-6 md:p-12 lg:p-20 flex justify-center items-start">
-      <div className="w-full max-w-2xl">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 mb-10 text-on-surface-variant text-[10px] font-black uppercase tracking-widest opacity-60">
-          <MaterialIcon name="arrow_back" className="text-sm" />
-          <Link className="hover:text-navy transition-colors" href="/dashboard/nanny/wallet">Back to Payouts</Link>
-        </div>
+    <div className="max-w-4xl mx-auto py-12">
+      <div className="mb-16">
+         <Link href="/dashboard/nanny/wallet" className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 hover:text-primary transition-all mb-6">
+            <MaterialIcon name="arrow_back" className="text-sm" />
+            Wallet Home
+         </Link>
+         <h1 className="text-5xl md:text-7xl font-headline font-black text-primary tracking-tighter italic leading-none">
+            Withdrawal <br/><span className="text-secondary italic">Terminal.</span>
+         </h1>
+      </div>
 
-        <div className="mb-12">
-          <h1 className="font-headline text-4xl font-black text-navy mb-4 tracking-tighter italic leading-none">Confirm Withdrawal</h1>
-          <p className="text-on-surface-variant text-lg font-medium opacity-60 leading-relaxed max-w-md">
-            Review your withdrawal details. Funds will be securely transferred to your verified bank account.
-          </p>
-        </div>
-
-        {/* Confirmation Card */}
-        <div className="bg-white rounded-[2.5rem] p-10 md:p-14 shadow-2xl shadow-navy/5 relative overflow-hidden border border-outline-variant/10">
-          <div className="space-y-10 relative z-10">
-            {/* Amount Input Section */}
-            <div className="flex flex-col gap-4">
-              <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40">Withdrawal Amount (USD)</span>
-              <div className="flex items-baseline gap-4 group">
-                <span className="text-5xl font-black text-navy font-headline tracking-tighter italic leading-none">$</span>
-                <input 
-                  type="number" 
-                  value={amount} 
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="text-5xl font-black text-navy font-headline tracking-tighter italic leading-none bg-transparent border-none focus:ring-0 w-full p-0"
-                  max={wallet?.balance / 100}
-                />
-              </div>
-              <p className="text-xs font-bold text-navy/40 uppercase tracking-widest">
-                Max Available: ${(wallet?.balance / 100).toFixed(2)}
-              </p>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        <div className="lg:col-span-7 space-y-8">
+          <div className="bg-white p-12 rounded-[3rem] shadow-2xl border border-outline-variant/10 relative overflow-hidden group">
+            <div className="relative z-10">
+               <label className="block text-[10px] font-black text-on-surface-variant mb-4 uppercase tracking-[0.2em] opacity-40 italic">Input Amount (USD)</label>
+               <div className="relative flex items-end">
+                  <span className="text-4xl font-headline font-black text-primary/20 mb-3 mr-4 italic tracking-tighter">$</span>
+                  <input 
+                    type="number" 
+                    value={amountStr}
+                    onChange={(e) => setAmountStr(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full bg-transparent border-none p-0 text-7xl md:text-8xl font-headline font-black text-primary placeholder:text-primary/5 focus:ring-0 italic tracking-tighter"
+                  />
+               </div>
+               
+               <div className="flex flex-wrap gap-3 mt-12">
+                  {[20, 50, 100].map(val => (
+                    <button 
+                      key={val}
+                      onClick={() => setQuickAmount(val)}
+                      className="px-6 py-3 bg-surface-container-low hover:bg-primary/5 rounded-xl text-[10px] font-black text-primary uppercase tracking-widest transition-all italic border border-outline-variant/10 active:scale-95 shadow-sm"
+                    >
+                      ${val}
+                    </button>
+                  ))}
+                  <button 
+                    onClick={setMaxAmount}
+                    className="px-6 py-3 bg-secondary-fixed/30 hover:bg-secondary-fixed/50 rounded-xl text-[10px] font-black text-on-secondary-fixed uppercase tracking-widest transition-all italic active:scale-95 shadow-sm"
+                  >
+                    Max (${(balanceCents / 100).toFixed(2)})
+                  </button>
+               </div>
             </div>
-
-            {/* Destination & Delivery */}
-            <div className="grid md:grid-cols-2 gap-10 py-10 border-y border-outline-variant/10">
-              <div className="space-y-4">
-                <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40">Destination Bank</span>
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-navy/5 flex items-center justify-center text-navy shadow-inner shadow-black/5">
-                    <MaterialIcon name="account_balance" className="text-2xl" />
-                  </div>
-                  <div>
-                    <p className="font-black text-navy text-sm uppercase tracking-wide leading-none mb-1">{payoutMethod.bankName}</p>
-                    <p className="text-on-surface-variant text-[10px] font-bold uppercase tracking-widest opacity-60">Ending in ••••{payoutMethod.last4}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40">Est. Delivery</span>
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-tertiary-fixed/40 flex items-center justify-center text-on-tertiary-fixed-variant shadow-inner shadow-black/5">
-                    <MaterialIcon name="schedule" className="text-2xl" />
-                  </div>
-                  <div>
-                    <p className="font-black text-navy text-sm uppercase tracking-wide leading-none mb-1">1-3 Business Days</p>
-                    <p className="text-on-surface-variant text-[10px] font-bold uppercase tracking-widest opacity-60">Standard Stripe Secure</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Trust Section */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <MaterialIcon name="verified" className="text-navy text-xl" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-navy">Secure Bank Transfer</span>
-              </div>
-              <div className="flex items-center gap-2 opacity-50 grayscale hover:grayscale-0 transition-all">
-                <span className="text-[8px] font-black uppercase tracking-tighter text-on-surface-variant">Powered by</span>
-                <div className="h-4 w-10 bg-navy/10 rounded-sm"></div> {/* Stripe Logo Placeholder */}
-              </div>
-            </div>
-
-            {/* Fees summary */}
-            <div className="bg-surface-container-low/50 p-6 rounded-2xl border border-outline-variant/10 space-y-2">
-              <div className="flex justify-between text-xs font-bold text-on-surface-variant">
-                <span>Withdrawal Fee</span>
-                <span>$0.50</span>
-              </div>
-              <div className="flex justify-between text-sm font-black text-navy pt-2 border-t border-navy/5">
-                <span>Net Transfer</span>
-                <span>${netAmount.toFixed(2)}</span>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-4">
-              <button 
-                onClick={handleWithdraw}
-                disabled={withdrawing || netAmount <= 0 || numericAmount > (wallet?.balance / 100)}
-                className="w-full py-5 bg-navy text-white text-sm font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl shadow-navy/20 hover:scale-[1.01] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-              >
-                {withdrawing ? (
-                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  <>
-                    <MaterialIcon name="check_circle" />
-                    <span>Confirm Withdrawal</span>
-                  </>
-                )}
-              </button>
-              <button 
-                onClick={() => router.back()}
-                className="w-full py-4 text-on-surface-variant text-[10px] font-black uppercase tracking-widest hover:text-navy transition-colors"
-                disabled={withdrawing}
-              >
-                Cancel & Return
-              </button>
+            <div className="absolute top-0 right-0 p-12 opacity-[0.03] rotate-12 group-hover:rotate-6 transition-transform duration-1000">
+               <MaterialIcon name="payments" className="text-[12rem]" fill />
             </div>
           </div>
-          <MaterialIcon name="payments" className="absolute -top-10 -right-10 text-[15rem] opacity-[0.02] pointer-events-none" />
+
+          <div className="bg-surface-container-low p-10 rounded-[2.5rem] border border-outline-variant/10">
+            <h3 className="text-sm font-black text-primary italic tracking-tight mb-8 flex items-center gap-3">
+               <MaterialIcon name="receipt" className="text-secondary" />
+               Calculation Audit
+            </h3>
+            <div className="space-y-4">
+               <div className="flex justify-between items-center opacity-60">
+                  <span className="text-xs font-medium italic">Withdrawal Subtotal</span>
+                  <span className="font-bold text-sm">${(totalCents / 100).toFixed(2)}</span>
+               </div>
+               <div className="flex justify-between items-center text-error border-b border-outline-variant/20 pb-4">
+                  <span className="text-xs font-medium italic">Service Fee (Standard Payout)</span>
+                  <span className="font-bold text-sm">-${(FEE_CENTS / 100).toFixed(2)}</span>
+               </div>
+               <div className="flex justify-between items-center pt-2">
+                  <span className="font-black text-primary italic uppercase text-[10px] tracking-widest">Net Payout Amount</span>
+                  <span className="font-headline font-black text-2xl text-primary tracking-tighter">${(netCents / 100).toFixed(2)}</span>
+               </div>
+            </div>
+          </div>
+
+          <button 
+            disabled={submitting || totalCents < MIN_WITHDRAWAL_CENTS || totalCents > balanceCents || !payoutMethod}
+            onClick={handleWithdraw}
+            className="w-full py-6 bg-gradient-to-br from-primary to-primary-container disabled:opacity-30 text-white rounded-[2rem] font-headline font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-all italic"
+          >
+            {submitting ? "Processing Transfer..." : "Confirm & Dispatch Funds"}
+          </button>
+
+          {error && (
+            <div className="p-6 bg-error/5 border border-error/10 text-error rounded-2xl flex items-center gap-4 animate-in slide-in-from-top-2">
+                <MaterialIcon name="warning" className="text-xl" fill />
+                <p className="text-xs font-bold italic tracking-tight">{error}</p>
+            </div>
+          )}
         </div>
 
-        {/* Editorial Footer */}
-        <div className="mt-12 flex gap-5 items-start bg-tertiary-fixed/20 p-8 rounded-3xl border border-tertiary/10">
-          <MaterialIcon name="info" className="text-on-tertiary-fixed-variant mt-1" />
-          <p className="text-xs text-on-tertiary-fixed-variant/70 font-medium leading-relaxed italic">
-            "Funds will be deducted from your Kindred balance immediately. For your security, withdrawals are monitored and may be subject to additional verification by your financial institution."
-          </p>
+        <div className="lg:col-span-5 space-y-8">
+           <div className="p-10 bg-primary/5 border border-primary/10 rounded-[3rem] shadow-xl shadow-black/[0.02]">
+              <div className="flex items-center gap-4 mb-8">
+                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-lg shadow-black/5">
+                    <MaterialIcon name="account_balance" className="text-primary text-xl" />
+                 </div>
+                 <div>
+                    <h4 className="font-headline font-black text-primary tracking-tight leading-none italic">Target Destination</h4>
+                    <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">Stripe Connected Express</p>
+                 </div>
+              </div>
+              
+              {payoutMethod ? (
+                <div className="space-y-4">
+                   <div className="p-6 bg-white rounded-2xl shadow-sm border border-outline-variant/10 flex items-center justify-between">
+                      <span className="text-xs font-black text-primary italic">{payoutMethod.bankName}</span>
+                      <span className="font-mono text-xs opacity-40 uppercase tracking-widest">••••{payoutMethod.last4}</span>
+                   </div>
+                   <div className="flex gap-3 items-center px-2">
+                       <MaterialIcon name="verified" className="text-green-600 text-sm" fill />
+                       <span className="text-[9px] font-black text-on-surface-variant/40 uppercase tracking-[0.2em] italic">Instant Verification Passed</span>
+                   </div>
+                </div>
+              ) : (
+                <Link href="/dashboard/nanny/wallet" className="block p-6 bg-white rounded-2xl border-2 border-dashed border-outline-variant/20 text-center hover:border-primary transition-all group">
+                   <MaterialIcon name="link" className="text-3xl text-primary/10 mb-2 group-hover:scale-110 transition-transform" />
+                   <p className="text-[10px] font-black text-primary uppercase tracking-widest italic">Link Payout Method</p>
+                </Link>
+              )}
+           </div>
+
+           <div className="p-10 bg-secondary-fixed/10 border border-secondary/10 rounded-[3rem] relative overflow-hidden">
+              <h4 className="font-headline font-black text-on-secondary-fixed tracking-tight italic mb-4">Financial Protocol</h4>
+              <ul className="space-y-6">
+                 {[
+                   { icon: "schedule", text: "Standard payout: 1-3 business days" },
+                   { icon: "security", text: "Bank-grade encrypted transfers" },
+                   { icon: "info", text: "Max withdrawal per 24hrs: $10,000" }
+                 ].map((item, i) => (
+                   <li key={i} className="flex gap-4 items-start">
+                     <MaterialIcon name={item.icon} className="text-secondary text-sm" />
+                     <p className="text-xs font-medium text-on-surface-variant italic opacity-80">{item.text}</p>
+                   </li>
+                 ))}
+              </ul>
+              <MaterialIcon name="layers" className="absolute -bottom-10 -right-10 text-[10rem] opacity-[0.03] rotate-12" fill />
+           </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 }

@@ -2,173 +2,31 @@
 
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
-import { nannyProfiles, wallets, walletTransactions, users } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { nannyProfiles, wallets, walletTransactions, users, bookings } from "@/db/schema";
+import { eq, desc, and, gte, sum, count, sql } from "drizzle-orm";
 import { requireUser } from "@/lib/get-server-user";
 
-/**
- * Creates or retrieves a Stripe Connect Express account and returns an onboarding link.
- */
-export async function getStripeConnectOnboarding() {
-  const user = await requireUser();
+import { getPayoutMethod as sharedGetPayoutMethod, withdrawFunds as sharedWithdrawFunds, getStripeConnectOnboarding as sharedOnboarding } from "@/lib/actions/stripe-payouts";
 
-  const [profile] = await db
-    .select()
-    .from(nannyProfiles)
-    .where(eq(nannyProfiles.id, user.uid));
-
-  let stripeId = profile?.stripeConnectId;
-
-  // 1. Create account if not exists
-  if (!stripeId) {
-    // Get email from DB since Firebase serverUser only has uid/email
-    const dbUser = await db.query.users.findFirst({
-      where: eq(users.id, user.uid),
-    });
-
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "US",
-      email: dbUser?.email || user.email || "",
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-      business_type: "individual",
-      business_profile: {
-        product_description: "Childcare services provided via KindredCare US",
-      },
-    });
-
-    stripeId = account.id;
-
-    // Update profile
-    await db
-      .update(nannyProfiles)
-      .set({ stripeConnectId: stripeId })
-      .where(eq(nannyProfiles.id, user.uid));
-    
-    // Initialize wallet
-    await db.insert(wallets).values({
-      id: user.uid,
-      balance: 0,
-    }).onConflictDoNothing();
-  }
-
-  // 2. Create account link
-  const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  const accountLink = await stripe.accountLinks.create({
-    account: stripeId,
-    refresh_url: `${origin}/dashboard/nanny/wallet`,
-    return_url: `${origin}/dashboard/nanny/wallet`,
-    type: "account_onboarding",
-  });
-
-  return accountLink.url;
-}
-
-/**
- * Fetches the connected Stripe account details (bank name, last4).
- */
 export async function getPayoutMethod() {
-  const user = await requireUser();
-
-  const [profile] = await db
-    .select()
-    .from(nannyProfiles)
-    .where(eq(nannyProfiles.id, user.uid));
-
-  if (!profile?.stripeConnectId) return null;
-
-  try {
-    const account = await stripe.accounts.retrieve(profile.stripeConnectId);
-    if (!account.external_accounts?.data.length) return null;
-
-    const bank = account.external_accounts.data[0] as any;
-    return {
-      bankName: bank.bank_name || "Linked Bank",
-      last4: bank.last4,
-      status: account.details_submitted ? "active" : "pending",
-    };
-  } catch (error) {
-    console.error("Stripe account fetch error", error);
-    return null;
-  }
+  return sharedGetPayoutMethod();
 }
 
-/**
- * Initiates a manual withdrawal to the connected bank account.
- */
 export async function withdrawFunds(amountCents: number) {
-  const user = await requireUser();
+  return sharedWithdrawFunds(amountCents);
+}
 
-  const [wallet] = await db
-    .select()
-    .from(wallets)
-    .where(eq(wallets.id, user.uid));
-
-  if (!wallet || wallet.balance < amountCents) {
-    throw new Error("Insufficient balance");
-  }
-
-  const [profile] = await db
-    .select()
-    .from(nannyProfiles)
-    .where(eq(nannyProfiles.id, user.uid));
-
-  if (!profile?.stripeConnectId) {
-    throw new Error("Payout method not configured");
-  }
-
-  // Withdrawals have a 50c fee based on design
-  const feeCents = 50;
-  const netAmount = amountCents - feeCents;
-
-  if (netAmount <= 0) throw new Error("Withdrawal amount too low");
-
-  // 1. Log Withdrawal (Pending)
-  const [txn] = await db.insert(walletTransactions).values({
-    walletId: user.uid,
-    amount: amountCents,
-    type: "withdrawal",
-    status: "pending",
-    description: "Manual Withdrawal to Bank",
-  }).returning();
-
-  try {
-    // 2. Trigger Stripe Payout
-    const payout = await stripe.payouts.create({
-      amount: netAmount,
-      currency: "usd",
-    }, {
-      stripeAccount: profile.stripeConnectId,
-    });
-
-    // 3. Update Wallet & Transaction
-    await db.update(wallets)
-      .set({ balance: wallet.balance - amountCents })
-      .where(eq(wallets.id, user.uid));
-
-    await db.update(walletTransactions)
-      .set({ status: "completed", stripeTransferId: payout.id })
-      .where(eq(walletTransactions.id, txn.id));
-
-    return { success: true };
-  } catch (error: any) {
-    console.error("Payout failed", error);
-    await db.update(walletTransactions)
-      .set({ status: "failed", description: `Failed: ${error.message}` })
-      .where(eq(walletTransactions.id, txn.id));
-    throw new Error(error.message || "Withdrawal failed");
-  }
+export async function getStripeConnectOnboarding() {
+  return sharedOnboarding("/dashboard/nanny/wallet");
 }
 
 /**
- * Fetches transaction history for the current user.
+ * Fetches transaction history and aggregates real financial stats for the nanny.
  */
 export async function getWalletData() {
   const user = await requireUser();
 
+  // 1. Fetch Basic Wallet & Transactions
   const wallet = await db.query.wallets.findFirst({
     where: eq(wallets.id, user.uid),
     with: {
@@ -179,5 +37,115 @@ export async function getWalletData() {
     }
   });
 
-  return wallet;
+  // 2. Aggregate YTD Earnings
+  const startOfYear = new Date(new Date().getFullYear(), 0, 1);
+  const [ytdResult] = await db
+    .select({ total: sum(walletTransactions.amount) })
+    .from(walletTransactions)
+    .where(and(
+      eq(walletTransactions.walletId, user.uid),
+      eq(walletTransactions.type, "earning"),
+      eq(walletTransactions.status, "completed"),
+      gte(walletTransactions.createdAt, startOfYear)
+    ));
+
+  // 3. Find Most Frequent Client
+  const [topClient] = await db
+    .select({ 
+      fullName: users.fullName,
+      bookingCount: count(bookings.id)
+    })
+    .from(bookings)
+    .innerJoin(users, eq(bookings.parentId, users.id))
+    .where(and(
+      eq(bookings.caregiverId, user.uid),
+      eq(bookings.status, "completed")
+    ))
+    .groupBy(users.fullName)
+    .orderBy(desc(count(bookings.id)))
+    .limit(1);
+
+  // 4. Generate Monthly Chart Data (Last 6 Months)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
+  sixMonthsAgo.setDate(1);
+
+  const rawMonthly = await db
+    .select({
+      month: sql<string>`TO_CHAR(${walletTransactions.createdAt}, 'Mon')`,
+      monthNum: sql<number>`EXTRACT(MONTH FROM ${walletTransactions.createdAt})`,
+      year: sql<number>`EXTRACT(YEAR FROM ${walletTransactions.createdAt})`,
+      total: sum(walletTransactions.amount)
+    })
+    .from(walletTransactions)
+    .where(and(
+      eq(walletTransactions.walletId, user.uid),
+      eq(walletTransactions.type, "earning"),
+      eq(walletTransactions.status, "completed"),
+      gte(walletTransactions.createdAt, sixMonthsAgo)
+    ))
+    .groupBy(
+      sql`EXTRACT(YEAR FROM ${walletTransactions.createdAt})`, 
+      sql`EXTRACT(MONTH FROM ${walletTransactions.createdAt})`, 
+      sql`TO_CHAR(${walletTransactions.createdAt}, 'Mon')`
+    )
+    .orderBy(
+      sql`EXTRACT(YEAR FROM ${walletTransactions.createdAt})`, 
+      sql`EXTRACT(MONTH FROM ${walletTransactions.createdAt})`
+    );
+
+  // Transform to a stable 6-month array for the chart
+  const months = [];
+  for (let i = 0; i < 6; i++) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    const mLabel = d.toLocaleString('en-US', { month: 'short' });
+    const match = rawMonthly.find(r => r.month === mLabel);
+    months.push({
+      m: mLabel,
+      val: match ? Number(match.total) / 100 : 0,
+      h: match ? Math.max(10, Math.min(100, (Number(match.total) / 500000) * 100)) + "%" : "10%",
+      curr: i === 4,
+      proj: i === 5
+    });
+  }
+
+  // 5. Fetch Inbound Payments (Bookings)
+  const inboundPayments = await db.query.bookings.findMany({
+    where: eq(bookings.caregiverId, user.uid),
+    with: {
+      parent: {
+        columns: {
+          fullName: true,
+        },
+        with: {
+          parentProfile: true
+        }
+      }
+    },
+    orderBy: [desc(bookings.startDate)],
+    limit: 10
+  });
+
+  return {
+    ...wallet,
+    stats: {
+      ytdEarnings: Number(ytdResult?.total || 0) / 100,
+      topClient: topClient?.fullName || "No bookings yet",
+      avgWeekly: (Number(ytdResult?.total || 0) / 100) / Math.max(1, new Date().getUTCMonth() * 4),
+      chart: months
+    },
+    inboundPayments: inboundPayments.map(b => ({
+      id: b.id,
+      family: b.parent?.fullName || "Family",
+      familyPhoto: (b.parent as any)?.parentProfile?.familyPhoto || null,
+      date: b.startDate,
+      hours: b.hoursPerDay,
+      amount: b.totalAmount / 100,
+      status: b.status === "completed" ? "Paid" : "Pending",
+      rate: 30, // Mock rate for UI
+      overtime: b.overtimeAmount / 100,
+      lateness: b.latenessMinutes
+    }))
+  };
 }

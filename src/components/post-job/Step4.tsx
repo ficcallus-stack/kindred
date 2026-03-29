@@ -3,18 +3,23 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js";
 import { StripeProvider } from "@/components/StripeProvider";
+import { getPaymentIntentStatus, sendReceiptEmail } from "@/app/dashboard/parent/post-job/actions";
+import { useToast } from "@/components/Toast";
 
 interface Step4Props {
   data: any;
-  onNext: () => void;
+  onNext: (paymentIntentId: string) => void;
   onBack: () => void;
 }
 
-function Step4Inner({ data, onNext, total }: { data: any, onNext: () => void, total: number }) {
+function Step4Inner({ data, onNext, total, paymentIntentId, hours, subtotal, fee }: { data: any, onNext: (id: string) => void, total: number, paymentIntentId: string, hours: number, subtotal: number, fee: number }) {
   const stripe = useStripe();
   const elements = useElements();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [isEmailSending, setIsEmailSending] = useState(false);
+  const { showToast } = useToast();
 
   const handlePay = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,23 +29,102 @@ function Step4Inner({ data, onNext, total }: { data: any, onNext: () => void, to
     const { error } = await stripe.confirmPayment({
       elements,
       confirmParams: {
-        return_url: `${window.location.origin}/dashboard/parent`,
+        return_url: `${window.location.origin}/dashboard/parent/post-job`,
       },
-      redirect: "if_required", // redirect only on 3DS authorization triggers
+      redirect: "if_required", 
     });
 
     if (error) {
       setErrorMessage(error.message || "Something went wrong with your payment.");
       setIsProcessing(false);
     } else {
-      onNext(); // Advance step count securely Node
+      setIsSuccess(true);
     }
   };
 
+  const handleSendEmail = async () => {
+    setIsEmailSending(true);
+    try {
+      await sendReceiptEmail({
+        amount: total,
+        hours,
+        rate: data.minRate || 25,
+        fee,
+        transactionId: paymentIntentId
+      });
+      showToast("Receipt sent to your email!", "success");
+    } catch (err: any) {
+      showToast("Failed to send email. Please try again.", "error");
+    } finally {
+      setIsEmailSending(false);
+    }
+  };
+
+  if (isSuccess) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 animate-in fade-in zoom-in-95 duration-500">
+        <div className="bg-surface-container-lowest rounded-[2.5rem] p-10 shadow-2xl border border-outline-variant/10 text-center space-y-8 relative overflow-hidden">
+          {/* Decorative background for success */}
+          <div className="absolute top-0 left-0 w-full h-2 bg-tertiary"></div>
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-tertiary/5 rounded-full blur-3xl"></div>
+
+          <div className="w-24 h-24 bg-tertiary/10 rounded-full flex items-center justify-center mx-auto mb-6">
+            <MaterialIcon name="verified" className="text-6xl text-tertiary" fill />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black font-headline text-primary tracking-tight">Escrow Authorized!</h2>
+            <p className="text-on-surface-variant font-medium">Your deposit of ${total.toFixed(2)} is secured in Kindred Escrow.</p>
+          </div>
+
+          <div className="bg-surface-container-low rounded-2xl p-6 text-left space-y-4 border border-outline-variant/5">
+            <div className="flex justify-between items-center pb-4 border-b border-outline-variant/10">
+              <span className="text-xs font-black uppercase tracking-widest text-on-surface-variant/60">Transaction ID</span>
+              <span className="text-sm font-mono font-bold text-primary">{paymentIntentId.slice(-12).toUpperCase()}</span>
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-on-surface-variant">Care Hours ({hours}h @ ${data.minRate}/hr)</span>
+                <span className="font-bold text-primary">${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-on-surface-variant">Service fee</span>
+                <span className="font-bold text-primary">${fee.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between text-lg font-black pt-2 border-t border-outline-variant/10">
+                <span className="text-primary">Total Secure Deposit</span>
+                <span className="text-primary font-headline">${total.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <button 
+              onClick={() => onNext(paymentIntentId)}
+              className="w-full py-5 bg-primary text-on-primary rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-3"
+            >
+              Continue to Final Review
+              <MaterialIcon name="arrow_forward" />
+            </button>
+            <button 
+              onClick={handleSendEmail}
+              disabled={isEmailSending}
+              className="w-full py-4 bg-surface-container-high text-primary rounded-2xl font-bold text-xs hover:bg-surface-container-highest transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <MaterialIcon name={isEmailSending ? "sync" : "mail"} className={cn("text-lg", isEmailSending && "animate-spin")} />
+              {isEmailSending ? "Sending..." : "Send Copy to my Email"}
+            </button>
+          </div>
+
+          <p className="text-[10px] text-on-surface-variant/60 font-medium italic">
+            Funds will only be released after you approve completed work milestones.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const minRate = data.minRate || 25;
-  const hours = 4;
-  const subtotal = minRate * hours;
-  const fee = 5.0;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -117,8 +201,8 @@ function Step4Inner({ data, onNext, total }: { data: any, onNext: () => void, to
             <div className="space-y-6 relative z-10">
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
-                  <p className="text-on-primary-container text-[10px] uppercase tracking-[0.2em] font-black font-label opacity-60">Duration</p>
-                  <p className="text-lg font-bold tracking-tight">Saturday, Oct 14 • 4 Hours</p>
+                  <p className="text-on-primary-container text-[10px] uppercase tracking-[0.2em] font-black font-label opacity-60">Care Period</p>
+                  <p className="text-lg font-bold tracking-tight">{data.startDate || "Upcoming"} • {hours} Estimated Hours</p>
                 </div>
                 <MaterialIcon name="calendar_today" className="text-primary-fixed-dim" />
               </div>
@@ -126,14 +210,14 @@ function Step4Inner({ data, onNext, total }: { data: any, onNext: () => void, to
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
                   <p className="text-on-primary-container text-[10px] uppercase tracking-[0.2em] font-black font-label opacity-60">Service</p>
-                  <p className="text-lg font-bold tracking-tight">Standard Daytime Care</p>
+                  <p className="text-lg font-bold tracking-tight">{data.duration || "Standard daytime care"}</p>
                 </div>
                 <MaterialIcon name="child_care" className="text-primary-fixed-dim" />
               </div>
               
               <div className="pt-8 mt-8 border-t border-white/10 space-y-4">
                 <div className="flex justify-between text-on-primary-container font-medium">
-                  <span className="text-sm">Estimated Total ({hours}hrs × ${minRate})</span>
+                  <span className="text-sm">Estimated Total ({hours}hrs × ${minRate}/hr)</span>
                   <span className="font-bold">${subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-on-primary-container font-medium">
@@ -200,37 +284,166 @@ function Step4Inner({ data, onNext, total }: { data: any, onNext: () => void, to
 
 export default function Step4({ data, onNext, onBack }: Step4Props) {
   const [clientSecret, setClientSecret] = useState<string>("");
+  const [paymentIntentId, setPaymentIntentId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [alreadyAuthorizedInfo, setAlreadyAuthorizedInfo] = useState<{ id: string; amount: number } | null>(null);
 
   const minRate = data.minRate || 25;
-  const hours = 4;
+  const hours = Object.values(data.schedule || {}).filter(Boolean).length * 2;
   const subtotal = minRate * hours;
   const fee = 5.0;
   const total = subtotal + fee;
 
   useEffect(() => {
-    setIsLoading(true);
-    fetch("/api/stripe/create-payment-intent", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: Math.round(total * 100),
-        description: "KindredCare Booking Escrow",
-      }),
-    })
-      .then((res) => res.json())
-      .then((resData) => setClientSecret(resData.clientSecret))
-      .catch(console.error)
-      .finally(() => setIsLoading(false));
-  }, [total]);
+    let isMounted = true;
+
+    async function initPayment() {
+      // Don't re-init if we already have a secret or are loading
+      if (clientSecret || isLoading) return;
+
+      setIsLoading(true);
+      setErrorMessage(null);
+      
+      try {
+        // 1. Check if we already have a valid authorized intent in the draft
+        if (data.stripePaymentIntentId) {
+          const info = await getPaymentIntentStatus(data.stripePaymentIntentId);
+          if (isMounted && (info.status === 'requires_capture' || info.status === 'succeeded')) {
+            // Already paid!
+            if (info.amount >= total) {
+              setAlreadyAuthorizedInfo({ id: info.id, amount: info.amount });
+              setPaymentIntentId(info.id);
+              setIsLoading(false);
+              return;
+            }
+          }
+          // If mismatched or unauthorized, we proceed to create a fresh one below
+        }
+
+        // 2. Create fresh intent if needed
+        const res = await fetch("/api/stripe/create-payment-intent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: Math.round(total * 100),
+            description: `KindredCare Escrow: ${hours} hours @ $${minRate}/hr`,
+          }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Failed to initialize payment");
+        }
+        
+        if (!isMounted) return;
+
+        const resData = await res.json();
+        setClientSecret(resData.clientSecret);
+        setPaymentIntentId(resData.paymentIntentId);
+      } catch (err: any) {
+        if (isMounted) {
+          console.error("Payment init error:", err);
+          setErrorMessage(err.message || "Could not connect to the payment server.");
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
+      }
+    }
+
+    initPayment();
+    return () => { isMounted = false; };
+  }, [total]); // Only re-init if the total amount changes
 
   if (isLoading) {
-    return <div className="py-20 text-center font-bold text-primary">Loading secure payment portal...</div>;
+    return (
+      <div className="py-20 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in duration-500">
+        <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        <p className="font-headline font-bold text-primary italic">Securely connecting to Kindred Escrow...</p>
+      </div>
+    );
   }
+
+  if (errorMessage) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in duration-500">
+        <div className="max-w-md p-8 bg-error/5 text-error rounded-[2.5rem] border border-error/20 shadow-xl shadow-error/5">
+          <MaterialIcon name="error" className="text-4xl mb-4" />
+          <p className="font-headline font-bold text-lg mb-2">Connection Error</p>
+          <p className="text-sm opacity-80 mb-8 leading-relaxed">{errorMessage}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full py-4 bg-error text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-error/20 hover:opacity-90 active:scale-95 transition-all"
+          >
+            Retry Connection
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If we already have a sufficient authorization, show a modified success screen
+  if (alreadyAuthorizedInfo && alreadyAuthorizedInfo.amount >= total) {
+    return (
+      <div className="max-w-2xl mx-auto py-12 animate-in fade-in zoom-in-95 duration-500">
+        <div className="bg-surface-container-lowest rounded-[2.5rem] p-10 shadow-2xl border border-outline-variant/10 text-center space-y-8 relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-emerald-500"></div>
+          <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
+            <MaterialIcon name="verified" className="text-6xl text-emerald-600" fill />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-3xl font-black font-headline text-primary tracking-tight">Payment Secured!</h2>
+            <p className="text-on-surface-variant font-medium">You already authorized ${alreadyAuthorizedInfo.amount.toFixed(2)} for this job.</p>
+          </div>
+          <div className="bg-emerald-50/50 rounded-2xl p-6 text-left border border-emerald-100 flex items-start gap-4">
+             <MaterialIcon name="info" className="text-emerald-600 shrink-0" />
+             <p className="text-xs text-emerald-800 leading-relaxed font-medium">
+                We've detected your existing authorization. Since the new total is within this amount, no further payment is required. We'll only capture what is actually worked.
+             </p>
+          </div>
+          <button 
+            onClick={() => onNext(alreadyAuthorizedInfo.id)}
+            className="w-full py-5 bg-primary text-on-primary rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-3"
+          >
+            Continue to Final Review
+            <MaterialIcon name="arrow_forward" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If we reach here and have no clientSecret, we can't show the form yet
+  if (!clientSecret) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center text-center gap-4 animate-in fade-in duration-500">
+        <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        <p className="font-headline font-bold text-primary italic">Initializing secure payment...</p>
+      </div>
+    );
+  }
+
+  // If we have an authorization but it's INSUFFICIENT, show a top-up notice
+  const isTopUp = alreadyAuthorizedInfo && alreadyAuthorizedInfo.amount < total;
 
   return (
     <StripeProvider clientSecret={clientSecret}>
-      <Step4Inner data={data} onNext={onNext} total={total} />
+      {isTopUp && (
+        <div className="max-w-4xl mx-auto mb-10 p-6 bg-amber-50 rounded-2xl border border-amber-100 flex items-start gap-4 animate-in slide-in-from-top-4 duration-500">
+          <div className="w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center shrink-0">
+            <MaterialIcon name="add_shopping_cart" className="text-amber-700" />
+          </div>
+          <div>
+            <h4 className="font-headline font-bold text-amber-900 mb-1">Updated Authorization Required</h4>
+            <p className="text-xs text-amber-800 leading-relaxed">
+              You previously authorized <strong>${alreadyAuthorizedInfo!.amount.toFixed(2)}</strong>. 
+              Since the hours or rates have increased, we need a new authorization for the total of <strong>${total.toFixed(2)}</strong>. 
+              The old authorization will be automatically voided.
+            </p>
+          </div>
+        </div>
+      )}
+      <Step4Inner key={paymentIntentId} data={data} onNext={onNext} total={total} paymentIntentId={paymentIntentId} hours={hours} subtotal={subtotal} fee={fee} />
     </StripeProvider>
   );
 }

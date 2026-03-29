@@ -4,7 +4,9 @@ import * as dotenv from "dotenv";
 dotenv.config({ path: ".env.local" });
 dotenv.config();
 
-if (!process.env.DATABASE_URL) {
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
   throw new Error("DATABASE_URL is not set");
 }
 
@@ -13,6 +15,6 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL,
+    url: connectionString!,
   },
 });

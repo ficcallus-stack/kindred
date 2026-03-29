@@ -89,7 +89,7 @@ vi.mock("@/db/schema", () => ({
   payments: { bookingId: "booking_id", stripePaymentIntentId: "stripe_pi_id" },
   applications: { id: "id", jobId: "job_id", caregiverId: "caregiver_id", status: "status", createdAt: "created_at" },
   users: { id: "id", fullName: "full_name" },
-  nannyProfiles: { id: "id", hourlyRate: "hourly_rate", location: "location", stripeConnectId: "stripe_connect_id" },
+  nannyProfiles: { id: "id", hourlyRate: "hourly_rate", location: "location" },
   wallets: { id: "id", balance: "balance" },
   walletTransactions: { id: "id", createdAt: "created_at" },
   reviews: { bookingId: "booking_id", reviewerId: "reviewer_id", revieweeId: "reviewee_id", createdAt: "created_at" },

@@ -32,6 +32,8 @@ export async function addChild(data: CreateChildInput) {
     name: parsed.data.name,
     age: parsed.data.age,
     type: parsed.data.type,
+    bio: parsed.data.bio,
+    photoUrl: parsed.data.photoUrl,
     specialNeeds: parsed.data.specialNeeds,
   });
 

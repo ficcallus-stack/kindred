@@ -92,13 +92,13 @@ export async function sendWelcomeEmail(email: string, name: string, role: string
   });
 }
 
-export async function sendPasswordResetEmail(email: string, name: string, resetLink: string) {
+export async function sendPasswordResetEmail(email: string, resetLink: string) {
   const { passwordResetTemplate, passwordResetText } = await import("./email-templates");
   return sendEmail({
-    to: [{ email, name }],
+    to: [{ email }],
     subject: "Reset your KindredCare password",
-    htmlBody: passwordResetTemplate(name, resetLink),
-    textBody: passwordResetText(name, resetLink),
+    htmlBody: passwordResetTemplate(email, resetLink),
+    textBody: passwordResetText(email, resetLink),
     from: { email: `noreply@${domain()}`, name: "KindredCare US" },
   });
 }
@@ -151,5 +151,30 @@ export async function sendBookingEmail(
     htmlBody: bookingEmailTemplate(name, type, details),
     textBody: bookingEmailText(name, type, details),
     from: { email: `bookings@${domain()}`, name: "KindredCare US" },
+  });
+}
+
+export async function sendSubscriptionSuccessEmail(email: string, name: string) {
+  const { subscriptionSuccessTemplate, subscriptionSuccessText } = await import("./email-templates");
+  return sendEmail({
+    to: [{ email, name }],
+    subject: "Welcome to Kindred Premium! 💎",
+    htmlBody: subscriptionSuccessTemplate(name),
+    textBody: subscriptionSuccessText(name),
+    from: { email: `premium@${domain()}`, name: "KindredCare US" },
+  });
+}
+
+export async function sendEscrowReceiptEmail(
+  email: string, name: string,
+  details: { amount: number; hours: number; rate: number; fee: number; transactionId: string }
+) {
+  const { escrowReceiptTemplate, escrowReceiptText } = await import("./email-templates");
+  return sendEmail({
+    to: [{ email, name }],
+    subject: `Receipt: $${details.amount.toFixed(2)} Secure Escrow Deposit`,
+    htmlBody: escrowReceiptTemplate(name, details),
+    textBody: escrowReceiptText(name, details),
+    from: { email: `escrow@${domain()}`, name: "KindredCare US" },
   });
 }

@@ -1,13 +1,14 @@
 export const dynamic = "force-dynamic";
-import MyChildren from "@/components/dashboard/MyChildren";
+
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { syncUser } from "@/lib/user-sync";
-import { jobs, applications, users, nannyProfiles, children } from "@/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { jobs, applications, users, nannyProfiles, children, bookings, parentProfiles } from "@/db/schema";
+import { eq, desc, and, count } from "drizzle-orm";
 import { db } from "@/db";
+import { format } from "date-fns";
 
 export default async function FamilyDashboard() {
   const user = await syncUser();
@@ -21,256 +22,313 @@ export default async function FamilyDashboard() {
     redirect("/dashboard/nanny");
   }
 
-  // Fetch jobs posted by this parent
-  const myJobs = await db.query.jobs.findMany({
-    where: eq(jobs.parentId, user.id),
-    orderBy: [desc(jobs.createdAt)],
+  const userId = user.id;
+
+  // 1. Fetch Profile Data
+  const parentProfile = await db.query.parentProfiles.findFirst({
+    where: eq(parentProfiles.id, userId),
   });
 
-  // Fetch applicants for these jobs
+  // 2. Fetch Children
+  const myChildren = await db.query.children.findMany({
+    where: eq(children.parentId, userId),
+  });
+
+  // 3. Fetch Applicants Hub (Latest 2)
   const myApplicants = await db.select({
     id: applications.id,
     jobTitle: jobs.title,
     nannyName: users.fullName,
+    nannyImage: users.profileImageUrl,
     nannyRate: nannyProfiles.hourlyRate,
     nannyLocation: nannyProfiles.location,
     status: applications.status,
-    createdAt: applications.createdAt,
     caregiverId: users.id,
   })
   .from(applications)
   .innerJoin(jobs, eq(applications.jobId, jobs.id))
   .innerJoin(users, eq(applications.caregiverId, users.id))
   .leftJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
-  .where(eq(jobs.parentId, user.id))
-  .orderBy(desc(applications.createdAt));
+  .where(eq(jobs.parentId, userId))
+  .orderBy(desc(applications.createdAt))
+  .limit(2);
 
-  // Fetch children from DB
-  const myChildren = await db.query.children.findMany({
-    where: eq(children.parentId, user.id),
-  });
+  // 4. Statistics (Job counts, Booking counts)
+  const [activeJobsCount] = await db.select({ count: count() }).from(jobs).where(and(eq(jobs.parentId, userId), eq(jobs.status, "open")));
+  const [activeBookingsCount] = await db.select({ count: count() }).from(bookings).where(and(eq(bookings.parentId, userId), eq(bookings.status, "confirmed")));
+  const totalPastBookings = await db.select({ count: count() }).from(bookings).where(and(eq(bookings.parentId, userId), eq(bookings.status, "completed")));
 
-  const fullName = user.fullName || "Parent";
+  const familyName = parentProfile?.familyName || user.fullName || "Your";
+  const familyBio = parentProfile?.bio || "Welcome to your family dashboard. Start by updating your profile and child details to find your perfect match.";
+  const location = parentProfile?.location || "Location not set";
 
   return (
-    <div className="p-8 lg:p-12 animate-in fade-in duration-700">
-      <div className="max-w-6xl mx-auto space-y-12">
+    <div className="bg-surface min-h-screen">
+      {/* Mobile Sidebar / Shared Sidebar logic would be in a layout, but here we overhauled the page content */}
+      
+      <main className="p-6 lg:p-10 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-700">
         
-        {/* Hero Welcome Section */}
-        <header className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-br from-primary to-primary-container p-10 md:p-14 text-white shadow-2xl shadow-primary/20 group">
-          <div className="relative z-10 max-w-2xl">
-            <h1 className="font-headline text-4xl md:text-5xl font-black tracking-tighter mb-6 leading-none italic">
-              Welcome back, <br className="md:hidden" /> {fullName}
-            </h1>
-            <p className="font-body text-xl text-on-primary-container leading-relaxed mb-10 opacity-90 italic">
-              Your household is humming. Start by posting a job or browsing our verified nannies to find the perfect match for your family.
+        {/* 1. Family Identity (Hero) */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-white rounded-[3rem] p-10 shadow-sm border border-outline-variant/10">
+          <div className="lg:col-span-7 space-y-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 text-secondary font-black text-xs tracking-[0.3em] uppercase opacity-70">
+                <MaterialIcon name="location_on" className="text-sm" fill />
+                {location}
+              </div>
+              <h1 className="font-headline text-5xl lg:text-7xl font-black text-primary tracking-tighter leading-none italic">
+                The {familyName} <br/><span className="text-secondary-container">Family Home</span>
+              </h1>
+            </div>
+            <p className="text-lg text-on-surface-variant leading-relaxed max-w-xl font-medium opacity-60 italic">
+              {familyBio}
             </p>
             <div className="flex flex-wrap gap-4">
-              <Link href="/dashboard/parent/post-job" className="px-8 py-4 bg-secondary-fixed-dim text-on-secondary-fixed font-black uppercase tracking-widest text-[10px] rounded-2xl active:scale-95 transition-transform shadow-xl shadow-orange-950/20">
-                Post a Job
+              <Link href="/dashboard/parent/profile" className="px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 flex items-center gap-2 hover:bg-slate-900 transition-all">
+                <MaterialIcon name="edit" className="text-sm" />
+                Edit Family Bio
               </Link>
-              <Link href="/browse" className="px-8 py-4 bg-white/10 backdrop-blur-md border border-white/20 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-white/20 transition-all">
-                Browse Nannies
+              <Link href="/dashboard/parent/location" className="px-8 py-4 bg-surface-container-low text-primary border border-outline-variant/10 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-surface-container-high transition-all flex items-center gap-2">
+                <MaterialIcon name="my_location" className="text-sm" />
+                Primary Location
               </Link>
             </div>
           </div>
-          
-          {/* Decorative Elements */}
-          <div className="absolute -right-20 -top-20 w-96 h-96 bg-secondary-container/20 rounded-full blur-[100px] group-hover:scale-110 transition-transform duration-1000"></div>
-          <div className="absolute right-12 bottom-0 w-80 h-80 opacity-10 group-hover:opacity-20 transition-opacity translate-y-20">
-            <MaterialIcon name="family_history" className="text-[20rem]" />
+          <div className="lg:col-span-5 relative">
+            <div className="absolute -top-6 -left-6 w-24 h-24 bg-tertiary-fixed rounded-full -z-10 opacity-30 blur-2xl animate-pulse"></div>
+            <div className="relative group">
+              <img 
+                alt={familyName} 
+                className={cn(
+                  "w-full h-[450px] object-cover shadow-2xl rounded-[3rem]",
+                  "clip-path:[polygon(0_0,100%_0,95%_100%,0%_100%)]"
+                )}
+                src={parentProfile?.familyPhoto || "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=2070&auto=format&fit=crop"} 
+              />
+              <Link 
+                href="/dashboard/parent/profile#photo" 
+                className="absolute inset-0 flex items-center justify-center bg-primary/20 opacity-0 group-hover:opacity-100 backdrop-blur-sm rounded-[3rem] transition-all cursor-pointer"
+              >
+                 <MaterialIcon name="photo_camera" className="text-white text-4xl" />
+              </Link>
+            </div>
+            <div className="absolute -bottom-4 -right-4 bg-surface rounded-3xl p-5 shadow-2xl border border-outline-variant/10 flex items-center gap-4 animate-in slide-in-from-right duration-500">
+              <div className="w-12 h-12 bg-secondary-fixed flex items-center justify-center rounded-2xl text-secondary shadow-inner">
+                <MaterialIcon name="favorite" fill />
+              </div>
+              <div>
+                <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">Family Vibe</p>
+                <p className="font-black text-primary tracking-tight">Active & Creative</p>
+              </div>
+            </div>
           </div>
-        </header>
+        </section>
 
-        {/* Dashboard Grid */}
+        {/* 2. Child Mini-Profiles */}
+        <section className="space-y-8">
+          <div className="flex items-center justify-between px-2">
+            <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic leading-none">Little Kindreds</h2>
+            <Link href="/dashboard/parent/children" className="text-link font-black text-[10px] uppercase tracking-[0.3em] flex items-center gap-2 hover:underline underline-offset-8 transition-all">
+              Manage Profiles <MaterialIcon name="arrow_forward" className="text-sm" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {myChildren.map((child) => (
+              <div key={child.id} className="bg-white p-8 rounded-[3rem] shadow-sm hover:shadow-xl transition-all group border border-outline-variant/5">
+                <div className="flex items-center gap-8">
+                  <div className="relative shrink-0">
+                    <img 
+                      alt={child.name} 
+                      className="w-24 h-24 rounded-[2rem] object-cover grayscale group-hover:grayscale-0 transition-all duration-700 shadow-xl border-4 border-white"
+                      src={child.photoUrl || `https://api.dicebear.com/7.x/pixel-art/svg?seed=${child.name}`} 
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="font-headline text-2xl font-black text-primary leading-none tracking-tight">{child.name}, {child.age}</h3>
+                    <div className="flex flex-wrap gap-2">
+                       <span className="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-[9px] font-black uppercase tracking-widest rounded-full">{child.type}</span>
+                       {/* Mock tags based on bio for design parity */}
+                       <span className="px-3 py-1 bg-secondary-fixed/30 text-secondary text-[9px] font-black uppercase tracking-widest rounded-full border border-secondary/10">Active</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            <Link 
+              href="/dashboard/parent/children/add"
+              className="bg-dashed border-4 border-dashed border-outline-variant/30 p-8 rounded-[3rem] flex flex-col items-center justify-center gap-3 text-on-surface-variant hover:border-primary hover:text-primary transition-all group bg-white/50"
+            >
+              <MaterialIcon name="add_circle" className="text-4xl group-hover:scale-125 transition-transform" />
+              <span className="font-black uppercase tracking-widest text-[10px]">Add Little One</span>
+            </Link>
+          </div>
+        </section>
+
+        {/* 3. Core Navigation Hub (Bento Style) */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           
-          {/* Left Column: Primary Sections */}
+          {/* Applicants Hub */}
           <div className="lg:col-span-8 space-y-10">
-            
-
-            <MyChildren initialChildren={myChildren} />
-
-            {/* Latest Applicants Section */}
-            <section className="bg-surface-container-lowest rounded-[3rem] p-10 shadow-sm border border-outline-variant/5">
-              <div className="flex justify-between items-center mb-10 px-2">
-                <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic">Latest Applicants</h2>
-                <Link href="/dashboard/parent/applicants" className="text-primary font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:underline underline-offset-8">
-                  View All
-                </Link>
-              </div>
-              
-              <div className="space-y-6">
-                {myApplicants.length > 0 ? (
-                  myApplicants.map((app: any) => (
-                    <div key={app.id} className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[2.5rem] bg-surface-container-low hover:shadow-xl transition-all group border border-transparent hover:border-outline-variant/10">
-                      <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center shrink-0">
-                        <img 
-                          src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${app.nannyName}`} 
-                          className="w-12 h-12" 
-                          alt="Nanny"
-                        />
-                      </div>
-                      <div className="flex-grow space-y-1">
-                        <div className="flex items-center gap-3">
-                          <h4 className="font-headline text-2xl font-black text-primary tracking-tight leading-none">{app.nannyName}</h4>
-                          <span className="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-black uppercase tracking-widest rounded-lg">New</span>
-                        </div>
-                        <p className="text-on-surface-variant text-sm font-medium opacity-60">Applied for: <span className="text-primary font-black italic">{app.jobTitle}</span></p>
-                        <div className="flex items-center gap-4 pt-2">
-                          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                            <MaterialIcon name="payments" className="text-lg" />
-                            ${app.nannyRate}/hr
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                            <MaterialIcon name="location_on" className="text-lg" />
-                            {app.nannyLocation}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-3 w-full md:w-auto">
-                        <Link 
-                          href={`/nannies/${app.caregiverId}`}
-                          className="flex-1 md:flex-none px-8 py-4 bg-white text-primary rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-sm hover:shadow-xl transition-all text-center"
-                        >
-                          View Profile
-                        </Link>
-                        <button className="flex-1 md:flex-none px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all">
-                          Message
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 italic">
-                    <MaterialIcon name="person_search" className="text-6xl mb-4" />
-                    <p className="font-headline font-bold text-xl">No applicants yet.</p>
-                    <p className="text-sm">Once caregivers apply to your jobs, they'll appear here.</p>
+            <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-outline-variant/5 h-full relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-64 h-64 bg-secondary-fixed/10 rounded-full blur-[100px] -z-0"></div>
+               <div className="relative z-10">
+                <div className="flex items-center justify-between mb-10">
+                  <div>
+                    <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic leading-none">Applicants Hub</h2>
+                    <p className="text-on-surface-variant text-sm font-medium opacity-60 mt-2">Active candidates for your open positions.</p>
                   </div>
-                )}
-              </div>
-            </section>
-
-            {/* Active Jobs Section */}
-            <section className="bg-surface-container-lowest rounded-[3rem] p-10 shadow-sm border border-outline-variant/5">
-              <div className="flex justify-between items-center mb-10 px-2">
-                <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic">Active Jobs</h2>
-                <Link href="/dashboard/parent/jobs" className="text-primary font-black text-[10px] uppercase tracking-widest flex items-center gap-2 hover:underline underline-offset-8">
-                  View All
-                </Link>
-              </div>
-              <div className="space-y-6">
-                {myJobs.length > 0 ? (
-                  myJobs.map((job: any) => (
-                    <div key={job.id} className="flex flex-col md:flex-row items-center gap-8 p-8 rounded-[2.5rem] bg-surface-container-low hover:shadow-xl transition-all group border border-transparent hover:border-outline-variant/10">
-                      <div className="flex-grow space-y-2">
-                        <div className="flex items-center gap-3">
-                          <span className="px-3 py-1 bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-lg">Active</span>
-                          <h4 className="font-headline text-2xl font-black text-primary tracking-tight leading-none">{job.title}</h4>
-                        </div>
-                        <p className="text-on-surface-variant text-sm font-medium opacity-60 italic line-clamp-2">{job.description}</p>
-                        <div className="flex items-center gap-4 pt-2">
-                          <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-widest">
-                            <MaterialIcon name="payments" className="text-lg" />
-                            {job.budget}
-                          </div>
-                          <div className="flex items-center gap-1.5 text-xs font-black text-slate-500 uppercase tracking-widest">
-                            <MaterialIcon name="calendar_today" className="text-lg" />
-                            Posted {new Date(job.createdAt).toLocaleDateString()}
+                  {myApplicants.length > 0 && (
+                    <span className="px-4 py-1.5 bg-secondary-container text-primary text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-black/5">{myApplicants.length} New</span>
+                  )}
+                </div>
+                
+                <div className="space-y-6">
+                  {myApplicants.length > 0 ? (
+                    myApplicants.map((app) => (
+                      <div key={app.id} className="flex flex-col md:flex-row items-center justify-between gap-6 p-6 rounded-[2.5rem] bg-surface-container-low hover:bg-white border border-transparent hover:border-outline-variant/10 transition-all group">
+                        <div className="flex items-center gap-6">
+                          <img 
+                            alt={app.nannyName} 
+                            className="w-16 h-16 rounded-2xl object-cover shadow-lg group-hover:rotate-3 transition-transform"
+                            src={app.nannyImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.nannyName}`} 
+                          />
+                          <div>
+                            <h4 className="font-headline text-2xl font-black text-primary leading-none tracking-tight">{app.nannyName}</h4>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40 mt-1 whitespace-nowrap">For: {app.jobTitle}</p>
                           </div>
                         </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                          <Link 
+                            href={`/dashboard/parent/messages/${app.caregiverId}`}
+                            className="p-4 bg-white text-primary rounded-2xl hover:bg-primary hover:text-white transition-all shadow-sm flex items-center justify-center shrink-0"
+                          >
+                            <MaterialIcon name="chat" fill />
+                          </Link>
+                          <Link 
+                            href={`/nannies/${app.caregiverId}`}
+                            className="flex-1 md:flex-none px-8 py-4 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all text-center"
+                          >
+                            View Profile
+                          </Link>
+                        </div>
                       </div>
-                      <div className="flex gap-3 w-full md:w-auto">
-                        <button className="flex-1 md:flex-none px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all">
-                          Manage Job
-                        </button>
-                      </div>
+                    ))
+                  ) : (
+                    <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 italic px-4">
+                      <MaterialIcon name="person_search" className="text-6xl mb-6" />
+                      <p className="font-headline font-bold text-xl">Waiting for talent.</p>
+                      <p className="text-xs mt-2 uppercase tracking-widest">Post a job to start meeting elite caregivers.</p>
                     </div>
-                  ))
-                ) : (
-                  <div className="py-20 flex flex-col items-center justify-center text-center opacity-30 italic">
-                    <MaterialIcon name="work_outline" className="text-6xl mb-4" />
-                    <p className="font-headline font-bold text-xl">No active jobs yet.</p>
-                    <Link href="/dashboard/parent/post-job" className="text-link font-black uppercase tracking-widest text-xs mt-4 underline underline-offset-8">Post your first job</Link>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </section>
+            </div>
+
+            {/* Sub-counters */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-outline-variant/10 flex flex-col justify-between h-56 group overflow-hidden relative">
+                 <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-primary/5 rounded-full group-hover:scale-150 transition-transform"></div>
+                 <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-4">
+                    <MaterialIcon name="work" className="text-primary" />
+                    <h3 className="font-headline text-2xl font-black text-primary italic leading-none tracking-tight">Active Jobs</h3>
+                  </div>
+                  <p className="text-on-surface-variant text-sm font-medium opacity-60">You have <span className="text-primary font-black uppercase tracking-widest">{activeJobsCount.count} listings</span> open.</p>
+                </div>
+                <div className="relative z-10 flex items-center justify-between mt-auto">
+                   <div className="flex -space-x-3">
+                     {[1].map(i => <div key={i} className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-black text-xs border-4 border-white shadow-xl">{activeJobsCount.count}</div>)}
+                   </div>
+                   <Link href="/dashboard/parent/jobs" className="text-primary text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform">
+                    Manage <MaterialIcon name="chevron_right" />
+                   </Link>
+                </div>
+              </div>
+
+              <div className="bg-primary text-white rounded-[3rem] p-8 shadow-2xl flex flex-col justify-between h-56 relative overflow-hidden group">
+                 <div className="absolute -top-4 -left-4 w-32 h-32 bg-white/5 rounded-full blur-2xl group-hover:scale-110 transition-transform"></div>
+                 <div className="relative z-10">
+                  <div className="flex items-center gap-3 mb-4">
+                    <MaterialIcon name="calendar_today" />
+                    <h3 className="font-headline text-2xl font-black italic leading-none tracking-tight">Booking Flow</h3>
+                  </div>
+                  <p className="text-primary-fixed text-sm font-medium opacity-70 italic">{activeBookingsCount.count} Confirmed • {totalPastBookings[0].count} Memories</p>
+                </div>
+                <div className="relative z-10">
+                  <Link href="/dashboard/parent/bookings" className="w-full py-4 bg-white/10 hover:bg-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                    <MaterialIcon name="history" className="text-sm" />
+                    View History
+                  </Link>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Right Column: Sidebar Modules */}
+          {/* Sidebar Modules (Right Column) */}
           <div className="lg:col-span-4 space-y-10">
-            
-            {/* Verification Center */}
-            <section className="bg-white rounded-[3rem] p-10 border-l-[12px] border-tertiary-fixed shadow-2xl shadow-primary/5 group relative overflow-hidden">
-              <Link 
-                href="/dashboard/parent/verification"
-                className="absolute inset-0 z-10"
-              />
-              <div className="flex items-center gap-6 mb-8 relative z-0">
-                <div className="p-4 bg-tertiary-fixed rounded-[1.5rem] shadow-inner group-hover:rotate-12 transition-transform">
-                  <MaterialIcon name="verified_user" className="text-on-tertiary-fixed text-4xl" fill />
+            {/* Subscription Module (Kindred Elite) */}
+            <div className="bg-gradient-to-br from-primary to-primary-container text-white rounded-[3rem] p-10 shadow-2xl relative overflow-hidden group">
+              <div className="absolute -right-20 -top-20 w-64 h-64 bg-secondary-fixed/20 rounded-full blur-[100px] animate-pulse"></div>
+              <div className="relative z-10 space-y-8">
+                <div className="flex justify-between items-start">
+                  <div className="bg-white/10 p-4 rounded-[1.5rem] shadow-inner">
+                    <MaterialIcon name="workspace_premium" className="text-4xl text-secondary-container" style={{ fontVariationSettings: "'FILL' 1" }} />
+                  </div>
+                  <span className="px-4 py-1 bg-secondary-container text-primary text-[10px] font-black rounded-full uppercase tracking-widest shadow-xl shadow-black/20">Elite Plan</span>
                 </div>
                 <div>
-                  <h3 className="font-headline font-black text-2xl text-primary tracking-tight italic leading-none truncate underline decoration-secondary-fixed decoration-2 underline-offset-8">Get Verified</h3>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40 mt-1">Boost trust with caregivers</p>
+                  <h3 className="font-headline text-3xl font-black italic tracking-tighter leading-none">Kindred Elite</h3>
+                  <p className="text-primary-fixed text-sm font-black uppercase tracking-[0.2em] opacity-40 mt-2">$23.00 / month</p>
                 </div>
-              </div>
-              <div className="space-y-4 relative z-0 opacity-50">
-                {["Identity (Pending)", "Address (Pending)", "Payment (Linked)"].map(item => (
-                  <div key={item} className="flex items-center gap-4 text-sm font-black text-slate-600 transition-all">
-                    <MaterialIcon name="radio_button_unchecked" className="text-slate-300 text-lg" />
-                    <span className="tracking-tight">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Upcoming Schedule */}
-            <section className="bg-surface-container-lowest rounded-[3rem] p-10 shadow-sm border border-outline-variant/5">
-              <h3 className="font-headline text-2xl font-black text-primary mb-10 tracking-tighter italic">Upcoming</h3>
-              <div className="py-12 flex flex-col items-center justify-center text-center opacity-30 italic px-4">
-                <MaterialIcon name="event_busy" className="text-5xl mb-4" />
-                <p className="font-headline font-bold text-lg">No bookings yet.</p>
-              </div>
-              <Link 
-                href="/dashboard/parent/bookings"
-                className="block w-full mt-12 py-5 bg-surface-container-low text-primary font-black uppercase tracking-widest text-[10px] rounded-2xl border-2 border-transparent hover:border-primary/5 transition-all active:scale-95 text-center"
-              >
-                Full Calendar
-              </Link>
-            </section>
-
-            {/* Premium Upsell Banner */}
-            <section className="relative overflow-hidden bg-secondary-container rounded-[3rem] p-10 shadow-2xl shadow-orange-950/20 group">
-              <div className="relative z-10 text-on-secondary-container space-y-4">
-                <h3 className="font-headline text-3xl font-black tracking-tighter leading-none italic">Upgrade to <span className="text-secondary">Premium</span></h3>
-                <p className="text-sm font-medium opacity-80 leading-relaxed italic">Unlock limitless possibilities for your family's care needs.</p>
-                <div className="space-y-3 pt-4">
-                  <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest">
-                    <MaterialIcon name="star" className="text-xl" fill /> Unlimited Messaging
-                  </div>
-                  <div className="flex items-center gap-3 text-xs font-black uppercase tracking-widest">
-                    <MaterialIcon name="electric_bolt" className="text-xl" fill /> Priority Support
-                  </div>
+                <div className="space-y-4 pt-4 border-t border-white/5">
+                  {["Priority Application Feed", "$1M Liability Buffer", "Advanced Safety Screening"].map(benefit => (
+                    <div key={benefit} className="flex items-center gap-3 text-xs font-black uppercase tracking-widest opacity-80 italic">
+                      <MaterialIcon name="check_circle" className="text-secondary-fixed text-sm" fill />
+                      {benefit}
+                    </div>
+                  ))}
                 </div>
-                <div className="pt-8 flex items-baseline gap-2">
-                  <span className="text-5xl font-black font-headline tracking-tighter">$50</span>
-                  <span className="text-sm font-black uppercase tracking-widest opacity-40">/month</span>
-                </div>
-                <Link 
-                  href="/premium"
-                  className="block w-full py-5 bg-primary text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-primary/20 hover:-translate-y-1 hover:shadow-primary/40 transition-all active:scale-95 text-center"
-                >
-                  Go Premium Now
+                <Link href="/dashboard/parent/subscription" className="block w-full py-6 bg-secondary-container text-primary font-black uppercase tracking-widest text-[11px] rounded-[1.5rem] shadow-xl shadow-black/30 hover:scale-105 active:scale-95 transition-all text-center">
+                  Manage Billing
                 </Link>
               </div>
-              <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-secondary-fixed opacity-30 rounded-full blur-3xl group-hover:scale-125 transition-transform duration-1000"></div>
-            </section>
+            </div>
 
+            {/* Care Memories Preview */}
+            <div className="bg-white rounded-[3rem] p-8 border border-outline-variant/10 shadow-sm relative overflow-hidden">
+              <h4 className="font-headline text-2xl font-black text-primary mb-8 tracking-tighter italic">Care Memories</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="aspect-square bg-surface-container-low rounded-[1.5rem] overflow-hidden group">
+                  <img 
+                    src="https://images.unsplash.com/photo-1542810634-71277d95dcbb?q=80&w=2070&auto=format&fit=crop" 
+                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-1000"
+                    alt="Memory"
+                  />
+                </div>
+                <div className="aspect-square bg-surface-container-low rounded-[1.5rem] overflow-hidden group">
+                  <img 
+                    src="https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?q=80&w=2038&auto=format&fit=crop" 
+                    className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-1000"
+                    alt="Memory"
+                  />
+                </div>
+              </div>
+              <button className="w-full mt-8 text-[10px] font-black uppercase tracking-widest text-primary hover:text-secondary opacity-40 hover:opacity-100 transition-all underline underline-offset-8">
+                Explore Scrapbook
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </main>
+
+      {/* FAB: Create Action */}
+      <Link 
+        href="/dashboard/parent/post-job"
+        className="fixed bottom-10 right-10 w-20 h-20 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center group hover:scale-110 active:scale-90 transition-all z-40 border-4 border-white/50 backdrop-blur-md"
+      >
+        <MaterialIcon name="add" className="text-4xl group-hover:rotate-90 transition-transform" />
+      </Link>
     </div>
   );
 }

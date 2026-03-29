@@ -7,105 +7,129 @@ import { cn } from "@/lib/utils";
 
 interface LayoutProps {
   children: React.ReactNode;
+  user: any;
 }
 
 const NAV_ITEMS = [
-  { id: "dashboard", label: "Overview", icon: "dashboard", href: "/dashboard/moderator" },
+  { id: "dashboard", label: "Dashboard Overview", icon: "dashboard", href: "/dashboard/moderator" },
   { id: "verifications", label: "Verifications", icon: "verified_user", href: "/dashboard/moderator/verifications" },
   { id: "moderation", label: "User Moderation", icon: "gavel", href: "/dashboard/moderator/moderation" },
   { id: "support", label: "Support & Tickets", icon: "confirmation_number", href: "/dashboard/moderator/support" },
+  { id: "exams-marking", label: "Exam Marking", icon: "assignment", href: "/dashboard/moderator/certifications" },
+  { id: "exams-mgmt", label: "Exam Management", icon: "quiz", href: "/dashboard/moderator/exams" },
+  { id: "referrals", label: "Referrals", icon: "group_add", href: "/dashboard/moderator/referrals" },
 ];
 
-export default function ModeratorDashboardLayoutClient({ children }: LayoutProps) {
+export default function ModeratorDashboardLayoutClient({ children, user }: LayoutProps) {
   const pathname = usePathname();
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen antialiased flex">
-      {/* SideNavBar */}
-      <aside className="h-screen w-64 border-r border-slate-200 dark:border-slate-800 fixed left-0 top-0 z-50 bg-slate-50 dark:bg-slate-950 flex flex-col py-6 font-headline text-sm font-medium">
-        <div className="px-6 mb-8 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-md">
-            <span className="material-symbols-outlined text-white font-fill">verified_user</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold text-blue-900 dark:text-blue-200 leading-tight">Moderator Portal</h1>
-            <p className="text-xs text-slate-500 font-medium tracking-wider uppercase">Safety & Trust</p>
-          </div>
+      {/* Sidebar Navigation */}
+      <aside className="fixed left-0 top-0 h-screen w-64 z-50 bg-slate-50 border-r border-slate-200/50 flex flex-col p-4 gap-2 font-headline text-sm antialiased">
+        <div className="px-2 py-6 mb-4">
+          <h1 className="text-xl font-extrabold text-blue-950 tracking-tight leading-none italic">Moderator Hub</h1>
+          <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">Trust & Safety Team</p>
         </div>
-
-        <nav className="flex-1 space-y-1 px-3">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.id}
-              href={item.href}
-              className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-semibold duration-200 text-sm",
-                pathname === item.href
-                  ? "bg-blue-100/50 dark:bg-blue-900/30 text-blue-900 dark:text-blue-100 shadow-sm"
-                  : "text-slate-600 dark:text-slate-400 hover:text-blue-900 dark:hover:text-blue-200 hover:bg-white dark:hover:bg-slate-900 hover:shadow-sm"
-              )}
-            >
-              <MaterialIcon name={item.icon} fill={pathname === item.href} className="text-xl" />
-              <span>{item.label}</span>
-            </Link>
-          ))}
+        
+        <nav className="flex-1 space-y-1">
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname === item.href || (item.id === "verifications" && pathname.startsWith("/dashboard/moderator/verifications"));
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
+                  isActive
+                    ? "bg-white text-blue-900 shadow-sm border border-slate-200/50 font-bold translate-x-1"
+                    : "text-slate-600 hover:text-blue-800 hover:bg-blue-50/50"
+                )}
+              >
+                <MaterialIcon 
+                  name={item.icon} 
+                  className={cn("text-[20px]", isActive ? "text-blue-900" : "text-slate-400 group-hover:text-blue-600")} 
+                  fill={isActive}
+                />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
         </nav>
 
-        <div className="px-3 mt-auto space-y-1">
-          <Link href="/dashboard/moderator/help" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-blue-900 transition-all font-semibold text-sm">
-            <MaterialIcon name="help" className="text-xl" />
-            <span>Help Center</span>
+        <div className="mt-auto border-t border-slate-200/50 pt-4 space-y-1">
+          <button className="w-full mb-4 py-3 bg-gradient-to-br from-primary to-primary-container text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-primary/10 hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95 italic">
+            <MaterialIcon name="bolt" className="text-sm" fill />
+            Quick Verify
+          </button>
+          
+          <Link 
+            href="/dashboard/moderator/settings"
+            className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-800 hover:bg-blue-50/50 rounded-lg transition-all duration-200"
+          >
+            <MaterialIcon name="settings" className="text-[20px] text-slate-400" />
+            <span>Settings</span>
           </Link>
-          <Link href="/login" className="flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-error transition-all font-semibold text-sm">
-            <MaterialIcon name="logout" className="text-xl text-error" />
-            <span>Logout</span>
+          
+          <Link 
+            href="/login"
+            className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-error hover:bg-error/5 rounded-lg transition-all duration-200"
+          >
+            <MaterialIcon name="logout" className="text-[20px] text-slate-400" />
+            <span>Sign Out</span>
           </Link>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 ml-64 min-h-screen">
-        {/* Top App Bar */}
-        <header className="fixed top-0 left-64 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-8 py-4 border-b border-slate-100 dark:border-slate-800 shadow-sm shadow-blue-900/5">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="relative w-full max-w-md group">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors material-symbols-outlined text-xl">search</span>
+      <main className="flex-1 ml-64 min-h-screen relative">
+        {/* Top App Bar (Glass) */}
+        <header className="fixed top-0 right-0 left-64 z-40 bg-white/80 backdrop-blur-xl flex items-center justify-between px-8 py-3 h-16 shadow-sm shadow-blue-900/5 border-b border-slate-100">
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-black text-blue-950 uppercase tracking-widest italic leading-none">
+              {NAV_ITEMS.find(i => pathname === i.href)?.label || "Moderator Hub"}
+            </span>
+            <div className="h-4 w-px bg-slate-200"></div>
+            <div className="flex items-center gap-3 text-slate-400 focus-within:text-primary transition-colors group">
+              <MaterialIcon name="search" className="text-xl" />
               <input 
                 type="text" 
-                placeholder="Search application ID or user..." 
-                className="w-full bg-slate-100 border-none rounded-full pl-10 pr-4 py-2 text-sm focus:ring-2 focus:ring-primary/10 transition-all shadow-inner"
+                placeholder="Search candidates..." 
+                className="bg-transparent border-none outline-none text-sm font-medium w-64 placeholder:text-slate-300"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-blue-50/50 rounded-full transition-all active:scale-95 relative">
-              <MaterialIcon name="notifications" className="text-xl" />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-error rounded-full ring-2 ring-white"></span>
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center text-slate-500 hover:bg-blue-50/50 rounded-full transition-all active:scale-95">
-              <MaterialIcon name="settings" className="text-xl" />
-            </button>
-            <div className="h-8 w-px bg-slate-200 mx-2"></div>
-            <div className="flex items-center gap-3 pl-2">
-              <img 
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCyQG9iW4uAzlqP--n2wmBmazv4mMCIH_nyPHhak3nMkBgDJybBEyk2KjK6e9Qk_QZTWN-BWoQXkOqa7hqRCdrSozChs2ZwqhAAc5ku410J_QvJAMt34NZXbfm2zfYHmUkrCWuCWFZ9XeSkpx0D1TAc0LZeDWVepf8ZQNhHst7JRvQ88tHFt2RFTNkRwBqx6PPmKmzECjatPkpNhE9gNW5gSPwPcoE_QTuEQlPoClafkmU6IbTl_Dd4CzStvUmEZmuQ-nsFEgAok3k" 
-                alt="Mod Avatar" 
-                className="w-9 h-9 rounded-full object-cover ring-2 ring-white shadow-sm"
-              />
-              <div className="hidden lg:block text-left">
-                <p className="text-xs font-bold text-blue-950 leading-none">Sarah Jenkins</p>
-                <p className="text-[10px] text-slate-500 font-medium">Senior Moderator</p>
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors relative group">
+                <MaterialIcon name="notifications" className="text-xl group-hover:scale-110 transition-transform" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full border-2 border-white"></span>
+              </button>
+              <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors">
+                <MaterialIcon name="help_outline" className="text-xl" />
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-3 pl-4 border-l border-slate-100">
+              <div className="text-right">
+                <p className="text-xs font-bold text-blue-950 leading-none">{user?.fullName || "Moderator"}</p>
+                <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">Personnel ID: {user?.id?.slice(0, 6) || "TEAM"}</p>
               </div>
+              <img 
+                src={`https://api.dicebear.com/7.x/initials/svg?seed=${user?.fullName || "Mod"}`} 
+                alt="Profile" 
+                className="w-9 h-9 rounded-xl object-cover border-2 border-primary/10 shadow-sm"
+              />
             </div>
           </div>
         </header>
 
-        {/* Page Canvas */}
-        <div className="pt-24 px-8 pb-12 max-w-7xl mx-auto">
+        {/* Page Content */}
+        <div className="pt-24 pb-12 px-8 max-w-7xl mx-auto">
           {children}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

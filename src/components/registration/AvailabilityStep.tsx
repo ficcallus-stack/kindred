@@ -9,12 +9,13 @@ interface AvailabilityStepProps {
   data: any;
   onBack: () => void;
   onSubmit: (data: any) => void;
+  isSubmitting?: boolean;
 }
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const TIMES = ["Mornings", "Afternoons", "Evenings"];
 
-export default function AvailabilityStep({ data, onBack, onSubmit }: AvailabilityStepProps) {
+export default function AvailabilityStep({ data, onBack, onSubmit, isSubmitting }: AvailabilityStepProps) {
   const [availability, setAvailability] = useState(data.times || {});
   const [rate, setRate] = useState(data.rate || "");
   const [locations, setLocations] = useState(data.locations || "");
@@ -148,9 +149,10 @@ export default function AvailabilityStep({ data, onBack, onSubmit }: Availabilit
           </button>
           <button
             type="submit"
-            className="bg-primary text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:opacity-90 transition-all flex items-center gap-3"
+            disabled={isSubmitting}
+            className="bg-primary disabled:opacity-50 text-white px-10 py-3 rounded-xl font-bold shadow-lg hover:opacity-90 transition-all flex items-center gap-3"
           >
-            Complete Registration
+            {isSubmitting ? "Registering..." : "Complete Registration"}
             <MaterialIcon name="done_all" className="text-sm" />
           </button>
         </div>

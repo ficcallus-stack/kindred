@@ -1,110 +1,111 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MaterialIcon } from "@/components/MaterialIcon";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
-import MapboxAutocomplete from "./MapboxAutocomplete";
 
-interface BrowseFiltersProps {
-  initialLocation: string;
-  initialRate: number;
-}
-
-export default function BrowseFilters({ initialLocation, initialRate }: BrowseFiltersProps) {
+export default function BrowseFilters({ initialLocation, initialRate }: { initialLocation: string, initialRate: number }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const [location, setLocation] = useState(initialLocation);
-  const [rate, setRate] = useState(initialRate);
+  const [distance, setDistance] = useState(searchParams.get("distance") || "10");
+  const [rate, setRate] = useState(searchParams.get("rate") || "45");
+  const [experience, setExperience] = useState<string | null>(searchParams.get("exp"));
 
-  const updateFilters = (newParams: Record<string, string>) => {
+  const updateFilters = (key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    Object.entries(newParams).forEach(([key, value]) => {
-      if (value) params.set(key, value);
-      else params.delete(key);
-    });
-    router.push(`/browse?${params.toString()}`, { scroll: false });
+    if (value) params.set(key, value);
+    else params.delete(key);
+    router.push(`/browse?${params.toString()}`);
   };
 
   return (
-    <div className="space-y-10">
-      {/* Location */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-          <MaterialIcon name="location_on" className="text-secondary" />
-          <span>Location</span>
-        </div>
-        <div className="relative">
-          <MapboxAutocomplete
-            initialLocation={location}
-            onSelect={(loc, lat, lng) => {
-              setLocation(loc);
-              updateFilters({ location: loc, lat: lat.toString(), lng: lng.toString() });
-            }}
-            placeholder="Enter city..."
-            inputClassName="w-full bg-white border-2 border-transparent rounded-[1.5rem] shadow-sm py-4 pl-6 pr-12 text-on-surface font-bold text-sm focus:ring-2 focus:ring-primary/20 outline-none"
-          />
-          <button 
-            onClick={() => updateFilters({ location })}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/40 hover:text-primary transition-colors"
-          >
-            <MaterialIcon name="search" />
-          </button>
-        </div>
+    <div className="bg-surface-container-lowest rounded-[2rem] p-8 shadow-[0_8px_32px_rgba(29,53,87,0.04)] sticky top-28">
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="font-headline font-extrabold text-xl text-primary">Filters</h2>
+        <button 
+          onClick={() => router.push("/browse")}
+          className="text-secondary text-sm font-bold"
+        >
+          Clear All
+        </button>
       </div>
 
-      {/* Rate Range */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-          <MaterialIcon name="payments" className="text-secondary" />
-          <span>Max Rate (${rate}/hr)</span>
+      {/* Distance */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Distance</label>
+          <span className="text-sm font-bold text-primary">Within {distance} mi</span>
         </div>
-        <div className="px-2">
-          <input 
-            className="w-full accent-primary h-2 rounded-full cursor-pointer" 
-            max="100" min="15" step="5" type="range" 
-            value={rate}
-            onChange={(e) => {
-              const val = e.target.value;
-              setRate(parseInt(val));
-              // Debounce URL update or just update on change
-            }}
-            onMouseUp={() => updateFilters({ rate: rate.toString() })}
-            onTouchEnd={() => updateFilters({ rate: rate.toString() })}
-          />
-          <div className="flex justify-between text-[10px] font-black text-slate-400 mt-2 uppercase tracking-wider">
-            <span>$15/hr</span>
-            <span>$100/hr</span>
-          </div>
+        <input 
+          type="range" 
+          max="50" 
+          min="1" 
+          value={distance}
+          onChange={(e) => {
+            setDistance(e.target.value);
+            updateFilters("distance", e.target.value);
+          }}
+          className="accent-primary w-full h-1 bg-surface-variant rounded-lg appearance-none cursor-pointer" 
+        />
+      </div>
+
+      {/* Hourly Rate */}
+      <div className="mb-8">
+        <div className="flex justify-between items-center mb-4">
+          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Hourly Rate</label>
+          <span className="text-sm font-bold text-primary">${rate} - $100+</span>
         </div>
+        <input 
+          type="range" 
+          max="100" 
+          min="15" 
+          value={rate}
+          onChange={(e) => {
+            setRate(e.target.value);
+            updateFilters("rate", e.target.value);
+          }}
+          className="accent-primary w-full h-1 bg-surface-variant rounded-lg appearance-none cursor-pointer" 
+        />
       </div>
 
       {/* Experience */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-3 text-primary font-black uppercase tracking-widest text-xs">
-          <MaterialIcon name="stars" className="text-primary" />
-          <span>Experience</span>
-        </div>
+      <div className="mb-8">
+        <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">Experience</label>
         <div className="grid grid-cols-2 gap-2">
-          {["1-3 yrs", "4-7 yrs", "8-12 yrs", "12+ yrs"].map((years, i) => (
+          {["1-3", "3-5", "5-10", "10+"].map((lvl) => (
             <button 
-              key={years} 
+              key={lvl}
+              onClick={() => {
+                const newVal = experience === lvl ? "" : lvl;
+                setExperience(newVal);
+                updateFilters("exp", newVal);
+              }}
               className={cn(
-                "rounded-2xl p-3 text-xs font-black transition-all",
-                i === 2 ? "bg-white text-primary shadow-sm" : "bg-transparent text-on-surface-variant/40 hover:bg-white/50"
+                "px-3 py-2.5 rounded-xl border-2 text-xs font-bold transition-all",
+                experience === lvl 
+                  ? "border-primary bg-primary text-white" 
+                  : "border-outline-variant/30 text-primary hover:border-primary"
               )}
             >
-              {years}
+              {lvl} yrs
             </button>
           ))}
         </div>
       </div>
 
-      <Link href="/browse" className="block py-6 text-primary font-black uppercase tracking-widest text-[10px] hover:underline underline-offset-8 text-center opacity-60 hover:opacity-100 transition-all">
-        Reset All Filters
-      </Link>
+      {/* Certifications (Static markers for now) */}
+      <div className="mb-2">
+        <label className="block text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-4">Certifications</label>
+        <div className="space-y-3">
+          {["CPR Certified", "First Aid Trained", "Global Care Verified"].map((cert) => (
+            <label key={cert} className="flex items-center gap-3 cursor-pointer group">
+              <input type="checkbox" className="w-5 h-5 rounded-md border-outline-variant text-primary focus:ring-primary" />
+              <span className="text-sm font-medium text-on-surface-variant group-hover:text-primary transition-colors">{cert}</span>
+            </label>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

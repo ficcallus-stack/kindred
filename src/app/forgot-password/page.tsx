@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { sendPasswordResetEmail } from "firebase/auth";
-import { auth } from "@/lib/firebase-client";
+import { initiatePasswordReset } from "@/lib/actions/auth";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { useToast } from "@/components/Toast";
 
@@ -18,14 +17,15 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
-      setSent(true);
-      showToast("Password reset link sent to your email!", "success");
+      const res = await initiatePasswordReset(email);
+      if (res.success) {
+        setSent(true);
+        showToast("Password reset link sent to your email!", "success");
+      } else {
+        showToast(res.error || "Something went wrong.", "error");
+      }
     } catch (err: any) {
-      const msg = err.code === "auth/user-not-found"
-        ? "No account found with this email."
-        : "Something went wrong. Please try again.";
-      showToast(msg, "error");
+      showToast("Network error. Please try again.", "error");
     } finally {
       setLoading(false);
     }

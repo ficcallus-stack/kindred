@@ -1,20 +1,50 @@
 import { db } from "@/db";
-import { users, nannyProfiles } from "@/db/schema";
-import { eq, and, sql, gte, lte, desc } from "drizzle-orm";
+import { users, nannyProfiles, parentProfiles } from "@/db/schema";
+import { eq, and, sql, lte, desc } from "drizzle-orm";
 import BrowseFilters from "@/components/BrowseFilters";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { LocationModal } from "@/components/browse/LocationModal";
+import { getServerUser } from "@/lib/get-server-user";
 
-export default async function BrowseNannies({ searchParams }: { searchParams: Promise<{ location?: string, rate?: string, lat?: string, lng?: string }> }) {
+export default async function BrowseNannies({ 
+  searchParams 
+}: { 
+  searchParams: Promise<{ location?: string, rate?: string, lat?: string, lng?: string, distance?: string, page?: string, skip?: string }> 
+}) {
+  const user = await getServerUser();
+  const userId = user?.uid;
   const params = await searchParams;
-  const locationFilter = params.location || "";
-  const lat = params.lat ? parseFloat(params.lat) : undefined;
-  const lng = params.lng ? parseFloat(params.lng) : undefined;
-  const maxRateFilter = params.rate ? parseInt(params.rate) : 100;
+  const isSkipped = params.skip === "true";
+  
+  let lat = params.lat ? parseFloat(params.lat) : undefined;
+  let lng = params.lng ? parseFloat(params.lng) : undefined;
+  let locationLabel = params.location || "";
 
-  const distanceSql = (lat && lng) 
+  // Fallback to logged-in user's stored location if no search lat/lng in URL AND not skipped
+  if (userId && (!lat || !lng) && !isSkipped) {
+    const parent = await db.query.parentProfiles.findFirst({
+      where: eq(parentProfiles.id, userId),
+    });
+    if (parent?.latitude && parent?.longitude) {
+      lat = parseFloat(parent.latitude);
+      lng = parseFloat(parent.longitude);
+      locationLabel = parent.location || locationLabel;
+    }
+  }
+
+  const maxRateFilter = params.rate ? parseInt(params.rate) : 100;
+  const searchDistance = params.distance ? parseInt(params.distance) : 50;
+  const page = params.page ? parseInt(params.page) : 1;
+  const limit = 10;
+  const offset = (page - 1) * limit;
+
+  // We only use distance calculation if coordinates are present AND we didn't skip discovery
+  const useProximity = !!(lat && lng && !isSkipped);
+
+  const distanceSql = useProximity
     ? sql`
         (3959 * acos(
           cos(radians(${lat})) * cos(radians(${nannyProfiles.latitude})) *
@@ -29,144 +59,208 @@ export default async function BrowseNannies({ searchParams }: { searchParams: Pr
     id: users.id,
     name: users.fullName,
     email: users.email,
+    profileImageUrl: users.profileImageUrl,
     location: nannyProfiles.location,
     experienceYears: nannyProfiles.experienceYears,
     hourlyRate: nannyProfiles.hourlyRate,
     isVerified: nannyProfiles.isVerified,
+    isOccupied: nannyProfiles.isOccupied,
+    maxTravelDistance: nannyProfiles.maxTravelDistance,
     bio: nannyProfiles.bio,
-    // Add distance cast to number for TypeScript safety in rendering
-    distance: distanceSql ? sql<number>`${distanceSql}`.as('distance') : sql<number>`0`.as('distance'),
+    distance: distanceSql ? sql<number>`${distanceSql}`.as('distance') : sql`0`.as('distance'),
   })
   .from(users)
   .innerJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
   .where(
     and(
       eq(users.role, "caregiver"),
-      distanceSql ? lte(distanceSql, 50) : (locationFilter ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationFilter + '%'})` : undefined),
-      params.rate ? lte(nannyProfiles.hourlyRate, maxRateFilter.toString()) : undefined
+      distanceSql ? lte(distanceSql, searchDistance) : (locationLabel ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationLabel + '%'})` : undefined),
+      params.rate ? lte(sql`CAST(${nannyProfiles.hourlyRate} AS NUMERIC)`, maxRateFilter) : undefined
     )
   )
-  .orderBy(distanceSql ? sql`${distanceSql} ASC` : desc(nannyProfiles.experienceYears));
+  .orderBy(distanceSql ? sql`${distanceSql} ASC` : desc(nannyProfiles.experienceYears))
+  .limit(limit)
+  .offset(offset);
 
   return (
     <div className="bg-surface min-h-screen">
       <Navbar />
+      <LocationModal />
 
-      <div className="flex pt-20">
-        {/* Side Filter Shell */}
-        <aside className="h-[calc(100vh-5rem)] w-80 sticky top-20 left-0 hidden lg:flex flex-col p-8 space-y-10 bg-surface-container-low border-r border-outline-variant/10 overflow-y-auto">
-          <div>
-            <h2 className="text-primary font-headline text-2xl font-black tracking-tighter italic">Filters</h2>
-            <p className="text-on-surface-variant text-[10px] font-black uppercase tracking-widest opacity-60">Refine your search</p>
-          </div>
-          
-          <BrowseFilters initialLocation={locationFilter} initialRate={maxRateFilter} />
-        </aside>
-
-        {/* Main Content Area */}
-        <section className="flex-1 bg-surface p-8 md:p-12 lg:p-20">
-          <header className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-8">
-            <div className="space-y-4">
-              <h1 className="text-5xl md:text-7xl font-black font-headline text-primary tracking-tighter leading-none italic">
-                Browse <span className="text-orange-600">Caregivers</span>
+      <main className="pt-24 pb-32 px-6 max-w-7xl mx-auto">
+        {/* Banner Section */}
+        <section className="mb-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="max-w-2xl">
+              <h1 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tight text-primary mb-4 leading-tight">
+                Exceptional Care for <br/><span className="text-secondary">Exceptional Families.</span>
               </h1>
-              <p className="text-on-surface-variant text-xl font-medium opacity-60 max-w-lg italic">
-                Find the perfect match for your family's unique rhythm and needs.
+              <p className="text-on-surface-variant text-lg max-w-lg leading-relaxed font-medium opacity-60 italic">
+                {(locationLabel && useProximity)
+                  ? `Discover vetted, local caregivers near ${locationLabel}. Expertly matched for safety and connection.`
+                  : "Discover vetted, elite caregivers from around the nation, curated for your family's unique rhythm."
+                }
               </p>
             </div>
-            <div className="flex items-center gap-3 bg-surface-container-low p-2 rounded-[2rem]">
-              <span className="text-[10px] font-black text-slate-400 px-6 uppercase tracking-widest">Sort By</span>
-              <button className="bg-white shadow-xl px-8 py-3 rounded-2xl text-primary font-black text-xs uppercase tracking-widest">Recommended</button>
+            <div className="flex flex-col gap-3">
+              <Link 
+                href="/dashboard/parent/post-job"
+                className="bg-secondary text-white px-8 py-5 rounded-2xl font-black uppercase tracking-[0.1em] text-[11px] flex items-center justify-center shadow-lg shadow-secondary/20 hover:bg-orange-800 transition-all font-label"
+              >
+                <MaterialIcon name="person_search" className="mr-2" />
+                Let nannies find me instead
+              </Link>
+              <p className="text-[10px] text-on-surface-variant text-center px-4 font-black uppercase tracking-widest opacity-40">Post your needs & get applications</p>
             </div>
-          </header>
+          </div>
+        </section>
+
+        <div className="flex flex-col lg:flex-row gap-10">
+          {/* Sidebar Filters */}
+          <aside className="lg:w-80 shrink-0">
+             <BrowseFilters initialLocation={useProximity ? locationLabel : ""} initialRate={maxRateFilter} />
+          </aside>
 
           {/* Nanny Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12">
-            {nannies.length > 0 ? nannies.map((nanny, i) => (
-              <div key={nanny.id} className="group bg-surface-container-lowest p-8 rounded-[3rem] shadow-[0_4px_32px_rgba(3,31,65,0.04)] hover:shadow-[0_40px_80px_-15px_rgba(3,31,65,0.1)] transition-all flex flex-col items-center text-center relative overflow-hidden border border-outline-variant/5">
-                
-                {/* Identity Verified Badge */}
-                {nanny.isVerified && (
-                  <div className="absolute top-8 left-8 z-20">
-                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-sm border border-emerald-50 scale-90 group-hover:scale-100 transition-transform">
-                      <MaterialIcon name="check_circle" className="text-emerald-500 text-sm" style={{ fontVariationSettings: "'FILL' 1" }} />
-                      <span className="text-emerald-900 text-[10px] font-black uppercase tracking-widest">Verified</span>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-8 px-2">
+              <p className="text-on-surface-variant font-black uppercase tracking-widest text-[10px] opacity-40">
+                Found <span className="text-primary font-bold">{nannies.length} results</span> {useProximity ? `near ${locationLabel || "Your Location"}` : "Nationwide"}
+              </p>
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-primary cursor-pointer hover:opacity-80 transition-opacity font-label">
+                Sort by: Recommended <MaterialIcon name="expand_more" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+              {nannies.map((nanny, i) => (
+                <div 
+                  key={nanny.id} 
+                  className="group bg-surface-container-lowest rounded-[3rem] p-8 shadow-[0_8px_48px_rgba(29,53,87,0.06)] hover:shadow-[0_16px_64px_rgba(29,53,87,0.12)] transition-all duration-500 relative overflow-hidden ring-1 ring-primary/5"
+                >
+                  <div className="flex gap-10 mb-8">
+                    {/* Image (Half width of top section) */}
+                    <div className="w-1/2 aspect-square relative flex-shrink-0">
+                      <div className={cn(
+                        "w-full h-full rounded-[48px_16px_48px_16px] overflow-hidden shadow-2xl ring-8 transition-all group-hover:scale-[1.03] group-hover:rotate-1",
+                        nanny.isVerified ? "ring-secondary-fixed/5" : "ring-surface-variant/5",
+                        nanny.isOccupied && "grayscale-[30%] opacity-90"
+                      )}>
+                        <img 
+                          src={nanny.profileImageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${nanny.name}`} 
+                          alt={nanny.name} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {nanny.isVerified && (
+                        <div className="absolute -top-4 -right-4 bg-white rounded-full p-3 shadow-2xl z-20">
+                          <MaterialIcon name="verified" className="text-secondary text-xl" style={{ fontVariationSettings: "'FILL' 1" }} />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Content Right (Name, Badge) */}
+                    <div className="w-1/2 flex flex-col justify-center gap-4">
+                      <div className={cn(
+                        "inline-flex items-center px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-full w-fit",
+                        nanny.isOccupied 
+                          ? "bg-error-container text-error" 
+                          : "bg-tertiary-fixed/20 text-on-tertiary-fixed"
+                      )}>
+                        <div className={cn("w-1.5 h-1.5 rounded-full mr-2", nanny.isOccupied ? "bg-error" : "bg-on-tertiary-fixed animate-pulse")} />
+                        {nanny.isOccupied ? "Occupied" : "Available Now"}
+                      </div>
+                      <h3 className="font-headline text-4xl font-black text-primary tracking-tighter italic leading-none group-hover:text-secondary transition-colors">{nanny.name}</h3>
+                      <div className="flex flex-col gap-1">
+                         <span className="text-on-surface-variant text-[10px] font-bold opacity-30 uppercase tracking-widest">Elite Caregiver</span>
+                      </div>
                     </div>
                   </div>
-                )}
 
-                <div className="w-full aspect-[4/4.5] mb-8 relative">
-                  <div className={cn("absolute inset-0 bg-secondary-fixed/5 rounded-[3rem] scale-105 transition-transform group-hover:rotate-0", i % 2 === 0 ? "-rotate-3" : "rotate-3")}></div>
-                  <img 
-                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${nanny.name}`} 
-                    alt={nanny.name} 
-                    className="w-full h-full object-cover rounded-[3rem] shadow-xl relative z-10 transition-transform duration-700 group-hover:scale-[1.02] group-hover:-rotate-1" 
-                  />
-                </div>
-
-                <div className="space-y-4 w-full">
-                  <div>
-                    <h3 className="text-3xl font-black text-primary font-headline tracking-tighter leading-none mb-2">{nanny.name}</h3>
-                    <p className="text-on-surface-variant text-sm font-black uppercase tracking-widest opacity-40 flex items-center justify-center gap-2">
-                       <MaterialIcon name="location_on" className="text-secondary text-base" />
-                       {nanny.location || "Location pending"}
-                       {nanny.distance > 0 && <span className="ml-1 text-primary">({nanny.distance.toFixed(1)} mi)</span>}
+                  {/* Location (Full width below image row) */}
+                  <div className="mb-10 bg-surface-container-low/50 p-6 rounded-[2rem] border border-primary/5">
+                    <p className="text-on-surface-variant text-sm font-bold flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm flex-shrink-0">
+                        <MaterialIcon name="location_on" className="text-secondary text-xl" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-primary font-black italic text-lg leading-tight">
+                          {(nanny as any).distance > 0 ? `${(nanny as any).distance.toFixed(1)} miles away` : (nanny.location || "Nearby")}
+                        </span>
+                        <span className="text-xs font-medium opacity-60 mt-1 uppercase tracking-widest">{nanny.location || "Verified Service Area"}</span>
+                      </div>
                     </p>
+                    {(nanny as any).distance > 0 && (nanny.maxTravelDistance || 25) >= (nanny as any).distance && !nanny.isOccupied && (
+                        <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border border-green-100">
+                           <MaterialIcon name="direct_route" className="text-[14px]" /> Within Reach
+                        </div>
+                    )}
                   </div>
 
-                  <div className="flex flex-wrap justify-center gap-2">
-                    <span className="bg-surface-container-low text-on-surface-variant text-[10px] font-black px-4 py-1.5 rounded-xl border border-outline-variant/15 uppercase tracking-widest">
-                      {nanny.experienceYears}+ Years Exp.
+                  {/* Stats Grid */}
+                  <div className="grid grid-cols-2 gap-6 mb-8">
+                    <div className="p-1">
+                      <p className="text-[10px] uppercase font-black text-on-surface-variant tracking-[0.2em] opacity-30 mb-2">Expertise</p>
+                      <p className="font-headline font-black text-primary italic leading-none text-2xl">{nanny.experienceYears}+ YRS</p>
+                    </div>
+                    <div className="p-1">
+                      <p className="text-[10px] uppercase font-black text-on-surface-variant tracking-[0.2em] opacity-30 mb-2">Hourly Rate</p>
+                      <p className="font-headline font-black text-primary italic leading-none text-2xl">${nanny.hourlyRate}<span className="text-xs font-medium opacity-40 ml-1">/hr</span></p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 mb-10">
+                    <span className="px-4 py-2 bg-secondary-fixed/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center border border-secondary/5">
+                      <MaterialIcon name="security" className="text-[14px] mr-2" /> Identity Verified
                     </span>
+                    {nanny.isVerified && (
+                      <span className="px-4 py-2 bg-tertiary-fixed/10 text-tertiary text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center border border-tertiary/5">
+                        <MaterialIcon name="public" className="text-[14px] mr-2" /> Global Care
+                      </span>
+                    )}
                   </div>
 
-                  <div className="pt-4 flex items-baseline justify-center gap-1">
-                    <span className="text-4xl font-black text-primary tracking-tighter italic">${nanny.hourlyRate}</span>
-                    <span className="text-slate-400 font-black text-[10px] uppercase tracking-widest">/hr</span>
+                  <div className="pt-2">
+                    <Link 
+                      href={`/nannies/${nanny.id}`}
+                      className={cn(
+                        "w-full block py-6 rounded-3xl font-black uppercase tracking-[0.3em] text-[11px] transition-all text-center shadow-2xl",
+                        nanny.isOccupied 
+                         ? "bg-outline-variant text-on-surface-variant cursor-not-allowed opacity-50" 
+                         : "bg-primary text-white shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-1 active:scale-98"
+                      )}
+                    >
+                      {nanny.isOccupied ? "Fully Booked" : "View Comprehensive Profile"}
+                    </Link>
                   </div>
-
-                  <Link 
-                    href={`/nannies/${nanny.id}`}
-                    className="w-full block bg-primary text-on-primary font-black uppercase tracking-[0.2em] text-[10px] py-6 rounded-[2rem] shadow-2xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all active:scale-95 text-center"
-                  >
-                    View Profile
-                  </Link>
                 </div>
+              ))}
+            </div>
+
+            {nannies.length === 0 && (
+              <div className="py-48 flex flex-col items-center justify-center text-center opacity-40 italic">
+                <div className="w-24 h-24 rounded-full bg-surface-container-low flex items-center justify-center mb-8">
+                  <MaterialIcon name="location_searching" className="text-4xl text-primary animate-pulse" />
+                </div>
+                <h3 className="text-4xl font-black font-headline text-primary italic tracking-tight mb-4">No results in this reach</h3>
+                <p className="text-xl max-w-md mx-auto leading-relaxed">We couldn't find any caregivers within 50 miles of your current location. Try adjusting your filters.</p>
               </div>
-            )) : (
-              <div className="col-span-full py-40 flex flex-col items-center justify-center text-center opacity-30 italic">
-                <MaterialIcon name="search_off" className="text-8xl mb-6" />
-                <h3 className="text-3xl font-black font-headline text-primary">No Caregivers Found</h3>
-                <p className="text-xl">Try adjusting your filters or search keywords.</p>
+            )}
+            
+            {/* Pagination */}
+            {nannies.length === limit && (
+              <div className="mt-20 flex justify-center">
+                 <Link 
+                   href={`/browse?page=${page + 1}${lat ? `&lat=${lat}` : ''}${lng ? `&lng=${lng}` : ''}`}
+                   className="px-16 py-6 bg-white border-2 border-primary text-primary rounded-[2rem] font-black uppercase tracking-[0.3em] text-[12px] hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10 active:scale-95"
+                 >
+                   Discover More Local Care
+                 </Link>
               </div>
             )}
           </div>
-
-          {/* CTA Banner */}
-          <section className="mt-24 bg-primary-container rounded-[4rem] p-12 md:p-20 relative overflow-hidden text-on-primary shadow-2xl shadow-primary/40 group">
-            <div className="absolute -right-20 -top-20 w-96 h-96 bg-secondary rounded-full opacity-10 blur-[100px] group-hover:scale-110 transition-transform duration-1000"></div>
-            <div className="relative z-10 flex flex-col xl:flex-row items-center justify-between gap-16">
-              <div className="max-w-2xl space-y-6">
-                <h2 className="text-4xl md:text-6xl font-black font-headline tracking-tighter italic leading-none">
-                  Not finding your <span className="text-orange-600 block">perfect match?</span>
-                </h2>
-                <p className="text-on-primary-container text-xl leading-relaxed font-medium opacity-80 italic">
-                  Let the right care come to you. Post a custom job listing and allow our top-tier nannies to apply directly.
-                </p>
-              </div>
-              <div className="flex flex-col gap-6 min-w-[280px]">
-                <Link 
-                  href="/dashboard/parent/post-job"
-                  className="bg-secondary text-on-secondary px-10 py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:shadow-orange-950/20 hover:-translate-y-2 transition-all active:scale-95 text-center"
-                >
-                  Post a Job Listing
-                </Link>
-                <p className="text-center text-[10px] font-black uppercase tracking-widest opacity-40">Free to post • Cancel anytime</p>
-              </div>
-            </div>
-          </section>
-        </section>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

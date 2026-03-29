@@ -51,13 +51,13 @@ export default async function ModeratorOverviewPage() {
         <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-outline-variant/10 flex flex-col gap-4">
           <div className="flex justify-between items-start">
             <div className="w-10 h-10 bg-secondary/5 rounded-xl flex items-center justify-center text-secondary">
-              <MaterialIcon name="family_history" className="text-xl" />
+              <MaterialIcon name="quiz" className="text-xl" />
             </div>
-            <span className="text-[10px] font-bold text-secondary px-3 py-1 bg-secondary/10 rounded-full tracking-wider">FAMILIES</span>
+            <span className="text-[10px] font-bold text-secondary px-3 py-1 bg-secondary/10 rounded-full tracking-wider">EXAMS</span>
           </div>
           <div>
             <p className="text-3xl font-black text-primary font-headline">{stats.accountApprovals}</p>
-            <p className="text-xs text-on-surface-variant font-medium">Account Approvals</p>
+            <p className="text-xs text-on-surface-variant font-medium">Exams to Grade</p>
           </div>
         </div>
 
@@ -65,9 +65,9 @@ export default async function ModeratorOverviewPage() {
         <div className="bg-surface-container-lowest p-6 rounded-2xl shadow-sm border border-outline-variant/10 flex flex-col gap-4">
           <div className="flex justify-between items-start">
             <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600">
-              <MaterialIcon name="confirmation_number" className="text-xl" />
+              <MaterialIcon name="support_agent" className="text-xl" />
             </div>
-            <span className="text-[10px] font-bold text-indigo-600 px-3 py-1 bg-indigo-50 rounded-full tracking-wider">ACTIVE</span>
+            <span className="text-[10px] font-bold text-indigo-600 px-3 py-1 bg-indigo-50 rounded-full tracking-wider">SUPPORT</span>
           </div>
           <div>
             <p className="text-3xl font-black text-primary font-headline">{stats.openTickets}</p>
@@ -108,20 +108,24 @@ export default async function ModeratorOverviewPage() {
                   {item.user?.nannyProfile?.photos?.[0] ? (
                     <Image src={item.user.nannyProfile.photos[0]} alt="Avatar" fill className="object-cover" />
                   ) : (
-                    <MaterialIcon name="report" className="text-3xl" />
+                    <MaterialIcon name="verified_user" className="text-3xl" />
                   )}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-bold text-primary">{item.user?.fullName || "Unknown User"} - {item.title}</h4>
-                    <span className="bg-error-container text-error text-[10px] font-bold px-2 py-0.5 rounded uppercase">{item.category}</span>
+                    <h4 className="font-bold text-primary">{item.user?.fullName || "Unknown User"} - Nanny Verification</h4>
+                    <span className="bg-error-container text-error text-[10px] font-bold px-2 py-0.5 rounded uppercase">
+                      {item.user?.isPremium ? "PREMIUM" : "STANDARD"}
+                    </span>
                   </div>
-                  <p className="text-xs text-on-surface-variant line-clamp-1 italic">{item.description || "No description provided."}</p>
+                  <p className="text-xs text-on-surface-variant line-clamp-1 italic">
+                    Requires manual review of identity and background documents.
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <span className="text-[10px] text-error font-bold uppercase tracking-wider">From {new Date(item.createdAt).toLocaleDateString()}</span>
                   <div className="flex gap-2">
-                    <button className="px-4 py-1.5 text-xs font-bold border border-outline-variant/30 text-primary rounded-xl hover:bg-surface-container-low transition-colors">Review</button>
+                    <a href={`/dashboard/moderator/verifications`} className="px-4 py-1.5 text-xs font-bold border border-outline-variant/30 text-primary rounded-xl hover:bg-surface-container-low transition-colors text-center inline-block">Review</a>
                   </div>
                 </div>
               </div>

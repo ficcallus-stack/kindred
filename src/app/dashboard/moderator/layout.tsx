@@ -16,5 +16,5 @@ export default async function ServerLayout({ children }: LayoutProps) {
     redirect("/dashboard/parent");
   }
 
-  return <ModeratorDashboardLayoutClient>{children}</ModeratorDashboardLayoutClient>;
+  return <ModeratorDashboardLayoutClient user={user}>{children}</ModeratorDashboardLayoutClient>;
 }

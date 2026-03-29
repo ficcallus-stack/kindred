@@ -1,63 +1,159 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import { MaterialIcon } from "@/components/MaterialIcon";
 import Step1 from "@/components/post-job/Step1";
 import Step2 from "@/components/post-job/Step2";
 import Step3 from "@/components/post-job/Step3";
 import Step4 from "@/components/post-job/Step4";
 import Step5 from "@/components/post-job/Step5";
-import { useEffect } from "react";
 import { createJob } from "./actions";
-import { getChildren } from "@/app/dashboard/parent/children/actions";
+import { getChildren } from "../children/actions";
+import { getParentProfile } from "../settings/actions";
+import { useToast } from "@/components/Toast";
 
 export default function PostJobPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableChildren, setAvailableChildren] = useState<any[]>([]);
+  const { showToast } = useToast();
 
   useEffect(() => {
-    getChildren().then(setAvailableChildren).catch(console.error);
+    // Fetch children and profile in parallel
+    Promise.all([
+      getChildren(),
+      getParentProfile()
+    ]).then(([children, profile]) => {
+      setAvailableChildren(children);
+      if (profile || children.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          location: profile?.location || prev.location,
+          childCount: children.length > 0 ? children.length : prev.childCount,
+          selectedChildrenIds: children.map((c: any) => c.id)
+        }));
+      }
+    }).catch(console.error);
   }, []);
 
   const [formData, setFormData] = useState({
-    childCount: 2,
-    location: "Austin, TX",
-    child1Years: 2,
-    child1Months: 4,
-    duration: "Full-time",
-    schedule: {
-      "Mon-morning": true, "Mon-afternoon": true,
-      "Tue-morning": true, "Tue-afternoon": true,
-      "Wed-morning": true, "Wed-afternoon": true,
-      "Thu-morning": true, "Thu-afternoon": true,
-      "Fri-morning": true, "Fri-afternoon": true
-    },
-    certs: { cpr: true, first_aid: true },
-    duties: { "Light housekeeping": true, "Meal prep": true },
-    minRate: 22,
-    maxRate: 28,
+    childCount: 1,
+    location: "",
+    duration: "",
+    startDate: "",
+    schedule: {} as Record<string, boolean>,
+    certs: { cpr: false, first_aid: false },
+    duties: {} as Record<string, boolean>,
+    minRate: 20,
+    maxRate: 30,
+    description: "",
   });
+  const [hasDraft, setHasDraft] = useState(false);
   const router = useRouter();
+
+  // Save to localStorage whenever formData or step changes
+  useEffect(() => {
+    if (formData.location || formData.description || Object.keys(formData.schedule).length > 0) {
+      const draft = { formData, step };
+      localStorage.setItem("job_posting_draft", JSON.stringify(draft));
+    }
+  }, [formData, step]);
+
+  // Check for draft on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem("job_posting_draft");
+    if (savedDraft) {
+      try {
+        const { formData: savedData, step: savedStep } = JSON.parse(savedDraft);
+        // Only flag if there's actual content
+        if (savedData.location || savedData.description) {
+          setHasDraft(true);
+        }
+      } catch (e) {
+        console.error("Failed to parse draft", e);
+      }
+    }
+  }, []);
+
+  const handleResumeDraft = () => {
+    const savedDraft = localStorage.getItem("job_posting_draft");
+    if (savedDraft) {
+      const { formData: savedData, step: savedStep } = JSON.parse(savedDraft);
+      setFormData(savedData);
+      setStep(savedStep);
+      showToast("Progress resumed!", "success");
+    }
+    setHasDraft(false);
+  };
+
+  const handleDiscardDraft = () => {
+    localStorage.removeItem("job_posting_draft");
+    setHasDraft(false);
+    showToast("Draft discarded.", "info");
+  };
+
+  const handleSaveAsDraft = () => {
+    const draft = { formData, step };
+    localStorage.setItem("job_posting_draft", JSON.stringify(draft));
+    showToast("Progress saved to your browser!", "success");
+  };
 
   const updateData = (newData: any) => {
     setFormData((prev) => ({ ...prev, ...newData }));
   };
 
-  const nextStep = () => setStep((s) => Math.min(s + 1, 5));
+  const canGoNext = () => {
+    if (step === 1) {
+      const hasChildren = (formData as any).selectedChildrenIds?.length > 0 || formData.childCount > 0;
+      return !!formData.location && !!formData.duration && !!formData.startDate && hasChildren;
+    }
+    if (step === 2) return Object.values(formData.schedule).some(v => v);
+    if (step === 3) return !!formData.description && formData.description.length > 20; 
+    if (step === 4) return !!(formData as any).stripePaymentIntentId;
+    return true;
+  };
+
+  const nextStep = (skipCheck = false) => {
+    if (!skipCheck) {
+      if (step === 1) {
+        const hasChildren = (formData as any).selectedChildrenIds?.length > 0 || formData.childCount > 0;
+        if (!hasChildren) return showToast("Please select or specify the number of children", "error");
+        if (!formData.location) return showToast("Please enter a location/zip code", "error");
+        if (!formData.duration) return showToast("Please select a job duration", "error");
+        if (!formData.startDate) return showToast("Please select a start date", "error");
+      }
+      if (step === 2 && !Object.values(formData.schedule).some(v => v)) {
+        return showToast("Please select at least one time slot in the schedule", "error");
+      }
+      if (step === 3 && (!formData.description || formData.description.length < 20)) {
+        return showToast("Please provide a job description (at least 20 characters)", "error");
+      }
+
+      if (!canGoNext()) {
+        showToast("Please complete all required fields on this step", "error");
+        return;
+      }
+    }
+    setStep((s) => Math.min(s + 1, 5));
+  };
   const prevStep = () => setStep((s) => Math.max(s - 1, 1));
-  const goToStep = (s: number) => setStep(s);
+  const goToStep = (s: number) => {
+    if (s < step) setStep(s);
+  };
 
   const handleSubmit = async () => {
+    if (!canGoNext()) return;
     setIsSubmitting(true);
     try {
-      await createJob(formData);
+      await createJob(formData as any);
+      localStorage.removeItem("job_posting_draft"); // Clear draft on success
+      showToast("Job posted successfully!", "success");
       router.push("/dashboard/parent");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create job:", error);
-      alert("Something went wrong while posting your job. Please try again.");
+      showToast(error.message || "Failed to post job. Please try again.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -75,7 +171,7 @@ export default function PostJobPage() {
     <div className="bg-surface font-body text-on-surface min-h-screen">
       <div className="flex max-w-7xl mx-auto min-h-screen">
         {/* Progress Sidebar */}
-        <aside className="hidden md:flex flex-col pt-12 pb-8 h-[calc(100vh-64px)] w-64 fixed left-0 top-16 bg-slate-50/50 border-r border-outline-variant/10 overflow-y-auto">
+        <aside className="hidden md:flex flex-col pt-12 pb-24 h-[calc(100vh-64px)] w-64 fixed left-0 top-16 bg-slate-50/50 border-r border-outline-variant/10 overflow-y-auto">
           <div className="px-6 mb-8">
             <h2 className="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1 font-label">New Job Posting</h2>
             <p className="text-sm font-bold text-secondary font-headline">Step {step} of 5</p>
@@ -84,7 +180,7 @@ export default function PostJobPage() {
             {STEPS.map((s, i) => (
               <div
                 key={i}
-                onClick={() => i + 1 < step && goToStep(i + 1)}
+                onClick={() => goToStep(i + 1)}
                 className={cn(
                   "flex items-center gap-3 py-3 px-6 transition-all rounded-r-full cursor-pointer",
                   step === i + 1
@@ -99,11 +195,11 @@ export default function PostJobPage() {
               </div>
             ))}
           </nav>
-          <div className="mt-8 px-6 pb-6">
-            <div className="bg-secondary/10 p-4 rounded-2xl border border-secondary/20 flex flex-col gap-2">
-              <MaterialIcon name="shield_locked" className="text-secondary-fixed text-2xl" />
-              <p className="text-xs font-medium text-secondary-fixed leading-relaxed">
-                <strong className="block mb-1 font-bold">Privacy Protected</strong>
+          <div className="mt-8 px-6 pb-20"> {/* Increased padding to avoid footer overlap */}
+            <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex flex-col gap-2">
+              <MaterialIcon name="shield_locked" className="text-emerald-600 text-2xl font-fill" fill />
+              <p className="text-xs font-bold text-emerald-900 leading-relaxed">
+                <strong className="block mb-1 font-black uppercase tracking-widest text-[10px]">Privacy Protected</strong>
                 Only background-verified nannies will have access to your job details and location.
               </p>
             </div>
@@ -113,6 +209,24 @@ export default function PostJobPage() {
         {/* Main Content */}
         <main className={cn("flex-1 pt-12 pb-20 px-6 md:px-12", step < 4 ? "md:ml-64" : step === 4 ? "md:ml-64" : "md:ml-64")}>
           <div className="max-w-4xl mx-auto">
+            {/* Resume Draft Banner */}
+            {hasDraft && step === 1 && (
+              <div className="mb-8 p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <MaterialIcon name="history" className="text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-primary font-headline">Resume your progress?</h4>
+                    <p className="text-xs text-on-surface-variant font-medium">We found an unfinished job post from your last visit.</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={handleDiscardDraft} className="px-4 py-2 text-xs font-bold text-on-surface-variant hover:text-primary transition-colors">Discard</button>
+                  <button onClick={handleResumeDraft} className="px-4 py-2 bg-primary text-on-primary rounded-xl text-xs font-bold shadow-md shadow-primary/10 active:scale-95 transition-all">Resume</button>
+                </div>
+              </div>
+            )}
             {/* Header Section (only for steps 1-4) */}
             {step < 5 && (
               <header className="mb-12">
@@ -122,6 +236,11 @@ export default function PostJobPage() {
                     <h1 className="text-4xl font-extrabold font-headline tracking-tight text-primary">
                       {STEPS[step - 1].title}
                     </h1>
+                    {/* Privacy Notice for Mobile */}
+                    <div className="md:hidden mt-4 inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 text-[11px] font-bold">
+                      <MaterialIcon name="shield_locked" className="text-sm font-fill" fill />
+                      Privacy Protected: Verified nannies only.
+                    </div>
                   </div>
                   <div className="w-full md:w-80">
                     <div className="flex justify-end text-[11px] font-bold text-primary mb-2 uppercase tracking-tight">
@@ -143,7 +262,7 @@ export default function PostJobPage() {
               {step === 1 && <Step1 availableChildren={availableChildren} data={formData} updateData={updateData} onNext={nextStep} onCancel={() => router.push("/dashboard/parent")} />}
               {step === 2 && <Step2 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
               {step === 3 && <Step3 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
-              {step === 4 && <Step4 data={formData} onNext={nextStep} onBack={prevStep} />}
+              {step === 4 && <Step4 data={formData} onNext={(id) => { updateData({ stripePaymentIntentId: id }); nextStep(true); }} onBack={prevStep} />}
               {step === 5 && <Step5 data={formData} onEdit={goToStep} onBack={prevStep} onSubmit={handleSubmit} />}
             </div>
           </div>
@@ -170,14 +289,15 @@ export default function PostJobPage() {
           <div className="flex items-center gap-6">
             <button 
               disabled={isSubmitting}
+              onClick={handleSaveAsDraft}
               className="text-primary font-headline font-bold text-sm hover:opacity-70 transition-opacity disabled:opacity-30"
             >
               Save as Draft
             </button>
             <button
-              disabled={isSubmitting}
+              disabled={isSubmitting || !canGoNext()}
               onClick={step === 5 ? handleSubmit : nextStep}
-              className="bg-primary text-on-primary px-10 py-3.5 rounded-xl font-headline font-extrabold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50"
+              className="bg-primary text-on-primary px-10 py-3.5 rounded-xl font-headline font-extrabold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
             >
               {isSubmitting ? "Processing..." : step === 5 ? "Post Job Now" : "Next Step"}
             </button>

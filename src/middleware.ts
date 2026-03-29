@@ -16,6 +16,7 @@ const publicRoutes = [
   "/api/auth/send-otp",
   "/api/auth/verify-otp",
   "/api/auth/sync",
+  "/api/health",
   "/forgot-password",
   "/verify-email",
   "/safety",
@@ -60,9 +61,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Since middleware runs on Edge runtime, we cannot use firebase-admin here.
-  // We simply verify the token exists. Real JWT cryptographic validation happens 
-  // downstream in the Server Actions / Server Components executing in the Node runtime.
+  // Middleware runs on Edge runtime where firebase-admin is unavailable.
+  // This check is a fast redirect layer only. Cryptographic JWT validation
+  // is enforced downstream via getServerUser() → adminAuth.verifySessionCookie()
+  // in every protected layout and server action.
   return NextResponse.next();
 }
 

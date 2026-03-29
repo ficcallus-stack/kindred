@@ -219,7 +219,7 @@ export default async function AdminPaymentsPage() {
             <tbody className="divide-y divide-outline-variant/10">
               {allPayments.length > 0 ? allPayments.map((p) => {
                 const colors = statusColors[p.status] || { text: "text-slate-500", dot: "bg-slate-400" };
-                const initials = p.userName ? p.userName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'U';
+                const initials = p.userName ? p.userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase() : 'U';
                 return (
                   <tr key={p.id} className="hover:bg-surface-container/10 transition-colors">
                     <td className="px-8 py-5 text-xs font-semibold text-outline">

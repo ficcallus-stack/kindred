@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { StripeProvider } from "@/components/StripeProvider";
 import BookingStep2 from "@/components/bookings/BookingStep2";
 import BookingStep3 from "@/components/bookings/BookingStep3";
+import { useToast } from "@/components/Toast";
 import { completeBooking } from "./actions";
 
 export default function BookingsPage() {
@@ -16,6 +17,7 @@ export default function BookingsPage() {
     bookingId: string;
     clientSecret: string;
   } | null>(null);
+  const { showToast } = useToast();
   const [bookingDetails, setBookingDetails] = useState({
     nannyName: "",
     schedule: "Mon - Fri, 8am - 4pm",
@@ -91,13 +93,14 @@ export default function BookingsPage() {
 
     try {
       await completeBooking(bookingId);
+      showToast("Booking completed and payment captured!", "success");
       // Refresh list
       const r = await fetch("/api/bookings");
       const data = await r.json();
       setExistingBookings(data);
     } catch (err) {
       console.error("Failed to complete booking:", err);
-      alert(err instanceof Error ? err.message : "Completion failed");
+      showToast(err instanceof Error ? err.message : "Completion failed", "error");
     }
   };
 

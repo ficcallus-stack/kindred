@@ -48,6 +48,8 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     status: jobs.status,
     createdAt: jobs.createdAt,
     familyName: users.fullName,
+    isPremium: users.isPremium,
+    scheduleType: jobs.scheduleType,
   })
   .from(jobs)
   .innerJoin(users, eq(jobs.parentId, users.id))
@@ -111,10 +113,17 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                 
                 <div className="flex-1 space-y-8">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="inline-flex items-center px-4 py-1.5 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-black rounded-full uppercase tracking-widest shadow-sm">
-                      <MaterialIcon name="verified" className="text-lg mr-2" fill />
-                      Verified Family
-                    </span>
+                    {job.isPremium ? (
+                      <span className="inline-flex items-center px-4 py-1.5 bg-secondary text-white text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-secondary/20 animate-pulse border-2 border-white/20">
+                        <MaterialIcon name="diamond" className="text-lg mr-2" fill />
+                        Premium Family
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-4 py-1.5 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-black rounded-full uppercase tracking-widest shadow-sm">
+                        <MaterialIcon name="verified" className="text-lg mr-2" fill />
+                        Verified Family
+                      </span>
+                    )}
                     <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-low px-4 py-1.5 rounded-full">Active Posting</span>
                   </div>
                   
@@ -135,9 +144,19 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-center justify-between pt-8 border-t border-outline-variant/10 gap-8">
-                    <div className="flex flex-col text-center sm:text-left">
-                      <span className="text-[10px] uppercase font-black text-on-surface-variant/40 tracking-[0.2em] mb-1">Budget</span>
-                      <span className="text-3xl font-black text-primary tabular-nums">{job.budget}<span className="text-xs font-black text-slate-400 align-middle ml-1">/HR</span></span>
+                    <div className="flex items-center gap-8">
+                      <div className="flex flex-col text-center sm:text-left">
+                        <span className="text-[10px] uppercase font-black text-on-surface-variant/40 tracking-[0.2em] mb-1">Budget</span>
+                        <span className="text-3xl font-black text-primary tabular-nums">{job.budget}<span className="text-xs font-black text-slate-400 align-middle ml-1">/HR</span></span>
+                      </div>
+                      <div className="w-[1px] h-10 bg-outline-variant/20 hidden sm:block"></div>
+                      <div className="flex flex-col text-center sm:text-left">
+                        <span className="text-[10px] uppercase font-black text-on-surface-variant/40 tracking-[0.2em] mb-1">Schedule</span>
+                        <span className="text-sm font-black text-secondary flex items-center gap-2 uppercase tracking-widest mt-2">
+                          <MaterialIcon name={job.scheduleType === 'recurring' ? 'sync' : 'event'} className="text-lg" />
+                          {job.scheduleType === 'recurring' ? 'Recurring' : 'One-time'}
+                        </span>
+                      </div>
                     </div>
                     <div className="flex gap-4 w-full sm:w-auto">
                       <Link 

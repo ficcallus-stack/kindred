@@ -3,63 +3,71 @@ import { MaterialIcon } from "./MaterialIcon";
 
 export default function Footer() {
   return (
-    <footer className="bg-slate-950 text-white w-full py-16 font-body z-10 relative">
+    <footer className="bg-[#f8faff] text-primary w-full py-16 font-body z-10 relative border-t border-primary/5">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-12 px-8 max-w-7xl mx-auto">
         <div className="space-y-8">
-          <div className="text-2xl font-black font-headline tracking-tighter text-white">KindredCare US</div>
-          <p className="text-slate-400 text-sm leading-relaxed max-w-xs font-medium">
+          <div className="text-2xl font-black font-headline tracking-tighter">KindredCare US</div>
+          <p className="text-on-surface-variant text-sm leading-relaxed max-w-xs font-medium opacity-80 italic">
             Redefining elite childcare through trust, safety, and human connection.
           </p>
           <div className="flex gap-4">
-            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-slate-950 shadow-xl shadow-black/20">
-              <MaterialIcon name="workspace_premium" className="text-2xl" fill />
+            <div className="w-10 h-10 rounded-full border border-primary/10 flex items-center justify-center text-primary hover:bg-white transition-all shadow-sm">
+              <MaterialIcon name="verified" className="text-xl" fill />
             </div>
-            <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center text-slate-950 shadow-xl shadow-black/20">
-              <MaterialIcon name="photo_camera" className="text-2xl" fill />
+            <div className="w-10 h-10 rounded-full border border-primary/10 flex items-center justify-center text-primary hover:bg-white transition-all shadow-sm">
+              <MaterialIcon name="photo_camera" className="text-xl" fill />
             </div>
           </div>
         </div>
 
         <div>
-          <h4 className="text-slate-500 font-bold mb-8 text-xs uppercase tracking-[0.2em] font-headline">Quick Links</h4>
-          <ul className="space-y-4 text-sm font-semibold">
-            <li><Link href="/browse" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Browse All Nannies</Link></li>
-            <li><Link href="/register/nanny" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Become a Nanny</Link></li>
-            <li><Link href="/faq" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">FAQ</Link></li>
-            <li><Link href="/safety" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Safety Center</Link></li>
+          <h4 className="text-primary font-black mb-8 text-[11px] uppercase tracking-[0.2em] font-headline opacity-60">Explore</h4>
+          <ul className="space-y-4 text-sm font-bold">
+            <li><Link href="/browse" className="text-on-surface-variant hover:text-primary transition-all">Browse All Nannies</Link></li>
+            <li><Link href="/register/nanny" className="text-on-surface-variant hover:text-primary transition-all">Become a Nanny</Link></li>
+            <li><Link href="/faq" className="text-on-surface-variant hover:text-primary transition-all">FAQ</Link></li>
+            <li><Link href="/safety" className="text-on-surface-variant hover:text-primary transition-all">Safety Center</Link></li>
           </ul>
         </div>
 
         <div>
-          <h4 className="text-slate-500 font-bold mb-8 text-xs uppercase tracking-[0.2em] font-headline">Legal</h4>
-          <ul className="space-y-4 text-sm font-semibold">
-            <li><Link href="/privacy" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Privacy Policy</Link></li>
-            <li><Link href="/terms" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Terms of Service</Link></li>
-            <li><Link href="/cookies" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Cookie Settings</Link></li>
-            <li><Link href="/safety" className="text-slate-200 hover:text-white hover:underline underline-offset-8 transition-all">Contact Us</Link></li>
+          <h4 className="text-primary font-black mb-8 text-[11px] uppercase tracking-[0.2em] font-headline opacity-60">Legal & Support</h4>
+          <ul className="space-y-4 text-sm font-bold">
+            <li><Link href="/privacy" className="text-on-surface-variant hover:text-primary transition-all">Privacy Policy</Link></li>
+            <li><Link href="/terms" className="text-on-surface-variant hover:text-primary transition-all">Terms of Service</Link></li>
+            <li><Link href="/cookies" className="text-on-surface-variant hover:text-primary transition-all">Cookie Settings</Link></li>
+            <li><Link href="/safety" className="text-on-surface-variant hover:text-primary transition-all">Contact Us</Link></li>
           </ul>
         </div>
 
         <div>
-          <h4 className="text-slate-500 font-bold mb-8 text-xs uppercase tracking-[0.2em] font-headline">Newsletter</h4>
-          <p className="text-slate-400 text-sm mb-6 max-w-[220px] font-medium leading-relaxed">Get the latest parenting tips and caregiver insights.</p>
-          <div className="flex bg-white rounded-xl p-1.5 shadow-inner">
+          <h4 className="text-primary font-black mb-8 text-[11px] uppercase tracking-[0.2em] font-headline opacity-60">Newsletter</h4>
+          <p className="text-on-surface-variant text-sm mb-6 max-w-[220px] font-medium leading-relaxed opacity-80">Get the latest parenting tips and caregiver insights.</p>
+          <div className="flex bg-white rounded-2xl p-2 border border-primary/5 shadow-2xl shadow-primary/5">
             <input
-              className="flex-1 bg-transparent border-none focus:ring-0 text-slate-900 text-sm font-semibold px-4 placeholder:text-slate-400"
-              placeholder="Your email"
+              className="flex-1 bg-transparent border-none focus:ring-0 text-primary text-sm font-bold px-4 placeholder:text-slate-300"
+              placeholder="Email Address"
               type="email"
             />
-            <button className="bg-[#1a2e4c] text-white w-12 h-12 rounded-lg flex items-center justify-center hover:bg-slate-900 transition-colors shadow-lg">
-              <MaterialIcon name="send" className="text-xl rotate-[-45deg] translate-x-1" />
+            <button className="bg-primary text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-slate-900 transition-colors shadow-lg">
+              <MaterialIcon name="arrow_forward" className="text-xl" />
             </button>
           </div>
         </div>
       </div>
       
-      <div className="max-w-7xl mx-auto px-8 mt-24 pt-12 border-t border-white/5">
-        <p className="text-slate-600 text-[10px] font-black uppercase tracking-[0.3em] opacity-80">
-          © 2024 KindredCare US. All rights reserved.
+      <div className="max-w-7xl mx-auto px-8 mt-24 pt-12 border-t border-primary/5 flex flex-col md:flex-row justify-between items-center gap-6">
+        <p className="text-on-surface-variant text-[10px] font-black uppercase tracking-[0.3em] opacity-40">
+          © 2026 KindredCare US. All rights reserved.
         </p>
+        <div className="flex items-center gap-6">
+           <span className="text-primary text-[10px] font-black tracking-[0.2em] uppercase opacity-60 italic">Excellence in Care</span>
+           <div className="flex gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-secondary" />
+              <div className="w-1.5 h-1.5 rounded-full bg-tertiary-fixed" />
+              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+           </div>
+        </div>
       </div>
     </footer>
   );

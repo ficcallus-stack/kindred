@@ -18,20 +18,24 @@ export default function HeroSearch() {
   };
 
   return (
-    <div className="bg-surface-container-lowest p-2 rounded-2xl shadow-xl flex flex-col md:flex-row gap-2 max-w-2xl outline-variant/15 border border-outline-variant/15">
+    <div className="bg-white p-2 rounded-2xl shadow-2xl flex flex-col md:flex-row gap-2 max-w-2xl border border-slate-100 transition-all duration-500 hover:shadow-primary/5">
       <div className="flex-1 flex items-center px-4 py-3 gap-3">
-        <MaterialIcon name="location_on" className="text-primary shrink-0" />
+        <MaterialIcon name="location_on" className="text-secondary shrink-0" fill />
         <MapboxAutocomplete
-          onSelect={(loc, lat, lng) => setSelectedLoc({ loc, lat, lng })}
-          placeholder="Search by State and Area (e.g. Austin, TX)"
-          inputClassName="w-full bg-transparent border-none focus:ring-0 text-on-surface placeholder:text-on-surface-variant/60 font-medium pt-1 outline-none"
+          onSelect={(loc, lat, lng) => {
+            setSelectedLoc({ loc, lat, lng });
+            // Immediate redirection for "real-time" feel
+            router.push(`/browse?location=${loc}&lat=${lat}&lng=${lng}`);
+          }}
+          placeholder="Find a Nanny in your Zip Code/City"
+          inputClassName="w-full bg-transparent border-none focus:ring-0 text-slate-800 placeholder:text-slate-400 font-medium pt-1 outline-none text-lg"
         />
       </div>
       <button 
         onClick={handleSearch}
-        className="bg-secondary-container text-on-secondary-container px-8 py-4 rounded-xl font-bold text-lg hover:brightness-95 transition-all shadow-lg shadow-secondary-container/20 shrink-0"
+        className="bg-primary text-white px-10 py-4 rounded-xl font-bold text-lg hover:brightness-110 transition-all shadow-xl shadow-primary/20 shrink-0 font-headline italic tracking-tight"
       >
-        Search
+        Search Now
       </button>
     </div>
   );

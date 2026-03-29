@@ -16,5 +16,5 @@ export default async function ServerLayout({ children }: LayoutProps) {
     redirect("/dashboard/nanny");
   }
 
-  return <ParentDashboardLayout>{children}</ParentDashboardLayout>;
+  return <ParentDashboardLayout user={user}>{children}</ParentDashboardLayout>;
 }

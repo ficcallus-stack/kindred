@@ -12,6 +12,8 @@ export default function WalletPage() {
   const [wallet, setWallet] = useState<any>(null);
   const [payoutMethod, setPayoutMethod] = useState<any>(null);
   const [onboardingLoading, setOnboardingLoading] = useState(false);
+  const [expandedPaymentId, setExpandedPaymentId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"inbound" | "withdrawals">("inbound");
 
   useEffect(() => {
     async function init() {
@@ -54,226 +56,311 @@ export default function WalletPage() {
   const balance = (wallet?.balance || 0) / 100;
 
   return (
-    <div className="space-y-12 pb-20">
-      {/* Wallet Hero Section (Asymmetric Bento) */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Balance Card */}
-        <div className="lg:col-span-2 relative overflow-hidden bg-gradient-to-br from-primary to-primary-container p-8 md:p-12 rounded-[1.5rem_0.75rem_1.5rem_0.75rem] shadow-2xl flex flex-col justify-between text-white border border-white/5">
-          <div className="relative z-10">
-            <p className="font-label text-blue-200 uppercase tracking-widest text-[10px] font-bold mb-4 bg-white/10 w-fit px-3 py-1 rounded-full">Available Balance</p>
-            <h2 className="font-headline text-5xl md:text-7xl font-extrabold tracking-tighter mb-10 leading-none">
-              ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </h2>
-            <div className="flex flex-wrap gap-6 items-center">
-              <Link 
-                href="/dashboard/nanny/wallet/withdraw"
+    <div className="max-w-7xl mx-auto px-2 py-8">
+      <style jsx global>{`
+        .asymmetric-clip {
+          border-top-left-radius: 1.5rem;
+          border-bottom-right-radius: 1.5rem;
+          border-top-right-radius: 0.75rem;
+          border-bottom-left-radius: 0.75rem;
+        }
+      `}</style>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+        {/* Main Content Column */}
+        <div className="lg:col-span-8 space-y-10">
+          
+          {/* Wallet Header Section */}
+          <section className="relative overflow-hidden bg-primary p-10 rounded-3xl shadow-2xl text-white">
+            <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
+              <div className="space-y-2">
+                <span className="text-blue-300 font-label uppercase tracking-widest text-[10px] font-black italic">Available Capital</span>
+                <h1 className="text-6xl font-black font-headline tracking-tighter italic">Total Wallet</h1>
+                <div className="flex items-baseline gap-2 mt-4">
+                  <span className="text-7xl font-black text-secondary tracking-tighter italic">
+                    ${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-blue-200 font-black uppercase tracking-widest text-[10px] italic">USD Liquid</span>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <Link 
+                  href="/dashboard/nanny/wallet/withdraw"
+                  className={cn(
+                    "bg-gradient-to-r from-secondary-container to-secondary py-5 px-10 rounded-2xl font-headline font-black uppercase tracking-widest text-[11px] text-on-secondary shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-3 italic",
+                    balance <= 0 && "opacity-50 pointer-events-none"
+                  )}
+                >
+                  <MaterialIcon name="account_balance_wallet" fill />
+                  Initiate Withdrawal
+                </Link>
+                <p className="text-[9px] font-black uppercase tracking-widest text-center opacity-40 italic">Min. Withdrawal $50.00</p>
+              </div>
+            </div>
+            <div className="absolute -right-20 -top-20 w-80 h-80 bg-white/5 rounded-full blur-3xl"></div>
+          </section>
+
+          {/* Action Required Banner if bank not linked */}
+          {!payoutMethod && (
+            <div className="bg-orange-50 border-2 border-orange-200 p-8 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-4 duration-1000">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-[1.5rem] flex items-center justify-center shadow-inner">
+                  <MaterialIcon name="account_balance" className="text-4xl" fill />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-orange-900 text-xl font-headline italic leading-tight">Payout Target Missing</h3>
+                  <p className="text-sm text-orange-700/70 font-medium italic">You must link a validated bank account before initiating transfers.</p>
+                </div>
+              </div>
+              <button 
+                onClick={handleConnectBank}
+                disabled={onboardingLoading}
+                className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-orange-700 transition-all flex items-center gap-3 whitespace-nowrap italic shadow-xl shadow-orange-600/20"
+              >
+                {onboardingLoading ? "Redirecting to Stripe..." : "Link Bank Now"}
+                <MaterialIcon name="arrow_forward" className="text-sm" />
+              </button>
+            </div>
+          )}
+
+          {/* Tab Navigation Area */}
+          <section className="space-y-8 animate-in fade-in duration-1000">
+            <div className="flex space-x-10 border-b border-outline-variant/10">
+              <button 
+                onClick={() => setActiveTab("inbound")}
                 className={cn(
-                  "bg-secondary-fixed-dim text-on-secondary-fixed px-10 py-5 rounded-2xl font-headline font-black text-lg hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-3 uppercase tracking-widest",
-                   balance <= 0 && "opacity-50 pointer-events-none"
+                  "pb-6 font-headline font-black text-xl italic relative transition-all",
+                  activeTab === "inbound" ? "text-primary px-2" : "text-on-surface-variant/40 hover:text-primary"
                 )}
               >
-                <span>Withdraw Now</span>
-                <MaterialIcon name="paid" className="text-2xl" />
-              </Link>
-              <p className="flex items-center text-blue-100/60 text-xs font-medium max-w-[220px] leading-relaxed">
-                <MaterialIcon name="info" className="text-sm mr-2 opacity-50" />
-                Transfers typically complete in 1-2 business days via Stripe Secure.
-              </p>
-            </div>
-          </div>
-          {/* Abstract Accent */}
-          <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-white/5 rounded-full blur-[100px]" />
-          <MaterialIcon name="currency_exchange" className="absolute -right-8 -bottom-8 text-[12rem] opacity-[0.03] rotate-12" />
-        </div>
-
-        {/* Bank Configuration Card */}
-        <div className="bg-surface-container-lowest p-8 md:p-10 rounded-3xl shadow-sm border border-outline-variant/10 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="font-headline font-bold text-navy text-lg">Payout Method</h3>
-              <div className="p-2 bg-secondary-fixed/20 rounded-xl">
-                <MaterialIcon name="account_balance" className="text-secondary" />
-              </div>
+                Inbound Earnings
+                {activeTab === "inbound" && <span className="absolute bottom-0 left-0 w-full h-1.5 bg-primary rounded-t-full shadow-[0_-4px_10px_rgba(var(--primary-rgb),0.2)]"></span>}
+              </button>
+              <button 
+                onClick={() => setActiveTab("withdrawals")}
+                className={cn(
+                  "pb-6 font-headline font-black text-xl italic relative transition-all",
+                  activeTab === "withdrawals" ? "text-primary px-2" : "text-on-surface-variant/40 hover:text-primary"
+                )}
+              >
+                Withdrawal History
+                {activeTab === "withdrawals" && <span className="absolute bottom-0 left-0 w-full h-1.5 bg-primary rounded-t-full shadow-[0_-4px_10px_rgba(var(--primary-rgb),0.2)]"></span>}
+              </button>
             </div>
 
-            {payoutMethod ? (
-              <div className="space-y-6">
-                <div className="p-5 bg-surface-container-low rounded-2xl border border-outline-variant/20 shadow-inner group">
-                  <p className="text-[10px] font-black text-on-surface-variant mb-2 uppercase tracking-widest opacity-60">Connected Account</p>
-                  <p className="font-headline font-bold text-navy flex items-center justify-between">
-                    <span>{payoutMethod.bankName}</span>
-                    <span className="text-xs opacity-40 font-mono tracking-[0.2em]">••••{payoutMethod.last4}</span>
-                  </p>
-                </div>
-                <button 
-                  onClick={handleConnectBank}
-                  disabled={onboardingLoading}
-                  className="w-full py-4 text-xs font-black text-navy border-2 border-navy/10 rounded-2xl hover:bg-navy/5 active:scale-[0.98] transition-all uppercase tracking-widest"
-                >
-                  {onboardingLoading ? "Updating..." : "Change Bank Account"}
-                </button>
+            {/* Tabbed Content Area */}
+            {activeTab === "inbound" ? (
+              <div className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-500">
+                {wallet?.inboundPayments?.length > 0 ? (
+                  wallet.inboundPayments.map((p: any) => (
+                    <div key={p.id} className="space-y-4">
+                      <div 
+                        className={cn(
+                          "bg-white p-8 rounded-[2.5rem] flex flex-col md:flex-row md:items-center justify-between gap-8 transition-all hover:shadow-xl border border-outline-variant/5 relative group overflow-hidden",
+                          p.status === "Pending" && "bg-surface-container-low/30"
+                        )}
+                      >
+                        <div className="flex items-center gap-6 relative z-10">
+                          {p.familyPhoto ? (
+                            <img src={p.familyPhoto} alt={p.family} className="w-20 h-20 asymmetric-clip object-cover bg-slate-100 shadow-lg border-2 border-white" />
+                          ) : (
+                            <div className="w-20 h-20 asymmetric-clip bg-primary/5 flex items-center justify-center text-primary font-black text-2xl shadow-inner border border-primary/10">
+                              {p.family.charAt(0)}
+                            </div>
+                          )}
+                          <div>
+                            <h3 className="font-black text-primary text-2xl font-headline italic tracking-tighter leading-none">{p.family}</h3>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 mt-3">
+                              {format(new Date(p.date), "MMM d, yyyy")} • {p.hours}h Shift
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-8 relative z-10">
+                          <div className="text-right">
+                            <p className="text-3xl font-black text-primary font-headline italic tracking-tighter">${p.amount.toFixed(2)}</p>
+                            <span className={cn(
+                              "text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-lg mt-2 inline-block shadow-sm italic",
+                              p.status === "Paid" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-primary/5 text-primary border border-primary/10"
+                            )}>
+                              {p.status}
+                            </span>
+                          </div>
+                          <button 
+                            onClick={() => setExpandedPaymentId(expandedPaymentId === p.id ? null : p.id)}
+                            className="w-12 h-12 rounded-2xl bg-surface-container-low hover:bg-primary/5 flex items-center justify-center transition-all text-on-surface-variant group-hover:scale-110 active:scale-95 shadow-sm"
+                          >
+                            <MaterialIcon name={expandedPaymentId === p.id ? "expand_less" : "expand_more"} />
+                          </button>
+                        </div>
+                        <MaterialIcon name="account_balance_wallet" className="absolute -bottom-6 -right-6 text-9xl opacity-[0.02] rotate-12" fill />
+                      </div>
+
+                      {/* Details Expanded */}
+                      {expandedPaymentId === p.id && (
+                        <div className="bg-primary/5 p-10 rounded-[3rem] border border-primary/10 animate-in slide-in-from-top-4 duration-500">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
+                            <div>
+                              <p className="text-[9px] uppercase font-black text-primary tracking-widest mb-3 opacity-40">Contract Rate</p>
+                              <p className="font-black text-primary text-lg italic tracking-tight">${p.rate.toFixed(2)} / hr</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase font-black text-primary tracking-widest mb-3 opacity-40">Duration</p>
+                              <p className="font-black text-primary text-lg italic tracking-tight">{p.hours}h Shift</p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase font-black text-secondary-fixed-variant tracking-widest mb-3 opacity-40">Overtime Surge</p>
+                              <p className="font-black text-secondary italic tracking-tight">
+                                {p.overtime > 0 ? `+$${p.overtime.toFixed(2)}` : "$0.00"}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-[9px] uppercase font-black text-primary tracking-widest mb-3 opacity-40">Total Settled</p>
+                              <p className="font-black text-primary text-2xl font-headline italic underline underline-offset-8 decoration-secondary decoration-4 tracking-tighter">
+                                ${(p.amount + p.overtime).toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-outline-variant/20 italic opacity-40">
+                    <MaterialIcon name="payments" className="text-6xl text-outline-variant mb-6" />
+                    <p className="font-headline font-black text-2xl text-primary">Genesis Stage</p>
+                    <p className="text-sm font-medium">Your financial history starts once your first booking concludes.</p>
+                  </div>
+                )}
               </div>
             ) : (
-              <div className="text-center py-6 space-y-6">
-                 <div className="w-14 h-14 bg-navy/5 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MaterialIcon name="link" className="text-navy/40 text-2xl" />
-                </div>
-                <p className="text-xs font-medium text-on-surface-variant leading-relaxed">Securely link your bank account via Stripe to enable instant payouts.</p>
-                <button 
-                  onClick={handleConnectBank}
-                  disabled={onboardingLoading}
-                  className="w-full py-5 bg-navy text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-lg shadow-navy/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                >
-                  {onboardingLoading ? "Redirecting..." : "Connect Stripe Express"}
-                </button>
+              <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+                {wallet?.transactions?.filter((t: any) => t.type === "withdrawal").length > 0 ? (
+                  wallet.transactions.filter((t: any) => t.type === "withdrawal").map((t: any) => (
+                    <div key={t.id} className="bg-white p-8 rounded-[2.5rem] flex items-center justify-between border border-outline-variant/10 shadow-sm relative overflow-hidden group">
+                       <div className="flex items-center gap-6 relative z-10">
+                          <div className={cn(
+                            "w-16 h-16 rounded-[1.5rem] flex items-center justify-center shadow-inner",
+                            t.status === "completed" ? "bg-emerald-50 text-emerald-600" :
+                            t.status === "pending" ? "bg-orange-50 text-orange-600" :
+                            "bg-error/5 text-error"
+                          )}>
+                             <MaterialIcon name={t.status === "completed" ? "done_all" : t.status === "pending" ? "hourglass_top" : "block"} className="text-3xl" />
+                          </div>
+                          <div>
+                             <h4 className="font-black text-xl text-primary font-headline italic leading-none tracking-tight">Withdrawal Dispatch</h4>
+                             <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 mt-3 italic">
+                               Ref: {t.id} • {format(new Date(t.createdAt), "MMM d, yyyy")}
+                             </p>
+                          </div>
+                       </div>
+                       <div className="text-right relative z-10">
+                          <p className="text-2xl font-black text-primary font-headline italic tracking-tighter">-${(t.amount / 100).toFixed(2)}</p>
+                          <span className={cn(
+                            "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] italic shadow-sm mt-3 inline-block",
+                            t.status === "completed" ? "bg-emerald-700 text-white" :
+                            t.status === "pending" ? "bg-orange-50 text-orange-700 border border-orange-100" :
+                            "bg-error/5 text-error border border-error/10"
+                          )}>
+                            {t.status === "pending" ? "Awaiting Admin Approval" : t.status}
+                          </span>
+                       </div>
+                       <MaterialIcon name="account_balance" className="absolute -bottom-6 -right-6 text-9xl opacity-[0.01] -rotate-12" fill />
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-outline-variant/20 italic opacity-40">
+                    <MaterialIcon name="account_balance" className="text-6xl text-outline-variant mb-6" />
+                    <p className="font-headline font-black text-2xl text-primary">No Transfers Yet</p>
+                    <p className="text-sm font-medium">Initiate a withdrawal to see your transfer requests here.</p>
+                  </div>
+                )}
               </div>
             )}
-          </div>
-          <div className="mt-8 p-5 bg-tertiary-fixed/30 rounded-2xl border border-tertiary/10">
-            <p className="text-[10px] leading-relaxed text-on-tertiary-fixed-variant font-bold uppercase tracking-wide opacity-80">
-              <span className="text-terracotta mr-1">●</span> Fee Transparency:
-            </p>
-            <p className="text-[10px] leading-relaxed text-on-tertiary-fixed-variant/70 font-medium mt-1">
-              A $0.50 processing fee applies to each manual withdrawal. Scheduled payouts remain free.
-            </p>
-          </div>
+          </section>
         </div>
-      </section>
 
-      {/* Insights & Transaction History */}
-      <section className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-start">
-        {/* Earnings Chart (Custom CSS) */}
-        <div className="lg:col-span-2 space-y-8">
-          <div className="flex items-end justify-between">
-            <div>
-              <h3 className="font-headline text-3xl font-black text-navy tracking-tight italic">Earnings Growth</h3>
-              <p className="text-on-surface-variant text-sm font-medium opacity-60">Visualizing your success over the last 6 months</p>
+        {/* Sidebar Column */}
+        <aside className="lg:col-span-4 space-y-8">
+          
+          {/* Payout Settings Card */}
+          <div className="bg-white p-8 rounded-3xl shadow-sm border border-outline-variant/10">
+            <h2 className="text-2xl font-bold text-primary mb-6 font-headline">Payout Settings</h2>
+            
+            <div className="space-y-8">
+              <div>
+                <label className="block text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-3 opacity-60">Linked Bank Account</label>
+                {payoutMethod ? (
+                  <div className="flex items-center gap-4 p-4 rounded-xl bg-surface-container-low border border-outline-variant/10 group">
+                    <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-white">
+                      <MaterialIcon name="account_balance" className="text-xl" fill />
+                    </div>
+                    <div>
+                      <p className="font-bold text-primary leading-tight">{payoutMethod.bankName}</p>
+                      <p className="text-xs text-on-surface-variant tracking-widest opacity-60">•••• {payoutMethod.last4}</p>
+                    </div>
+                    <button 
+                      onClick={handleConnectBank}
+                      disabled={onboardingLoading}
+                      className="ml-auto text-primary opacity-40 group-hover:opacity-100 transition-opacity"
+                    >
+                      <MaterialIcon name="edit" className="text-sm" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-orange-50 border border-orange-100 text-center">
+                    <p className="text-[10px] font-bold text-orange-800 uppercase tracking-widest mb-2">Not Connected</p>
+                    <button 
+                      onClick={handleConnectBank}
+                      disabled={onboardingLoading}
+                      className="text-xs font-black text-orange-600 underline"
+                    >
+                      Connect Stripe Express
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-on-surface-variant uppercase tracking-widest mb-3 opacity-60">Payout Frequency</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-3 p-4 rounded-xl border border-primary bg-primary/5 cursor-pointer border-2">
+                    <div className="w-5 h-5 rounded-full border-4 border-primary bg-white"></div>
+                    <span className="font-bold text-primary text-sm">Instant (Manual)</span>
+                  </label>
+                  <label className="flex items-center gap-3 p-4 rounded-xl border border-outline-variant/20 hover:bg-surface-container-low cursor-pointer transition-colors opacity-50 grayscale">
+                    <div className="w-5 h-5 rounded-full border-2 border-outline-variant bg-white"></div>
+                    <span className="font-medium text-on-surface-variant text-sm">Weekly Auto-Pay</span>
+                  </label>
+                </div>
+              </div>
+
+              <button 
+                onClick={handleConnectBank}
+                disabled={onboardingLoading}
+                className="w-full py-4 rounded-xl border-2 border-primary text-primary font-bold hover:bg-primary hover:text-white transition-all text-xs uppercase tracking-widest"
+              >
+                {onboardingLoading ? "Loading..." : "Manage All Methods"}
+              </button>
             </div>
           </div>
-          <div className="bg-surface-container-lowest p-10 rounded-[2.5rem] shadow-sm h-[320px] flex items-end justify-between gap-6 relative border border-outline-variant/5">
-             {/* Simple Bar Chart Mockup - Scaling based on design heights */}
-             {[
-               { m: "Jan", val: 1200, h: "40%" },
-               { m: "Feb", val: 1450, h: "55%" },
-               { m: "Mar", val: 1800, h: "70%" },
-               { m: "Apr", val: 1650, h: "65%" },
-               { m: "May", val: 2100, h: "85%", curr: true },
-               { m: "Jun", val: 2400, h: "95%", proj: true },
-             ].map((item, i) => (
-               <div key={i} className="flex-1 flex flex-col justify-end items-center gap-4 h-full group">
-                 <div 
-                   className={cn(
-                     "w-full rounded-t-2xl transition-all duration-700 ease-in-out relative",
-                     item.curr ? "bg-terracotta shadow-[0_0_30px_rgba(var(--color-terracotta),0.3)]" : "bg-surface-container group-hover:bg-navy/10",
-                     item.proj && "opacity-40 border-2 border-dashed border-navy/20 bg-transparent"
-                   )}
-                   style={{ height: item.h }}
-                 >
-                   {item.curr && (
-                      <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-navy text-white text-[10px] px-3 py-1.5 rounded-full font-black shadow-lg">
-                        ${item.val}
-                      </div>
-                   )}
-                 </div>
-                 <span className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest opacity-40">{item.m}</span>
-               </div>
-             ))}
-          </div>
-        </div>
 
-        {/* Quick Stats list */}
-        <div className="space-y-6">
-          <div className="p-8 bg-surface-container-high rounded-[2rem] border border-outline-variant/10 shadow-sm group hover:scale-[1.02] transition-all">
-            <p className="text-[10px] font-black text-on-surface-variant mb-3 uppercase tracking-widest opacity-50">Total Earnings (YTD)</p>
-            <p className="text-4xl font-headline font-black text-navy tracking-tighter italic leading-none">$12,480.00</p>
+          {/* Fast-Track Payouts Info */}
+          <div className="bg-tertiary-container text-on-tertiary-container p-8 rounded-3xl relative overflow-hidden group">
+            <div className="relative z-10">
+              <MaterialIcon name="verified_user" className="text-4xl mb-4 text-secondary-container" fill />
+              <h3 className="text-xl font-bold mb-2 font-headline">Fast-Track Payouts</h3>
+              <p className="text-sm opacity-90 leading-relaxed font-medium">
+                Identity verification is 100% complete. You are eligible for instant withdrawals 24/7 with zero hold times.
+              </p>
+            </div>
+            {/* Abstract background icon */}
+            <div className="absolute -bottom-4 -right-4 text-on-tertiary-container opacity-5 group-hover:scale-110 transition-transform">
+              <MaterialIcon name="savings" className="text-9xl" />
+            </div>
           </div>
-          <div className="p-8 bg-tertiary-fixed rounded-[2rem] border border-tertiary/10 shadow-sm hover:scale-[1.02] transition-all">
-            <p className="text-[10px] font-black text-on-tertiary-fixed-variant mb-3 uppercase tracking-widest opacity-50">Most Frequent Client</p>
-            <p className="text-xl font-headline font-black text-on-tertiary-fixed tracking-tight">The Thompson Family</p>
-          </div>
-          <div className="p-8 bg-white border border-outline-variant/20 rounded-[2rem] shadow-sm hover:scale-[1.02] transition-all">
-            <p className="text-[10px] font-black text-on-surface-variant mb-3 uppercase tracking-widest opacity-50">Avg. Weekly Pay</p>
-            <p className="text-2xl font-headline font-black text-navy tracking-tighter italic leading-none">$520.00</p>
-          </div>
-        </div>
-      </section>
 
-      {/* Transaction History Section */}
-      <section className="space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-headline text-3xl font-black text-navy tracking-tight italic">Transaction History</h3>
-            <p className="text-on-surface-variant text-sm font-medium opacity-60">Full audit trail of your earnings and payouts</p>
-          </div>
-          <button className="text-[10px] font-black text-navy flex items-center gap-2 hover:bg-navy/5 px-4 py-2 rounded-xl border border-navy/10 uppercase tracking-widest transition-all">
-            Download CSV <MaterialIcon name="download" className="text-sm" />
-          </button>
-        </div>
-
-        <div className="bg-white border border-outline-variant/40 rounded-[2.5rem] overflow-hidden shadow-sm">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-surface-container-low/50 border-b border-outline-variant/20">
-                <th className="px-10 py-6 text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Date</th>
-                <th className="px-10 py-6 text-[10px] font-black text-on-surface-variant uppercase tracking-widest">Description</th>
-                <th className="px-10 py-6 text-[10px] font-black text-on-surface-variant uppercase tracking-widest text-center">Status</th>
-                <th className="px-10 py-6 text-[10px] font-black text-on-surface-variant uppercase tracking-widest text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/10">
-              {wallet?.transactions?.length > 0 ? (
-                wallet.transactions.map((txn: any) => (
-                  <tr key={txn.id} className="hover:bg-surface-container-low/30 transition-all group">
-                    <td className="px-10 py-6 text-sm font-bold text-navy whitespace-nowrap">
-                      {format(new Date(txn.createdAt), "MMM d, yyyy")}
-                    </td>
-                    <td className="px-10 py-6">
-                      <div className="flex items-center gap-5">
-                        <div className={cn(
-                          "w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs shadow-sm shadow-black/5",
-                          txn.type === "earning" ? "bg-green-50 text-green-700" : "bg-navy text-white"
-                        )}>
-                          {txn.type === "earning" ? <MaterialIcon name="arrow_downward" /> : <MaterialIcon name="paid" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-black text-navy leading-tight mb-1">{txn.description}</p>
-                          <p className="text-[10px] text-on-surface-variant/50 font-bold uppercase tracking-widest">Account Transfer</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-10 py-6 text-center">
-                      <span className={cn(
-                        "px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest shadow-sm",
-                        txn.status === "completed" ? "bg-green-100/50 text-green-700" 
-                        : txn.status === "pending" ? "bg-orange-100/50 text-orange-700" 
-                        : "bg-red-50 text-red-500"
-                      )}>
-                        {txn.status}
-                      </span>
-                    </td>
-                    <td className={cn(
-                      "px-10 py-6 text-right font-headline font-black text-lg tracking-tighter",
-                      txn.type === "earning" ? "text-green-600" : "text-navy opacity-60"
-                    )}>
-                      {txn.type === "earning" ? "+" : "-"}${ (txn.amount / 100).toFixed(2) }
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                   <td colSpan={4} className="py-24 text-center">
-                      <div className="w-16 h-16 bg-navy/5 rounded-full flex items-center justify-center mx-auto mb-6 opacity-40">
-                        <MaterialIcon name="receipt_long" className="text-3xl text-navy" />
-                      </div>
-                      <p className="font-headline font-black text-navy italic text-xl opacity-40">No transactions recorded yet</p>
-                      <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest opacity-20 mt-2">Financial records will appear here as you earn</p>
-                   </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+        </aside>
+      </div>
     </div>
   );
 }

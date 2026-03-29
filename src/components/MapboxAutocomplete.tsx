@@ -52,7 +52,7 @@ export default function MapboxAutocomplete({
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=us&types=place,region,address&access_token=${token}`);
+        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=us&types=place,region,address,postcode&access_token=${token}`);
         const data = await res.json();
         if (data.features) {
           setSuggestions(data.features);

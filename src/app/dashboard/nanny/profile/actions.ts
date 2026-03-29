@@ -21,25 +21,53 @@ export async function updateNannyProfile(data: UpdateNannyProfileInput) {
     throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
   }
 
-  const { fullName, bio, hourlyRate, experienceYears, location, latitude, longitude } = parsed.data;
+  const { 
+    fullName, bio, hourlyRate, experienceYears, location, latitude, longitude,
+    education, coreSkills, specializations, videoUrl, availability, logistics, profileImageUrl
+  } = parsed.data;
 
   // Update user table
   await db.update(users).set({
     fullName,
+    profileImageUrl,
     updatedAt: new Date(),
   }).where(eq(users.id, clerkUser.uid));
 
-  // Update nanny_profiles table
-  await db.update(nannyProfiles).set({
+  // Update or insert nanny_profiles table
+  await db.insert(nannyProfiles).values({
+    id: clerkUser.uid,
     bio,
     hourlyRate,
     experienceYears,
     location,
     latitude: latitude ? latitude.toString() : undefined,
     longitude: longitude ? longitude.toString() : undefined,
-  }).where(eq(nannyProfiles.id, clerkUser.uid));
+    education,
+    coreSkills: coreSkills || [],
+    specializations: specializations || [],
+    videoUrl: videoUrl || "",
+    availability: availability || {},
+    logistics: logistics || [],
+  }).onConflictDoUpdate({
+    target: nannyProfiles.id,
+    set: {
+      bio,
+      hourlyRate,
+      experienceYears,
+      location,
+      latitude: latitude ? latitude.toString() : undefined,
+      longitude: longitude ? longitude.toString() : undefined,
+      education,
+      coreSkills: coreSkills || [],
+      specializations: specializations || [],
+      videoUrl: videoUrl || "",
+      availability: availability || {},
+      logistics: logistics || [],
+    }
+  });
 
   revalidatePath("/dashboard/nanny/profile");
+  revalidatePath(`/nannies/${clerkUser.uid}`);
 }
 
 import { uploadToR2 } from "@/lib/r2";
@@ -76,11 +104,16 @@ export async function uploadProfilePhotos(formData: FormData) {
     uploadedUrls.push(url);
   }
 
-  await db.update(nannyProfiles).set({
+  await db.insert(nannyProfiles).values({
+    id: clerkUser.uid,
     photos: [...existingPhotos, ...uploadedUrls],
-  }).where(eq(nannyProfiles.id, clerkUser.uid));
+  }).onConflictDoUpdate({
+    target: nannyProfiles.id,
+    set: { photos: [...existingPhotos, ...uploadedUrls] }
+  });
 
   revalidatePath("/dashboard/nanny/profile");
+  revalidatePath(`/nannies/${clerkUser.uid}`);
 }
 
 export async function deleteProfilePhoto(photoUrl: string) {
@@ -98,6 +131,7 @@ export async function deleteProfilePhoto(photoUrl: string) {
   }).where(eq(nannyProfiles.id, clerkUser.uid));
 
   revalidatePath("/dashboard/nanny/profile");
+  revalidatePath(`/nannies/${clerkUser.uid}`);
 }
 
 import { adminAuth } from "@/lib/firebase-admin";

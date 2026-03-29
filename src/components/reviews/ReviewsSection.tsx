@@ -5,80 +5,101 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { ReviewForm } from "./ReviewForm";
 import { ReplyForm } from "./ReplyForm";
 
-export function ReviewsSection({ nannyId, initialReviews }: { nannyId: string, initialReviews: any[] }) {
+export function ReviewsSection({ 
+  nannyId, 
+  initialReviews, 
+  currentUserId,
+  hasBookedBefore 
+}: { 
+  nannyId: string, 
+  initialReviews: any[], 
+  currentUserId?: string,
+  hasBookedBefore: boolean
+}) {
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
 
+  const canReply = currentUserId === nannyId;
+
   return (
-    <section className="space-y-12 animate-in fade-in duration-700 delay-300">
-      <div className="flex items-center justify-between">
-        <h3 className="text-3xl font-black text-primary font-headline tracking-tighter italic flex items-center gap-4">
-          <MaterialIcon name="reviews" className="text-secondary text-4xl" />
-          Reviews ({initialReviews.length})
-        </h3>
-        <button 
-          onClick={() => setIsReviewModalOpen(true)}
-          className="bg-primary/10 text-primary px-6 py-2 rounded-full font-bold hover:bg-primary hover:text-white transition-all text-sm uppercase tracking-widest"
-        >
-          Leave a Review
-        </button>
+    <section className="mb-20">
+      <div className="flex justify-between items-end mb-10">
+        <div className="space-y-2">
+          <h2 className="text-3xl font-extrabold font-headline text-primary italic uppercase tracking-tighter">Parent Testimonials</h2>
+          <p className="text-on-surface-variant text-sm font-medium">Trusted by {initialReviews.length} families in the marketplace.</p>
+        </div>
+        
+        <div className="flex gap-4">
+          <button className="text-primary font-bold border-b-2 border-primary/20 hover:border-primary transition-all text-xs uppercase tracking-widest">
+            View all {initialReviews.length} reviews
+          </button>
+          
+          {hasBookedBefore && (
+            <button 
+              onClick={() => setIsReviewModalOpen(true)}
+              className="bg-primary text-white px-6 py-2 rounded-full font-bold hover:bg-primary/90 transition-all text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-primary/20"
+            >
+              Leave a Review
+            </button>
+          )}
+        </div>
       </div>
 
-      <div className="space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {initialReviews.length === 0 ? (
-          <p className="text-on-surface-variant italic opacity-60">No reviews yet. Be the first to leave one!</p>
+          <div className="col-span-full py-20 bg-surface-container-low rounded-[3rem] text-center">
+             <MaterialIcon name="reviews" className="text-4xl text-outline-variant mb-4 opacity-40" />
+             <p className="text-on-surface-variant font-bold opacity-60">No reviews yet.</p>
+             {!hasBookedBefore && <p className="text-[10px] text-slate-400 mt-2 uppercase tracking-widest font-black italic">Booking required to leave feedback</p>}
+          </div>
         ) : (
           initialReviews.map((review) => (
-            <div key={review.id} className="bg-surface-container-low p-8 rounded-[3rem] space-y-6">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-secondary-container text-on-secondary-container rounded-full flex items-center justify-center font-bold text-xl uppercase">
-                    {review.reviewer.fullName[0]}
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-lg">{review.reviewer.fullName}</h4>
-                    <div className="flex items-center gap-1 text-secondary">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <MaterialIcon key={i} name="star" fill={i < review.rating} className="text-sm" />
-                      ))}
-                    </div>
-                  </div>
+            <div key={review.id} className="bg-surface-container-lowest p-8 rounded-[2rem] editorial-shadow relative overflow-hidden group">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-primary-fixed flex items-center justify-center font-black text-primary overflow-hidden shadow-inner">
+                  {review.reviewer.fullName[0]}
                 </div>
-                <span className="text-xs text-on-surface-variant font-bold uppercase tracking-widest opacity-50">
-                  {new Date(review.createdAt).toLocaleDateString()}
-                </span>
+                <div>
+                  <p className="font-bold text-primary">{review.reviewer.fullName}</p>
+                  <p className="text-[10px] text-on-surface-variant uppercase tracking-widest font-black opacity-40">Previous Client</p>
+                </div>
+                
+                <div className="ml-auto flex flex-col items-end gap-1">
+                  <div className="flex gap-0.5">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <span key={i} className="material-symbols-outlined text-sm text-secondary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                        {i < review.rating ? "star" : "star_outline"}
+                      </span>
+                    ))}
+                  </div>
+                  {review.totalAmount && (
+                    <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest border border-emerald-200">
+                      Verified Booking: ${(review.totalAmount / 100).toFixed(0)}
+                    </span>
+                  )}
+                </div>
               </div>
               
-              <p className="text-on-surface text-lg leading-relaxed">{review.comment}</p>
+              <p className="text-on-surface-variant italic leading-relaxed text-sm">"{review.comment}"</p>
               
-              {review.images && review.images.length > 0 && (
-                <div className="flex gap-4 overflow-x-auto pb-4">
-                  {review.images.map((img: string, i: number) => (
-                    <img key={i} src={img} alt="Review attachment" className="w-32 h-32 object-cover rounded-2xl border-4 border-white shadow-md" />
-                  ))}
+              {review.replyText && (
+                <div className="mt-6 p-4 bg-tertiary-fixed/10 border-l-2 border-tertiary rounded-r-xl space-y-1">
+                  <p className="text-[8px] font-black text-tertiary uppercase tracking-widest">Caregiver's Response</p>
+                  <p className="text-xs text-on-tertiary-fixed-variant leading-relaxed opacity-80">"{review.replyText}"</p>
                 </div>
               )}
 
-              {/* Nanny Reply Block */}
-              {review.replyText ? (
-                <div className="mt-8 ml-8 sm:ml-12 p-6 bg-primary/5 border-l-4 border-primary rounded-r-3xl space-y-4">
-                  <div className="flex items-center gap-3">
-                    <MaterialIcon name="subdirectory_arrow_right" className="text-primary text-xl" />
-                    <span className="font-bold text-primary tracking-tight">Nanny's Reply</span>
-                  </div>
-                  <p className="text-on-surface-variant italic leading-relaxed">{review.replyText}</p>
-                </div>
-              ) : (
+              {canReply && !review.replyText && (
                 <button 
                   onClick={() => setReplyingTo(review.id)}
-                  className="text-xs text-primary font-bold uppercase tracking-widest hover:underline mt-4 inline-block"
+                  className="mt-4 text-[9px] font-black uppercase tracking-widest text-primary hover:underline"
                 >
-                  Reply to this review
+                  Reply to this feedback
                 </button>
               )}
 
               {replyingTo === review.id && (
-                <div className="mt-6 ml-8 sm:ml-12">
+                <div className="mt-4">
                   <ReplyForm reviewId={review.id} onSuccess={() => setReplyingTo(null)} />
                 </div>
               )}

@@ -2,6 +2,7 @@
 
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import MapboxAutocomplete from "@/components/MapboxAutocomplete";
 
 interface Step1Props {
   availableChildren?: any[];
@@ -145,19 +146,18 @@ export default function Step1({ availableChildren = [], data, updateData, onNext
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-4">
             <label className="text-xl font-bold font-headline text-primary block">
-              Primary location
+              Primary location (Area/Zip)
             </label>
             <div className="relative group">
+              <MapboxAutocomplete 
+                initialLocation={data.location}
+                onSelect={(loc) => updateData({ location: loc })}
+                inputClassName="w-full pl-12 pr-4 py-4 bg-surface-container-lowest border-none rounded-xl shadow-sm focus:ring-2 focus:ring-primary/40 font-medium placeholder:font-normal placeholder:opacity-40"
+                placeholder="Where will care take place?"
+              />
               <MaterialIcon
                 name="location_on"
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
-              />
-              <input
-                className="w-full pl-12 pr-4 py-4 bg-surface-container-lowest border-none rounded-xl shadow-sm focus:ring-2 focus:ring-primary/40 font-medium"
-                placeholder="Zip code"
-                type="text"
-                value={data.location || ""}
-                onChange={(e) => updateData({ location: e.target.value })}
+                className="absolute left-4 top-[1.35rem] text-on-surface-variant pointer-events-none z-10"
               />
             </div>
           </div>
@@ -168,7 +168,7 @@ export default function Step1({ availableChildren = [], data, updateData, onNext
             <div className="relative group">
               <MaterialIcon
                 name="calendar_today"
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant"
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
               />
               <input
                 className="w-full pl-12 pr-4 py-4 bg-surface-container-lowest border-none rounded-xl shadow-sm focus:ring-2 focus:ring-primary/40 font-medium cursor-pointer"

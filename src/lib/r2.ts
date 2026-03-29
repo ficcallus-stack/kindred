@@ -40,11 +40,23 @@ export async function uploadToR2(
 }
 
 export async function getPresignedUrl(fileName: string) {
-  if (!R2_BUCKET_NAME) throw new Error("R2_BUCKET_NAME is not defined");
+  if (!process.env.R2_BUCKET_NAME) throw new Error("R2_BUCKET_NAME is not defined");
 
   const command = new GetObjectCommand({
-    Bucket: R2_BUCKET_NAME,
+    Bucket: process.env.R2_BUCKET_NAME,
     Key: fileName,
+  });
+
+  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+}
+
+export async function createPresignedUploadUrl(fileName: string, contentType: string) {
+  if (!process.env.R2_BUCKET_NAME) throw new Error("R2_BUCKET_NAME is not defined");
+
+  const command = new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET_NAME,
+    Key: fileName,
+    ContentType: contentType, // strictly enforce browser headers
   });
 
   return await getSignedUrl(s3Client, command, { expiresIn: 3600 });

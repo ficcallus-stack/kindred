@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
-import { payments, bookings, certifications } from "@/db/schema";
+import { payments, bookings, certifications, processedWebhookEvents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function POST(req: NextRequest) {
@@ -23,6 +23,17 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     console.error("Webhook signature verification failed:", err.message);
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+  }
+
+  // ── Idempotency check: skip already-processed events ─────
+  const [existing] = await db
+    .select({ eventId: processedWebhookEvents.eventId })
+    .from(processedWebhookEvents)
+    .where(eq(processedWebhookEvents.eventId, event.id))
+    .limit(1);
+
+  if (existing) {
+    return NextResponse.json({ received: true, deduplicated: true });
   }
 
   try {
@@ -80,6 +91,12 @@ export async function POST(req: NextRequest) {
       default:
         break;
     }
+
+    // ── Record event as processed ──────────────────────────
+    await db.insert(processedWebhookEvents).values({
+      eventId: event.id,
+      eventType: event.type,
+    });
 
     return NextResponse.json({ received: true });
   } catch (error: any) {

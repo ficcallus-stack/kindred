@@ -13,6 +13,8 @@ import { auth } from "@/lib/firebase-client";
 // Step Components
 import ProfileStep from "@/components/registration/ProfileStep";
 import AvailabilityStep from "@/components/registration/AvailabilityStep";
+import { registerNanny } from "./actions";
+import { useToast } from "@/components/Toast";
 
 const STEPS = [
   { id: 1, title: "Basic Profile", progress: 50 },
@@ -34,6 +36,8 @@ export default function NannyRegistration() {
       terms: "",
     },
   });
+  const [submitting, setSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, STEPS.length));
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
@@ -155,10 +159,30 @@ export default function NannyRegistration() {
                 <AvailabilityStep 
                   data={formData.availability} 
                   onBack={prevStep} 
-                  onSubmit={(data) => { 
-                    updateFormData("availability", data); 
-                    // Redirect straight to verification to complete elite onboarding
-                    router.push("/dashboard/nanny/verification");
+                  isSubmitting={submitting}
+                  onSubmit={async (availabilityData) => { 
+                    setSubmitting(true);
+                    try {
+                      const finalData = {
+                        profile: formData.profile as any,
+                        availability: availabilityData
+                      };
+                      
+                      const result = await registerNanny(finalData);
+                      if (result.success) {
+                        showToast("Registration successful! Starting verification...", "success");
+                        // Delay slightly so the role change propagates if needed, though redirect should handle it
+                        setTimeout(() => {
+                           // Force a hard navigation to ensure the new role is picked up by layouts/middleware
+                           window.location.href = "/dashboard/nanny/verification";
+                        }, 500);
+                      }
+                    } catch (error) {
+                      console.error("Registration failed", error);
+                      showToast("Registration failed. Please try again.", "error");
+                    } finally {
+                      setSubmitting(false);
+                    }
                   }} 
                 />
               )}

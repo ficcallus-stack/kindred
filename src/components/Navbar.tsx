@@ -21,7 +21,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="fixed top-0 w-full z-50 bg-white/70 backdrop-blur-xl border-b border-outline-variant/10 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] transition-all">
+      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 shadow-sm transition-all duration-500">
         <div className="flex justify-between items-center h-20 px-6 max-w-7xl mx-auto gap-8">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 group whitespace-nowrap">
@@ -40,7 +40,8 @@ export default function Navbar() {
                 {/* ROLE: PARENT */}
                 {role === "parent" && (
                   <>
-                    <NavLink href="/dashboard/parent" label="Find Care" icon="search" />
+                    <NavLink href="/dashboard/parent" label="Dashboard" icon="grid_view" />
+                    <NavLink href="/browse" label="Browse Nannies" icon="groups" />
                     <NavLink href="/dashboard/parent/post-job" label="Post Job" icon="post_add" />
                     <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
                   </>
@@ -49,8 +50,8 @@ export default function Navbar() {
                 {/* ROLE: NANNY */}
                 {role === "caregiver" && (
                   <>
-                    <NavLink href="/jobs" label="Find Jobs" icon="work" />
                     <NavLink href="/dashboard/nanny" label="Dashboard" icon="grid_view" />
+                    <NavLink href="/jobs" label="Find Jobs" icon="work" />
                     <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
                   </>
                 )}
@@ -58,9 +59,10 @@ export default function Navbar() {
                 {/* ROLE: MODERATOR */}
                 {role === "moderator" && (
                   <>
-                    <NavLink href="/dashboard/moderator" label="Mod Dashboard" icon="shield_person" />
+                    <NavLink href="/dashboard/moderator" label="Dashboard" icon="grid_view" />
                     <NavLink href="/dashboard/moderator/verifications" label="Verifications" icon="verified" />
                     <NavLink href="/dashboard/moderator/support" label="Support" icon="support_agent" />
+                    <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
                   </>
                 )}
 
@@ -75,15 +77,17 @@ export default function Navbar() {
               </>
             )}
 
-            {/* GUEST / ALWAYS VISIBLE */}
-            {(!isSignedIn || !role) && (
+            {/* GUEST ONLY */}
+            {isLoaded && !isSignedIn && (
               <>
-                <NavLink href="/browse" label="Browse Nannies" icon="groups" />
+                <NavLink href="/browse" label="Find Nannies" icon="groups" />
                 <NavLink href="/register/nanny" label="Become a Nanny" icon="card_membership" />
+                <NavLink href="/referrals" label="Refer & Earn" icon="volunteer_activism" />
+                <NavLink href="/#how-it-works" label="How it Works" icon="help_outline" />
+                <NavLink href="/safety" label="Safety" icon="verified_user" />
+                <NavLink href="/pricing" label="Pricing" icon="payments" />
               </>
             )}
-            
-            <NavLink href="/safety" label="Trust & Safety" icon="verified_user" secondaryIcon="secondary" />
           </div>
 
           {/* Right Actions */}
@@ -100,23 +104,56 @@ export default function Navbar() {
             )}
             
             {isLoaded && isSignedIn && (
-              <div className="flex items-center gap-4 bg-slate-50 p-1.5 pr-3 rounded-2xl border border-slate-200/50">
-                <button
-                  onClick={signOut}
-                  className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center hover:bg-primary/20 transition-all"
-                  title="Sign out"
+              <>
+                {/* Support Button */}
+                <Link
+                  href="/dashboard/messages/support"
+                  className="w-11 h-11 rounded-full bg-primary/5 text-primary flex items-center justify-center hover:bg-primary/10 transition-all shadow-sm border border-primary/10 relative"
+                  title="Live Support"
                 >
-                  <MaterialIcon name="logout" className="text-lg text-primary" />
-                </button>
-                <div className="hidden sm:block">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
-                    {role === "parent" ? "Family" : role === "caregiver" ? "Nanny" : "Member"}
-                  </p>
-                  <p className="text-[12px] font-bold text-slate-700 leading-none">
-                    {user?.displayName || "Account"}
-                  </p>
+                  <MaterialIcon name="support_agent" className="text-xl" />
+                  <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white pointer-events-none"></span>
+                </Link>
+
+                <div className="relative group">
+                  <Link
+                    href={`/dashboard/${role === 'admin' ? 'admin' : role === 'moderator' ? 'moderator' : role === 'caregiver' ? 'nanny' : 'parent'}/settings`}
+                    className="flex items-center gap-4 bg-slate-50 p-1.5 pr-3 rounded-2xl border border-slate-200/50 hover:bg-slate-100 transition-all cursor-pointer"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <MaterialIcon name="person" className="text-lg text-primary" />
+                    </div>
+                    <div className="hidden sm:block">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                        {role === "parent" ? "Family" : role === "caregiver" ? "Nanny" : role?.toUpperCase() || "Member"}
+                      </p>
+                      <p className="text-[12px] font-bold text-slate-700 leading-none">
+                        {user?.displayName || "Account"}
+                      </p>
+                    </div>
+                  </Link>
+                  
+                  {/* Desktop Dropdown */}
+                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-200/50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all transform origin-top-right scale-95 group-hover:scale-100">
+                    <div className="p-2 space-y-1">
+                      <Link
+                        href={`/dashboard/${role === 'admin' ? 'admin' : role === 'moderator' ? 'moderator' : role === 'caregiver' ? 'nanny' : 'parent'}/settings`}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-primary rounded-xl transition-all"
+                      >
+                        <MaterialIcon name="settings" className="text-[18px]" />
+                        Account Settings
+                      </Link>
+                      <button
+                        onClick={signOut}
+                        className="w-full flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                      >
+                        <MaterialIcon name="logout" className="text-[18px]" />
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </>
             )}
 
             {/* Mobile hamburger */}
@@ -148,19 +185,40 @@ export default function Navbar() {
                 <>
                   {role === "parent" && (
                     <>
-                      <MobileNavLink href="/dashboard/parent" label="Dashboard" icon="dashboard" onClick={() => setMobileOpen(false)} />
+                      <MobileNavLink href="/dashboard/parent" label="Dashboard" icon="grid_view" onClick={() => setMobileOpen(false)} />
+                      <MobileNavLink href="/browse" label="Browse Nannies" icon="groups" onClick={() => setMobileOpen(false)} />
                       <MobileNavLink href="/dashboard/parent/post-job" label="Post a Job" icon="post_add" onClick={() => setMobileOpen(false)} />
                     </>
                   )}
                   {role === "caregiver" && (
                     <>
-                      <MobileNavLink href="/dashboard/nanny" label="Dashboard" icon="dashboard" onClick={() => setMobileOpen(false)} />
+                      <MobileNavLink href="/dashboard/nanny" label="Dashboard" icon="grid_view" onClick={() => setMobileOpen(false)} />
                       <MobileNavLink href="/jobs" label="Find Jobs" icon="work" onClick={() => setMobileOpen(false)} />
                     </>
                   )}
+                  {role === "moderator" && (
+                    <>
+                      <MobileNavLink href="/dashboard/moderator" label="Dashboard" icon="grid_view" onClick={() => setMobileOpen(false)} />
+                      <MobileNavLink href="/dashboard/moderator/verifications" label="Verifications" icon="verified" onClick={() => setMobileOpen(false)} />
+                    </>
+                  )}
+                  {role === "admin" && (
+                    <>
+                      <MobileNavLink href="/dashboard/admin" label="Admin Panel" icon="admin_panel_settings" onClick={() => setMobileOpen(false)} />
+                    </>
+                  )}
+                  <MobileNavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" onClick={() => setMobileOpen(false)} />
                 </>
               )}
-              <MobileNavLink href="/browse" label="Browse Nannies" icon="groups" onClick={() => setMobileOpen(false)} />
+              {!isSignedIn && (
+                <>
+                  <MobileNavLink href="/browse" label="Browse Nannies" icon="groups" onClick={() => setMobileOpen(false)} />
+                  <MobileNavLink href="/register/nanny" label="Become a Nanny" icon="card_membership" onClick={() => setMobileOpen(false)} />
+                  <MobileNavLink href="/referrals" label="Refer & Earn" icon="volunteer_activism" onClick={() => setMobileOpen(false)} />
+                  <MobileNavLink href="/#how-it-works" label="How it Works" icon="help_outline" onClick={() => setMobileOpen(false)} />
+                  <MobileNavLink href="/pricing" label="Pricing" icon="payments" onClick={() => setMobileOpen(false)} />
+                </>
+              )}
               <MobileNavLink href="/safety" label="Trust & Safety" icon="verified_user" onClick={() => setMobileOpen(false)} />
             </nav>
 

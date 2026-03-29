@@ -10,7 +10,7 @@ import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth-context";
 
 export default function LoginPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, role } = useAuth();
   const { showToast } = useToast();
   
   const [email, setEmail] = useState("");
@@ -18,14 +18,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectUrl = searchParams.get("redirect_url") || "/";
+  const redirectPath = searchParams.get("redirect_url");
 
-  // Redirect if already logged in
+  // Redirect based on user role
   useEffect(() => {
-    if (!authLoading && user && !user.isAnonymous) {
-      router.push(redirectUrl);
+    if (!authLoading && user && !user.isAnonymous && role) {
+      if (redirectPath) {
+        router.push(redirectPath);
+      } else {
+        if (role === "caregiver") {
+          router.push("/dashboard/nanny");
+        } else if (role === "parent") {
+          router.push("/browse");
+        } else if (role === "admin" || role === "moderator") {
+          router.push("/dashboard/moderator");
+        } else {
+          router.push("/");
+        }
+      }
     }
-  }, [user, authLoading, router, redirectUrl]);
+  }, [user, authLoading, role, router, redirectPath]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +45,7 @@ export default function LoginPage() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       showToast("Welcome back to Kindred!", "success");
-      router.push(redirectUrl);
+      if (redirectPath) router.push(redirectPath);
     } catch (err: any) {
       const msg = err.code === "auth/invalid-credential" 
         ? "Invalid email or password. Please try again."
@@ -52,7 +64,7 @@ export default function LoginPage() {
     try {
       await signInWithPopup(auth, googleProvider);
       showToast("Welcome to Kindred!", "success");
-      router.push(redirectUrl);
+      if (redirectPath) router.push(redirectPath);
     } catch (err: any) {
       if (err.code !== "auth/popup-closed-by-user") {
         showToast("Google login failed. Please try email login.", "error");
@@ -69,6 +81,16 @@ export default function LoginPage() {
       showToast("Guest login failed. Please try again.", "error");
     }
   };
+
+  if (user && !user.isAnonymous && !role) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin mb-8 shadow-xl shadow-primary/5"></div>
+        <h2 className="text-2xl font-headline font-bold text-primary mb-2">Setting things up...</h2>
+        <p className="text-on-surface-variant font-medium text-sm">We're tailoring your dashboard experience.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen">

@@ -9,7 +9,7 @@ export async function generateMetadata({ params }: { params: { competitor: strin
   const capitalized = competitor.charAt(0).toUpperCase() + competitor.slice(1);
   return {
     title: `Best Alternative to ${capitalized} in 2026 | KindredCare US`,
-    description: `Tired of hidden fees on ${capitalized}? Discover why families are switching to KindredCare US for rigorous background checks and zero subscription models.`,
+    description: `Tired of mandatory fees on ${capitalized}? Discover KindredCare US's transparent marketplace with optional premium benefits for early messaging.`,
   };
 }
 
@@ -24,7 +24,7 @@ export default function ComparePage({ params }: { params: { competitor: string }
     },
     {
       question: `Does KindredCare charge monthly subscription fees like ${competitor}?`,
-      answer: `No. KindredCare completely eliminates the subscription model. You only pay a transparent service fee when you successfully book a nanny.`
+      answer: `KindredCare eliminates the mandatory subscription model. You can message any nanny for free once a booking is confirmed. We also offer an optional Premium tier for families who want to message caregivers before hiring.`
     }
   ];
 
@@ -42,7 +42,7 @@ export default function ComparePage({ params }: { params: { competitor: string }
             The #1 Alternative to <br/> <span className="text-error line-through decoration-4 decoration-error/50">{competitor}</span>
           </h1>
           <p className="text-on-surface-variant text-xl max-w-2xl mx-auto leading-relaxed">
-            Stop paying monthly subscription fees just to message caregivers. Switch to KindredCare US and experience premium vetting, transparent pricing, and instant escrow payments.
+            Stop being forced into monthly subscriptions just to find care. KindredCare US offers a transparent marketplace where you only pay for successful matches, with optional premium upgrades for early access.
           </p>
         </header>
 
@@ -56,7 +56,7 @@ export default function ComparePage({ params }: { params: { competitor: string }
           
           <div className="space-y-6">
             <div className="grid grid-cols-3 gap-6 items-center py-4 bg-surface-container-low rounded-2xl px-6">
-              <div className="font-bold text-primary text-sm flex items-center gap-2"><MaterialIcon name="credit_card_off" className="text-secondary" /> Monthly Subscription Fees</div>
+              <div className="font-bold text-primary text-sm flex items-center gap-2"><MaterialIcon name="credit_card_off" className="text-secondary" /> Mandatory Subscription Fees</div>
               <div className="text-center text-success font-black text-xl flex justify-center"><MaterialIcon name="close" className="text-error" /></div>
               <div className="text-center text-on-surface-variant flex justify-center opacity-50"><MaterialIcon name="check" /></div>
             </div>

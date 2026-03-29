@@ -2,7 +2,7 @@
 
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { bookings, payments, wallets, walletTransactions, users } from "@/db/schema";
+import { bookings, payments, wallets, walletTransactions, users, referrals } from "@/db/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { createBookingSchema, type CreateBookingInput } from "@/lib/validations";
@@ -156,49 +156,69 @@ export async function completeBooking(bookingId: string) {
     throw new Error("Only confirmed or in-progress bookings can be completed");
   }
 
-  // 1. Capture Stripe Payment
+  // 1. Capture Stripe Payment (External operation, done before TX)
   if (booking.stripePaymentIntentId) {
     try {
       await stripe.paymentIntents.capture(booking.stripePaymentIntentId);
     } catch (e) {
       console.error("Stripe capture failed", e);
-      // If already captured, we continue, otherwise we might want to block
     }
   }
 
-  // 2. Update Booking Status
-  await db.update(bookings)
-    .set({ status: "completed" })
-    .where(eq(bookings.id, bookingId));
+  // 2. Perform all DB updates in one atomic transaction
+  await db.transaction(async (tx) => {
+    // A. Update Booking Status
+    await tx.update(bookings)
+      .set({ status: "completed" })
+      .where(eq(bookings.id, bookingId));
 
-  // 3. Update Payment Status
-  await db.update(payments)
-    .set({ status: "captured" })
-    .where(eq(payments.bookingId, bookingId));
+    // B. Update Payment Status
+    await tx.update(payments)
+      .set({ status: "captured" })
+      .where(eq(payments.bookingId, bookingId));
 
-  // 4. Update Nanny's Wallet
-  // Ensure wallet exists
-  await db.insert(wallets)
-    .values({ id: booking.caregiverId, balance: 0 })
-    .onConflictDoNothing();
+    // C. Update Nanny's Wallet
+    await tx.insert(wallets)
+      .values({ id: booking.caregiverId, balance: 0 })
+      .onConflictDoNothing();
 
-  // Add funds
-  await db.update(wallets)
-    .set({ 
-      balance: sql`${wallets.balance} + ${booking.totalAmount}`,
-      updatedAt: new Date(),
-    })
-    .where(eq(wallets.id, booking.caregiverId));
+    await tx.update(wallets)
+      .set({ 
+        balance: sql`${wallets.balance} + ${booking.totalAmount}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(wallets.id, booking.caregiverId));
 
-  // 5. Log Transaction
-  await db.insert(walletTransactions)
-    .values({
-      walletId: booking.caregiverId,
-      amount: booking.totalAmount,
-      type: "earning",
-      status: "completed",
-      description: `Earnings from booking #${bookingId.slice(0, 8)}`,
+    // D. Log Transaction
+    await tx.insert(walletTransactions)
+      .values({
+        walletId: booking.caregiverId,
+        amount: booking.totalAmount,
+        type: "earning",
+        status: "completed",
+        description: `Earnings from booking #${bookingId.slice(0, 8)}`,
+      });
+
+    // E. Referral Logic: Check if Parent was referred
+    const parentReferral = await tx.query.referrals.findFirst({
+      where: and(eq(referrals.refereeId, booking.parentId), eq(referrals.status, "signed_up")),
     });
+    if (parentReferral) {
+      await tx.update(referrals)
+        .set({ status: "reviewing" })
+        .where(eq(referrals.id, parentReferral.id));
+    }
+
+    // F. Referral Logic: Check if Nanny was referred
+    const nannyReferral = await tx.query.referrals.findFirst({
+      where: and(eq(referrals.refereeId, booking.caregiverId), eq(referrals.status, "signed_up")),
+    });
+    if (nannyReferral) {
+      await tx.update(referrals)
+        .set({ status: "reviewing" })
+        .where(eq(referrals.id, nannyReferral.id));
+    }
+  });
 
   revalidatePath("/dashboard/parent/bookings");
   revalidatePath("/dashboard/nanny/wallet");

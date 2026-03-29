@@ -24,6 +24,7 @@ export default async function NannyProfilePage() {
 
   const initialData = {
     fullName: user.fullName,
+    profileImageUrl: user.profileImageUrl || "",
     location: profileDetails?.location || "",
     latitude: profileDetails?.latitude ? Number(profileDetails.latitude) : undefined,
     longitude: profileDetails?.longitude ? Number(profileDetails.longitude) : undefined,
@@ -31,6 +32,12 @@ export default async function NannyProfilePage() {
     experienceYears: profileDetails?.experienceYears || 0,
     bio: profileDetails?.bio || "",
     photos: (profileDetails?.photos as string[]) || [],
+    education: profileDetails?.education || "",
+    coreSkills: (profileDetails?.coreSkills as string[]) || [],
+    specializations: (profileDetails?.specializations as string[]) || [],
+    videoUrl: profileDetails?.videoUrl || "",
+    availability: profileDetails?.availability || {},
+    logistics: (profileDetails?.logistics as string[]) || [],
   };
 
   return <ProfileForm initialData={initialData} />;

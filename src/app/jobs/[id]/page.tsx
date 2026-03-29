@@ -19,6 +19,8 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
     createdAt: jobs.createdAt,
     familyName: users.fullName,
     parentEmail: users.email,
+    scheduleType: jobs.scheduleType,
+    specificDates: jobs.specificDates,
   })
   .from(jobs)
   .innerJoin(users, eq(jobs.parentId, users.id))
@@ -93,6 +95,43 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
                 <p className="text-xl font-medium text-on-surface-variant leading-relaxed italic whitespace-pre-wrap">
                   {job.description}
                 </p>
+              </div>
+            </section>
+
+            <section className="bg-surface-container-lowest rounded-[3rem] p-12 shadow-sm border border-outline-variant/5">
+              <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic mb-10 pb-6 border-b border-outline-variant/10 flex items-center gap-4">
+                <MaterialIcon name="calendar_today" className="text-secondary text-3xl" fill />
+                Schedule & Timing
+              </h2>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4 p-6 bg-slate-50 rounded-2xl border border-slate-100">
+                   <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                      <MaterialIcon name={job.scheduleType === 'recurring' ? 'sync' : 'event'} className="text-2xl text-primary" />
+                   </div>
+                   <div>
+                      <h4 className="font-headline font-black text-primary uppercase tracking-widest text-[10px]">Job Type</h4>
+                      <p className="text-lg font-bold text-primary italic capitalize">{job.scheduleType?.replace('_', ' ')}</p>
+                   </div>
+                </div>
+
+                {job.scheduleType === 'one_time' && (job.specificDates as string[])?.length > 0 && (
+                  <div className="space-y-4">
+                     <p className="text-xs font-black uppercase tracking-widest text-on-surface-variant opacity-40 ml-2">Specific Dates Requested</p>
+                     <div className="flex flex-wrap gap-3">
+                        {(job.specificDates as string[]).map((date: string) => (
+                           <div key={date} className="px-6 py-3 bg-white border border-outline-variant/10 rounded-2xl shadow-sm font-bold text-sm text-primary">
+                              {new Date(date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                           </div>
+                        ))}
+                     </div>
+                  </div>
+                )}
+
+                {job.scheduleType === 'recurring' && (
+                  <p className="text-lg font-medium text-on-surface-variant leading-relaxed italic ml-2">
+                    This is a recurring weekly position. Please refer to the initial "Care requested" summary above for general weekly availability needs.
+                  </p>
+                )}
               </div>
             </section>
 

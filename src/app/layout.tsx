@@ -3,9 +3,9 @@ import { Plus_Jakarta_Sans, Inter } from "next/font/google";
 import "./globals.css";
 import Footer from "@/components/Footer";
 import { ToastProvider } from "@/components/Toast";
-import SupportWidget from "@/components/SupportWidget";
 import { AuthProvider } from "@/lib/auth-context";
 import CookieBanner from "@/components/CookieBanner";
+import { PostHogProvider } from "@/components/providers/PostHogProvider";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -91,10 +91,11 @@ export default function RootLayout({
         </head>
         <body className="antialiased bg-surface text-on-surface font-body min-h-screen flex flex-col">
           <ToastProvider>
-            <main className="flex-grow">
-              {children}
-            </main>
-            <SupportWidget />
+            <PostHogProvider>
+              <main className="flex-grow">
+                {children}
+              </main>
+            </PostHogProvider>
           </ToastProvider>
           <Footer />
           <CookieBanner />

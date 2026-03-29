@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { getServerUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { users, nannyProfiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, nannyProfiles, referrals } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { adminAuth } from "@/lib/firebase-admin";
 
 // POST â€” Sync Firebase user to our database (called after signup/login)
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { role, fullName } = await request.json();
+    const { role, fullName, referralCode } = await request.json();
 
     // Check if user already exists
     const existingUser = await db.query.users.findFirst({
@@ -26,11 +26,11 @@ export async function POST(request: Request) {
       if (role && role !== existingUser.role) {
         // Only allow parent/caregiver via self-service
         const safeRole = (role === "parent" || role === "caregiver") ? role : existingUser.role;
-        const [updated] = await db
+        const [updated] = (await db
           .update(users)
           .set({ role: safeRole, updatedAt: new Date() })
           .where(eq(users.id, serverUser.uid))
-          .returning();
+          .returning()) as any[];
 
         // Sync role to Firebase custom claims
         await adminAuth.setCustomUserClaims(serverUser.uid, { role: safeRole });
@@ -47,13 +47,35 @@ export async function POST(request: Request) {
     // Only allow parent/caregiver at signup
     const userRole = (role === "parent" || role === "caregiver") ? role : "parent";
 
+    // Check for referral attribution
+    let referredByUserId: string | null = null;
+    if (referralCode) {
+        const referrer = await db.query.users.findFirst({
+            where: eq(users.referralCode, referralCode.toUpperCase())
+        });
+        if (referrer) {
+            referredByUserId = referrer.id;
+        }
+    }
+
     // Create user in DB
-    const [newUser] = await db.insert(users).values({
+    const [newUser] = (await db.insert(users).values({
       id: serverUser.uid,
       email: userEmail,
       fullName: userName,
       role: userRole,
-    }).returning();
+      referredBy: referredByUserId,
+    }).returning()) as any[];
+
+    // If referred, create referral record
+    if (referredByUserId) {
+        await db.insert(referrals).values({
+            referrerId: referredByUserId,
+            refereeId: serverUser.uid,
+            status: "signed_up",
+            rewardAmount: 2500, // $25 initial milestone
+        });
+    }
 
     // Sync role to Firebase custom claims
     await adminAuth.setCustomUserClaims(serverUser.uid, { role: userRole });

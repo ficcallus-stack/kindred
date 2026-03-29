@@ -10,6 +10,10 @@ export const createJobSchema = z.object({
   certs: z.record(z.string(), z.boolean()).default({}),
   duties: z.record(z.string(), z.boolean()).default({}),
   description: z.string().max(5000).optional(),
+  scheduleType: z.enum(["recurring", "one_time"]).default("recurring"),
+  schedule: z.record(z.string(), z.boolean()).optional(),
+  specificDates: z.array(z.string()).optional(),
+  stripePaymentIntentId: z.string().min(1, "Payment verification is required"),
 }).refine((data) => data.maxRate >= data.minRate, {
   message: "Max rate must be greater than or equal to min rate",
   path: ["maxRate"],
@@ -26,6 +30,13 @@ export const updateNannyProfileSchema = z.object({
   location: z.string().max(200).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  education: z.string().max(1000).optional(),
+  coreSkills: z.array(z.string()).optional(),
+  specializations: z.array(z.string()).optional(),
+  videoUrl: z.string().url("Invalid Video URL profile format").or(z.literal("")).optional(),
+  profileImageUrl: z.string().url("Invalid Profile Photo URL format").or(z.literal("")).optional(),
+  availability: z.record(z.string(), z.any()).optional(),
+  logistics: z.array(z.string()).optional(),
 });
 
 export type UpdateNannyProfileInput = z.infer<typeof updateNannyProfileSchema>;
@@ -43,6 +54,8 @@ export const createChildSchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   age: z.coerce.number().int().min(0).max(18),
   type: z.string().min(1).max(50),
+  bio: z.string().max(1000).optional(),
+  photoUrl: z.string().url("Must be valid URL").optional().or(z.literal("")),
   specialNeeds: z.array(z.string().max(100)).max(10).default([]),
 });
 
@@ -69,6 +82,7 @@ export type CreateBookingInput = z.infer<typeof createBookingSchema>;
 export const sendMessageSchema = z.object({
   conversationId: z.string().uuid(),
   content: z.string().min(1, "Message cannot be empty").max(5000),
+  imageUrl: z.string().url("Must be a valid URL").optional(),
 });
 
 export type SendMessageInput = z.infer<typeof sendMessageSchema>;
@@ -103,3 +117,21 @@ export const enrollCertificationSchema = z.object({
 });
 
 export type EnrollCertificationInput = z.infer<typeof enrollCertificationSchema>;
+
+export const uploadExamSchema = z.object({
+  certificationType: z.enum(["registration", "elite_bundle", "standards_program"]),
+  title: z.string().min(1).max(200),
+  description: z.string().max(1000).optional(),
+  passPercentage: z.coerce.number().int().min(1).max(100).default(75),
+  timeLimit: z.coerce.number().int().min(1).max(300).default(60),
+  price: z.coerce.number().int().min(0).default(4500),
+  retakePrice: z.coerce.number().int().min(0).default(500),
+  questions: z.array(z.object({
+    text: z.string().min(1),
+    marks: z.coerce.number().int().min(1),
+    page: z.coerce.number().int().min(1),
+    order: z.coerce.number().int().min(1),
+  })).min(1),
+});
+
+export type UploadExamInput = z.infer<typeof uploadExamSchema>;

@@ -11,7 +11,8 @@ interface Step5Props {
 }
 
 export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
-  const DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const TIMES = ["early_morning", "morning", "late_morning", "midday", "early_afternoon", "late_afternoon", "evening", "late_evening"];
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in zoom-in-95 duration-500">
@@ -28,10 +29,10 @@ export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
             </button>
           </div>
           <h2 className="font-headline text-2xl font-bold text-primary mb-3">
-            Experienced Nanny for {data.childCount || 2} Active Child{data.childCount > 1 ? 'ren' : ''} in {data.location || 'Austin'}
+            Experienced Nanny for {data.childCount || 1} Active Child{data.childCount > 1 ? 'ren' : ''} in {data.location || 'Austin'}
           </h2>
           <p className="text-on-surface-variant leading-relaxed">
-            {data.description || "Looking for a patient and energetic caregiver to engage our children in creative play, outdoor activities, and light educational tasks. Experience with early childhood development is a plus."}
+            {data.description || "Looking for a patient and energetic caregiver to engage our children in creative play, outdoor activities, and light educational tasks."}
           </p>
         </section>
 
@@ -53,7 +54,10 @@ export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
                 <span className="font-bold text-sm tracking-tight">{data.childCount || 1} Child{data.childCount > 1 ? 'ren' : ''}</span>
               </li>
               <div className="pl-5 space-y-2 border-l-2 border-outline-variant/20 ml-1">
-                {Array.from({ length: typeof data.childCount === 'number' ? data.childCount : 4 }).map((_, i) => (
+                {(data.selectedChildrenIds || []).length > 0 ? (
+                  <p className="text-xs font-bold text-primary opacity-80 mb-2">Selected from profile</p>
+                ) : null}
+                {Array.from({ length: typeof data.childCount === 'number' ? data.childCount : 0 }).map((_, i) => (
                   <li key={i} className="flex items-center gap-3 text-on-surface-variant text-xs font-medium">
                     <MaterialIcon name="child_care" className="text-sm text-primary opacity-60" />
                     <span>
@@ -70,6 +74,14 @@ export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
                 <MaterialIcon name="calendar_today" className="text-secondary" />
                 <span className="font-bold text-sm">Starts: {data.startDate || "As soon as possible"}</span>
               </li>
+              {data.stripePaymentIntentId && (
+                <li className="flex items-center gap-3 pt-4 border-t border-outline-variant/10 mt-4 animate-in fade-in duration-700">
+                  <div className="px-3 py-1.5 bg-success/10 text-success rounded-lg flex items-center gap-2 border border-success/20 shadow-sm shadow-success/5">
+                    <MaterialIcon name="verified" className="text-xs" fill />
+                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">Secure Escrow Payment Verified</span>
+                  </div>
+                </li>
+              )}
             </ul>
           </section>
 
@@ -114,26 +126,23 @@ export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
           <div className="flex flex-col md:flex-row justify-between md:items-center gap-6">
             <div className="flex-1">
               <h3 className="font-headline font-bold text-primary text-xl mb-4">Schedule & Rates</h3>
-              <div className="grid grid-cols-7 gap-2 mb-6">
+              <div className="grid grid-cols-7 gap-1 mb-6">
                 {DAYS.map((day) => (
                   <div key={day} className="text-center">
-                    <span className="text-[10px] font-bold text-on-surface-variant block mb-1">{day}</span>
-                    <div
-                      className={cn(
-                        "h-6 w-full rounded-sm mb-1",
-                        data.schedule?.[`${day.charAt(0) + day.slice(1).toLowerCase()}-morning`]
-                          ? "bg-secondary-container"
-                          : "bg-surface-container"
-                      )}
-                    />
-                    <div
-                      className={cn(
-                        "h-6 w-full rounded-sm",
-                        data.schedule?.[`${day.charAt(0) + day.slice(1).toLowerCase()}-afternoon`]
-                          ? "bg-secondary-container"
-                          : "bg-surface-container"
-                      )}
-                    />
+                    <span className="text-[9px] font-black text-on-surface-variant block mb-1 uppercase tracking-tighter">{day}</span>
+                    <div className="flex flex-col gap-0.5">
+                      {TIMES.map(timeId => (
+                        <div
+                          key={timeId}
+                          className={cn(
+                            "h-3 w-full rounded-[1px]",
+                            data.schedule?.[`${day}-${timeId}`]
+                              ? "bg-secondary"
+                              : "bg-surface-container-high"
+                          )}
+                        />
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>
