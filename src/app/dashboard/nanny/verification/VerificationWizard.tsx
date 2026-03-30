@@ -78,7 +78,7 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
         {currentStep === 1 && (
             <IdentityStep 
                 user={user} 
-                onNext={async (fd) => {
+                onNext={async (fd: FormData) => {
                     setIsSubmitting(true);
                     await uploadIdentityDocs(fd);
                     setIsSubmitting(false);
@@ -89,7 +89,8 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
         )}
         {currentStep === 2 && (
             <BackgroundStep 
-                onNext={async (ssn) => {
+                user={user}
+                onNext={async (ssn: string) => {
                     setIsSubmitting(true);
                     await submitBackgroundAuth(ssn);
                     setIsSubmitting(false);
@@ -102,7 +103,7 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
         {currentStep === 3 && (
             <ProfileStep 
                 initialProfile={profileData}
-                onNext={async (data) => {
+                onNext={async (data: any) => {
                     setIsSubmitting(true);
                     await saveProfessionalProfile(data);
                     setIsSubmitting(false);
@@ -115,7 +116,7 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
         {currentStep === 4 && (
             <ReferencesStep 
                 initialRefs={verifData.references || []}
-                onNext={async (refs) => {
+                onNext={async (refs: any[]) => {
                     setIsSubmitting(true);
                     await submitReferences(JSON.stringify(refs));
                     setIsSubmitting(false);
@@ -251,7 +252,7 @@ function IdentityStep({ user, onNext, isSubmitting }: any) {
     );
 }
 
-function BackgroundStep({ onNext, onBack, isSubmitting }: any) {
+function BackgroundStep({ user, onNext, onBack, isSubmitting }: any) {
     const [ssn, setSsn] = useState("");
     const [signed, setSigned] = useState(false);
 

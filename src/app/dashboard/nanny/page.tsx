@@ -139,7 +139,7 @@ export default async function NannyDashboardHome() {
                   <div className="flex items-center gap-6 w-full md:w-auto">
                     <div className="w-16 h-16 rounded-[1.2rem] overflow-hidden border-2 border-white/20 shadow-xl shrink-0 group-hover:scale-105 transition-transform duration-500">
                       <img 
-                        src={(activeBooking.parent as any)?.parentProfile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${activeBooking.parent.fullName}`} 
+                        src={(activeBooking.parent as any)?.parentProfile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${(activeBooking.parent as any).fullName}`} 
                         alt="Family"
                         className="w-full h-full object-cover"
                       />
@@ -149,7 +149,7 @@ export default async function NannyDashboardHome() {
                         <span className={cn("w-2 h-2 rounded-full", activeBooking.status === "in_progress" ? "bg-green-400 animate-pulse" : "bg-orange-400")}></span>
                         {activeBooking.status === "in_progress" ? "Active Session" : "Upcoming Shift"}
                       </span>
-                      <h2 className="text-2xl font-headline font-black text-white italic tracking-tighter leading-tight">The {activeBooking.parent.fullName.split(" ").pop()} Family</h2>
+                      <h2 className="text-2xl font-headline font-black text-white italic tracking-tighter leading-tight">The {(activeBooking.parent as any).fullName.split(" ").pop()} Family</h2>
                       <p className="text-white/70 text-[11px] font-medium mt-0.5">
                         {format(new Date(activeBooking.startDate), "h:mm a")} - {format(new Date(activeBooking.endDate), "h:mm a")} • {activeBooking.hoursPerDay} Hours
                       </p>
@@ -294,14 +294,14 @@ export default async function NannyDashboardHome() {
               <span className="text-xs font-bold text-primary">Availability Status</span>
               <div className="flex items-center gap-2">
                 <label className="relative inline-flex items-center cursor-not-allowed">
-                  <input className="sr-only peer" type="checkbox" checked={profile?.availability === "full_time" || profile?.availability === "part_time"} readOnly />
+                  <input className="sr-only peer" type="checkbox" checked={(profile?.availability as any) === "full_time" || (profile?.availability as any) === "part_time"} readOnly />
                   <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
                 </label>
                 <span className={cn(
                    "text-[10px] font-bold uppercase",
-                   (profile?.availability === "full_time" || profile?.availability === "part_time") ? "text-secondary" : "text-slate-500"
+                   ((profile?.availability as any) === "full_time" || (profile?.availability as any) === "part_time") ? "text-secondary" : "text-slate-500"
                 )}>
-                  {(profile?.availability === "full_time" || profile?.availability === "part_time") ? "Active" : "Offline"}
+                  {((profile?.availability as any) === "full_time" || (profile?.availability as any) === "part_time") ? "Active" : "Offline"}
                 </span>
               </div>
             </div>

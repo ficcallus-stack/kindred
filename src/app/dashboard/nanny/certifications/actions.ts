@@ -2,7 +2,7 @@
 
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { certifications, payments, certificationExams, examSubmissions } from "@/db/schema";
+import { certifications, payments, certificationExams, examSubmissions, examQuestions } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { enrollCertificationSchema, type EnrollCertificationInput } from "@/lib/validations";
@@ -65,12 +65,12 @@ export async function enrollCertification(data: EnrollCertificationInput) {
                     
                     // Recover Certification
                     await db.update(certifications)
-                      .set({ status: newStatus as any, updatedAt: new Date(), stripePaymentId: txn.stripePaymentIntentId })
+                      .set({ status: newStatus as any, stripePaymentId: txn.stripePaymentIntentId })
                       .where(eq(certifications.id, existingCert.id));
 
                     // Patch Payment Row
                     await db.update(payments)
-                      .set({ status: "succeeded", updatedAt: new Date() })
+                      .set({ status: "captured" })
                       .where(eq(payments.stripePaymentIntentId, txn.stripePaymentIntentId));
                     
                     throw new Error(`Orphaned payment fully recovered! Your profile is actively verified. Please refresh the page to dismiss this modal.`);
@@ -104,7 +104,6 @@ export async function enrollCertification(data: EnrollCertificationInput) {
         .set({
             status: "pending_payment",
             stripePaymentId: paymentIntent.id,
-            updatedAt: new Date(),
         })
         .where(eq(certifications.id, certId));
   } else {
@@ -156,10 +155,10 @@ export async function getMyCertifications() {
                 ),
                 orderBy: [desc(examSubmissions.createdAt)]
             });
-            return { ...cert, lastSubmissionId: lastSub?.id };
+            return { ...cert, lastSubmissionId: lastSub?.id, lastSubmissionStatus: lastSub?.status };
         }
     }
-    return cert;
+    return { ...cert, lastSubmissionId: null, lastSubmissionStatus: null };
   }));
 
   return certsWithSubmissions;

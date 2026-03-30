@@ -54,10 +54,10 @@ export async function getHighPriorityQueue() {
     .limit(5);
 
   const urgentQueue = rows.map(r => ({
-    ...r.caregiverVerifications,
+    ...r.caregiver_verifications,
     user: {
       ...r.users,
-      nannyProfile: r.nannyProfiles
+      nannyProfile: r.nanny_profiles
     }
   }));
 
@@ -72,10 +72,10 @@ export async function getHighPriorityQueue() {
       .limit(5);
     
     return fallbackRows.map(r => ({
-      ...r.caregiverVerifications,
+      ...r.caregiver_verifications,
       user: {
         ...r.users,
-        nannyProfile: r.nannyProfiles
+        nannyProfile: r.nanny_profiles
       }
     }));
   }
@@ -117,7 +117,7 @@ export async function getSubmissionDetails(submissionId: string) {
     orderBy: (q, { asc }) => [asc(q.page), asc(q.order)],
   });
 
-  return { ...submission, exam: { ...submission.exam, questions } };
+  return { ...submission, exam: { ...(submission.exam as any), questions } };
 }
 
 export async function markExamSubmission(submissionId: string, score: number, notes?: string) {
@@ -130,7 +130,7 @@ export async function markExamSubmission(submissionId: string, score: number, no
 
   if (!submission) throw new Error("Submission not found");
 
-  const passed = score >= submission.exam.passPercentage;
+  const passed = score >= (submission.exam as any).passPercentage;
 
   await db.update(examSubmissions)
     .set({
@@ -150,7 +150,7 @@ export async function markExamSubmission(submissionId: string, score: number, no
       })
       .where(and(
         eq(certifications.caregiverId, submission.caregiverId),
-        eq(certifications.type, submission.exam.certificationType)
+        eq(certifications.type, (submission.exam as any).certificationType)
       ));
   }
 
@@ -259,7 +259,7 @@ export async function getRecentActivity() {
     id: log.id,
     type: log.action.toLowerCase(),
     title: log.action.replace(/_/g, " "),
-    description: `Moderator ${log.actor?.fullName} performed ${log.action} on ${log.entityType} (${log.entityId})`,
+    description: `Moderator ${(log.actor as any)?.fullName} performed ${log.action} on ${log.entityType} (${log.entityId})`,
     timestamp: log.createdAt,
   }));
 }

@@ -13,19 +13,19 @@ export default async function SupportChatPage({ params }: { params: Promise<{ id
   const user = await syncUser();
   if (!user || (user.role !== "moderator" && user.role !== "admin")) redirect("/login");
 
-  const conversation = await db.query.conversations.findFirst({
+  const conversation = (await db.query.conversations.findFirst({
     where: eq(conversations.id, id),
     with: {
       members: {
         with: { user: true }
       }
     }
-  });
+  })) as any;
 
   if (!conversation || !conversation.isSupport) notFound();
 
   // Ensure Mod is a member so they can send Ably messages natively
-  const isMember = conversation.members.some(m => m.userId === user.id);
+  const isMember = (conversation.members as any[]).some((m: any) => m.userId === user.id);
   if (!isMember) {
     await db.insert(conversationMembers).values({
       conversationId: id,
@@ -37,7 +37,7 @@ export default async function SupportChatPage({ params }: { params: Promise<{ id
     }
   }
 
-  const userMember = conversation.members.find(m => m.user?.role !== "moderator" && m.user?.role !== "admin")?.user;
+  const userMember = (conversation.members as any[]).find((m: any) => m.user?.role !== "moderator" && m.user?.role !== "admin")?.user;
 
   const messages = await getConversationMessages(id);
 

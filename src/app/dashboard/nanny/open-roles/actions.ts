@@ -66,12 +66,12 @@ export async function getOpenJobs(options: FilterOptions = {}) {
     minRate: job.minRate,
     maxRate: job.maxRate,
     createdAt: job.createdAt,
-    parentName: job.parent.parentProfile?.familyName,
-    parentPhoto: job.parent.parentProfile?.familyPhoto,
-    location: job.parent.parentProfile?.location,
-    latitude: job.parent.parentProfile?.latitude,
-    longitude: job.parent.parentProfile?.longitude,
-    children: job.parent.children,
+    parentName: (job.parent as any).parentProfile?.familyName,
+    parentPhoto: (job.parent as any).parentProfile?.familyPhoto,
+    location: (job.parent as any).parentProfile?.location,
+    latitude: (job.parent as any).parentProfile?.latitude,
+    longitude: (job.parent as any).parentProfile?.longitude,
+    children: (job.parent as any).children,
   }));
 
   // Proximity Filter (Application Level for now, or we can use SQL for better perf if radius is active)
@@ -119,8 +119,8 @@ export async function getJobDetail(jobId: string) {
   return {
     ...job,
     parentInfo: job.parent,
-    profile: job.parent.parentProfile,
-    children: job.parent.children,
+    profile: (job.parent as any).parentProfile,
+    children: (job.parent as any).children,
   };
 }
 
@@ -165,7 +165,7 @@ export async function applyToJob(jobId: string, message?: string) {
     caregiverId: user.uid,
     message,
     status: "pending",
-  }).returning({ id: applications.id });
+  }).returning();
 
   revalidatePath(`/dashboard/nanny/open-roles/${jobId}`);
   revalidatePath("/dashboard/nanny");
@@ -225,8 +225,8 @@ export async function getApplicationStatus(applicationId: string) {
   return {
     ...app,
     job: app.job,
-    parent: app.job.parent,
-    profile: app.job.parent.parentProfile,
-    children: app.job.parent.children,
+    parent: (app.job as any).parent,
+    profile: (app.job as any).parent.parentProfile,
+    children: (app.job as any).parent.children,
   };
 }

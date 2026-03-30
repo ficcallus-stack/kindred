@@ -21,7 +21,7 @@ export async function getReferralStats() {
 
   const photo = user.role === 'parent' 
     ? user.parentProfile?.familyPhoto 
-    : user.nannyProfile?.photoUrl;
+    : user.profileImageUrl;
 
   // Fetch приглашенных (Those who signed up using this user's code)
   // We identify them by `referredBy` in the users table
@@ -79,8 +79,9 @@ export async function getReferralStats() {
 // ── Admin/Moderator Actions ───────────────────────────────
 
 export async function getPendingReferrals() {
-  const clerkUser = await requireUser();
-  if (clerkUser.role !== 'admin') {
+  const serverUser = await requireUser();
+  const [user] = await db.select().from(users).where(eq(users.id, serverUser.uid)).limit(1);
+  if (!user || user.role !== 'admin') {
     throw new Error("Unauthorized: Only admins can manage payouts");
   }
 
@@ -95,8 +96,9 @@ export async function getPendingReferrals() {
 }
 
 export async function approveReferralPayout(referralId: string) {
-  const clerkUser = await requireUser();
-  if (clerkUser.role !== 'admin') {
+  const serverUser = await requireUser();
+  const [user] = await db.select().from(users).where(eq(users.id, serverUser.uid)).limit(1);
+  if (!user || user.role !== 'admin') {
     throw new Error("Unauthorized: Only admins can release funds");
   }
 
@@ -134,8 +136,9 @@ export async function approveReferralPayout(referralId: string) {
 }
 
 export async function rejectReferral(referralId: string) {
-    const clerkUser = await requireUser();
-    if (clerkUser.role !== 'admin') {
+    const serverUser = await requireUser();
+    const [user] = await db.select().from(users).where(eq(users.id, serverUser.uid)).limit(1);
+    if (!user || user.role !== 'admin') {
       throw new Error("Unauthorized: Only admins can reject payouts");
     }
 

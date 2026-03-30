@@ -32,13 +32,16 @@ export async function getConversations() {
     },
   });
 
-  return memberships.map((m) => ({
-    ...m.conversation,
-    otherMembers: m.conversation.members
-      .filter((member) => member.userId !== clerkUser.uid)
-      .map((member) => member.user),
-    lastMessage: m.conversation.messages[0] || null,
-  }));
+  return memberships.map((m) => {
+    const convo = m.conversation as any;
+    return {
+      ...convo,
+      otherMembers: convo.members
+        .filter((member: any) => member.userId !== clerkUser.uid)
+        .map((member: any) => member.user),
+      lastMessage: convo.messages[0] || null,
+    };
+  });
 }
 
 export async function getConversationMessages(conversationId: string) {
@@ -181,7 +184,7 @@ export async function createConversation(data: CreateConversationInput) {
   });
 
   const existingConvo = existingMemberships.find((m) =>
-    m.conversation.members.some((member) => member.userId === recipientId)
+    (m.conversation as any).members.some((member: any) => member.userId === recipientId)
   );
 
   if (existingConvo) {
@@ -250,7 +253,7 @@ export async function initiateSupportChat() {
     with: { conversation: true },
   });
   
-  const openSupport = userMemberships.find(m => m.conversation.isSupport && m.conversation.supportStatus === "open");
+  const openSupport = userMemberships.find(m => (m.conversation as any).isSupport && (m.conversation as any).supportStatus === "open");
   if (openSupport) {
     return { conversationId: openSupport.conversationId };
   }

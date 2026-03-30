@@ -34,7 +34,7 @@ export default async function NannyBookingsPage() {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {active.length > 0 ? (
-            active.map(booking => (
+            active.map((booking: any) => (
               <Link 
                 key={booking.id} 
                 href={`/dashboard/nanny/bookings/${booking.id}`}
@@ -44,7 +44,7 @@ export default async function NannyBookingsPage() {
                   <div className="flex items-center justify-between mb-8">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden border-2 border-white shadow-xl group-hover:scale-110 transition-transform duration-500">
                       <img 
-                        src={(booking.parent as any)?.parentProfile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${booking.parent.fullName}`} 
+                        src={(booking.parent as any)?.parentProfile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${(booking.parent as any).fullName}`} 
                         className="w-full h-full object-cover" 
                         alt="Family" 
                       />
@@ -57,7 +57,7 @@ export default async function NannyBookingsPage() {
                     </span>
                   </div>
                   
-                  <h3 className="text-2xl font-black text-primary font-headline italic tracking-tighter mb-2 group-hover:underline">The {booking.parent.fullName.split(" ").pop()} Family</h3>
+                  <h3 className="text-2xl font-black text-primary font-headline italic tracking-tighter mb-2 group-hover:underline">The {(booking.parent as any).fullName.split(" ").pop()} Family</h3>
                   <p className="text-on-surface-variant/60 text-xs font-bold uppercase tracking-widest flex items-center gap-2 mb-6">
                     <MaterialIcon name="calendar_month" className="text-sm" />
                     {format(new Date(booking.startDate), "MMMM d, yyyy")}
@@ -106,7 +106,7 @@ export default async function NannyBookingsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-outline-variant/10">
-              {past.map(booking => (
+               {past.map((booking: any) => (
                 <tr key={booking.id} className="hover:bg-surface-container-low/20 transition-all group cursor-pointer">
                   <td className="px-10 py-6 text-sm font-bold text-primary italic">
                     {format(new Date(booking.startDate), "MMM d, yyyy")}
@@ -115,12 +115,12 @@ export default async function NannyBookingsPage() {
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm">
                         <img 
-                          src={(booking.parent as any)?.parentProfile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${booking.parent.fullName}`} 
+                          src={(booking.parent as any)?.parentProfile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${(booking.parent as any).fullName}`} 
                           className="w-full h-full object-cover" 
                           alt="Family" 
                         />
                       </div>
-                      <span className="font-bold text-primary tracking-tight">The {booking.parent.fullName.split(" ").pop()} Family</span>
+                      <span className="font-bold text-primary tracking-tight">The {(booking.parent as any).fullName.split(" ").pop()} Family</span>
                     </div>
                   </td>
                   <td className="px-10 py-6">

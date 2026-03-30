@@ -8,26 +8,42 @@ export async function syncUser() {
   const serverUser = await getServerUser();
   if (!serverUser) return null;
 
-  // Check if user exists in our DB
-  const existingUser = await db.query.users.findFirst({
+  // 1. Try by UID
+  const existingUserById = await db.query.users.findFirst({
     where: eq(users.id, serverUser.uid),
   });
 
-  if (existingUser) {
-    return existingUser;
-  }
+  if (existingUserById) return existingUserById;
 
-  // Get Firebase user info
+  // 2. Not found by UID: Check by Email (Accounts might have a different UID in DB)
   const fbUser = await adminAuth.getUser(serverUser.uid);
   const email = fbUser.email || "";
   const fullName = fbUser.displayName || "Kindred User";
 
-  // Create user in our DB
+  const existingUserByEmail = await db.query.users.findFirst({
+    where: eq(users.email, email),
+  });
+
+  if (existingUserByEmail) {
+    // Conflict: Same email, different UID. Migrate record to the new UID.
+    try {
+      const updated = await db.update(users)
+        .set({ id: serverUser.uid })
+        .where(eq(users.id, existingUserByEmail.id))
+        .returning();
+      return updated[0];
+    } catch (e) {
+      console.warn("UID Migration failed during syncUser:", e);
+      return existingUserByEmail; // Fallback to existing record
+    }
+  }
+
+  // 3. Truly new user
   const newUser = await db.insert(users).values({
     id: serverUser.uid,
     email,
     fullName,
-    role: "parent", // Default role, updated via sync API
+    role: "parent", 
   }).returning();
 
   return newUser[0];

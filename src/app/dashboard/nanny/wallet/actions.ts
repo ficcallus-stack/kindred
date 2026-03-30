@@ -137,7 +137,7 @@ export async function getWalletData() {
     },
     inboundPayments: inboundPayments.map(b => ({
       id: b.id,
-      family: b.parent?.fullName || "Family",
+      family: (b.parent as any)?.fullName || "Family",
       familyPhoto: (b.parent as any)?.parentProfile?.familyPhoto || null,
       date: b.startDate,
       hours: b.hoursPerDay,

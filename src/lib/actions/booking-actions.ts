@@ -44,7 +44,10 @@ export async function initBookingAction(data: {
 export async function createFinalPaymentSession(data: {
   bookingId: string;
 }) {
-  const user = await requireUser();
+  const serverUser = await requireUser();
+  const [user] = await db.select().from(users).where(eq(users.id, serverUser.uid)).limit(1);
+  if (!user) throw new Error("User record not found.");
+  
   const origin = (await headers()).get("origin");
 
   // 1. Fetch Booking
@@ -64,14 +67,14 @@ export async function createFinalPaymentSession(data: {
     const customer = await stripe.customers.create({
       email: user.email || undefined,
       name: user.fullName || undefined,
-      metadata: { userId: user.uid }
+      metadata: { userId: user.id }
     });
     customerId = customer.id;
-    await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, user.uid));
+    await db.update(users).set({ stripeCustomerId: customerId }).where(eq(users.id, user.id));
   }
 
   // 3. Calculate Final Amount (re-verify on server)
-  const hourlyRate = parseFloat(booking.caregiverProfile.hourlyRate || "0");
+  const hourlyRate = parseFloat((booking.caregiverProfile as any).hourlyRate || "0");
   const diffDays = Math.ceil(Math.abs(booking.endDate.getTime() - booking.startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   const subtotal = diffDays * booking.hoursPerDay * hourlyRate * 100;
   const fee = Math.round(subtotal * 0.025);
@@ -86,7 +89,7 @@ export async function createFinalPaymentSession(data: {
       price_data: {
         currency: "usd",
         product_data: { 
-          name: `Childcare with ${booking.caregiver.user.fullName}`,
+          name: `Childcare with ${(booking.caregiver as any).user.fullName}`,
           description: `${diffDays} days for Booking #${booking.id.slice(0,8)}`
         },
         unit_amount: total,
@@ -140,7 +143,7 @@ export async function updateBookingStatusNanny(data: {
         await stripe.refunds.create({
           payment_intent: booking.stripePaymentIntentId.startsWith("cs_") ? undefined : booking.stripePaymentIntentId,
           checkout_session: booking.stripePaymentIntentId.startsWith("cs_") ? booking.stripePaymentIntentId : undefined
-        });
+        } as any);
       } catch (refundErr: any) {
         console.error("Automated refund failed:", refundErr.message);
         // We still marked it cancelled, but Admin might need to manual refund

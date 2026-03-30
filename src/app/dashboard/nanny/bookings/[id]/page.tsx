@@ -11,9 +11,9 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
 
   if (!booking) return notFound();
 
-  const family = booking.parent;
-  const profile = (family as any).parentProfile;
-  const children = (family as any).children || [];
+  const family = booking.parent as any;
+  const profile = family?.parentProfile;
+  const children = family?.children || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 space-y-12 animate-in fade-in duration-1000">
@@ -84,7 +84,7 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                        <div>
                           <p className="font-headline font-black text-xl italic text-primary leading-none">{child.name}</p>
                           <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">
-                            {format(new Date(), "yyyy") - format(new Date(child.dateOfBirth), "yyyy")} Years Old
+                            {Number(format(new Date(), "yyyy")) - Number(format(new Date(child.dateOfBirth), "yyyy"))} Years Old
                           </p>
                        </div>
                     </div>

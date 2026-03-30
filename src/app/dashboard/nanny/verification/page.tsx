@@ -4,7 +4,7 @@ import VerificationWizard from "./VerificationWizard";
 import { SuccessState, PendingState, RejectedState } from "./StatusScreens";
 
 export default async function VerificationPage() {
-  const { user } = await requireUser();
+  const user = await requireUser();
   const initialData = await getVerificationData();
   const status = initialData?.verification?.status || "none";
 

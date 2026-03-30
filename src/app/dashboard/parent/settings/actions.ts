@@ -33,6 +33,8 @@ export async function updateParentProfile(data: {
     await db.update(parentProfiles)
       .set({
         ...data,
+        latitude: data.latitude?.toString(),
+        longitude: data.longitude?.toString(),
         updatedAt: new Date(),
       })
       .where(eq(parentProfiles.id, user.uid));
@@ -40,6 +42,8 @@ export async function updateParentProfile(data: {
     await db.insert(parentProfiles).values({
       id: user.uid,
       ...data,
+      latitude: data.latitude?.toString(),
+      longitude: data.longitude?.toString(),
     });
   }
 

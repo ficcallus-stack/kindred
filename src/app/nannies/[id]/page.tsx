@@ -39,12 +39,13 @@ const getNanny = cache(async (id: string) => {
     coreSkills: nannyProfiles.coreSkills,
     certifications: nannyProfiles.certifications,
     videoUrl: nannyProfiles.videoUrl,
+    maxTravelDistance: nannyProfiles.maxTravelDistance,
   })
   .from(users)
   .innerJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
   .where(eq(users.id, id))
   .limit(1);
-  return result[0];
+  return result[0] as any;
 });
 
 const getNannyReviews = cache(async (id: string) => {
@@ -112,7 +113,7 @@ export default async function NannyPublicProfile({ params }: { params: Promise<{
 
   const nannyReviews = await getNannyReviews(id);
   const avgRating = nannyReviews.length > 0 
-    ? (nannyReviews.reduce((acc, r) => acc + (r.rating || 0), 0) / nannyReviews.length).toFixed(1)
+    ? (nannyReviews.reduce((acc: number, r: any) => acc + (r.rating || 0), 0) / nannyReviews.length).toFixed(1)
     : "0";
 
   const displayName = nanny.name.split(' ')[0] + (nanny.name.split(' ')[1] ? ` ${nanny.name.split(' ')[1][0]}.` : "");
@@ -252,7 +253,7 @@ export default async function NannyPublicProfile({ params }: { params: Promise<{
             <div className="space-y-6">
               <h2 className="text-4xl font-extrabold font-headline text-primary tracking-tighter italic uppercase">About {nanny.name.split(' ')[0]}</h2>
               <div className="space-y-4 text-lg text-on-surface-variant leading-relaxed opacity-80 italic">
-                {nanny.bio ? nanny.bio.split('\n').map((p, i) => <p key={i}>{p}</p>) : (
+                {nanny.bio ? (nanny.bio as string).split('\n').map((p: string, i: number) => <p key={i}>{p}</p>) : (
                   <p>Dedicated professional with a heart for childcare and community building.</p>
                 )}
               </div>
@@ -261,7 +262,7 @@ export default async function NannyPublicProfile({ params }: { params: Promise<{
             <div className="space-y-6">
               <h3 className="text-xs font-black font-headline text-primary uppercase tracking-[0.3em] opacity-40">Specialized Skills</h3>
               <div className="flex flex-wrap gap-3">
-                {((nanny.coreSkills as string[]) || ["CPR & First Aid", "Montessori Certified"]).map(skill => (
+                {((nanny.coreSkills as string[]) || ["CPR & First Aid", "Montessori Certified"]).map((skill: string) => (
                   <span key={skill} className="bg-tertiary-fixed-dim/20 text-on-tertiary-fixed-variant px-5 py-3 rounded-2xl font-black text-[10px] border border-tertiary-fixed/30 flex items-center gap-2 uppercase tracking-widest hover:bg-tertiary-fixed-dim/40 transition-colors">
                     <MaterialIcon name="check_circle" className="text-sm text-tertiary" /> {skill}
                   </span>

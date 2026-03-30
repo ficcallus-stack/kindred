@@ -29,22 +29,25 @@ export default async function ModeratorCertificationsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {pendingExams.length > 0 ? pendingExams.map((submission) => (
+            {pendingExams.length > 0 ? pendingExams.map((submission) => {
+              const caregiver = submission.caregiver as any;
+              const exam = submission.exam as any;
+              return (
               <tr key={submission.id} className="hover:bg-slate-50/50 transition-colors group">
                 <td className="px-8 py-6">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-full bg-slate-100 overflow-hidden relative border border-slate-200 shadow-inner">
-                      {submission.caregiver.fullName?.[0]}
+                      {caregiver.fullName?.[0]}
                     </div>
                     <div>
-                      <p className="font-bold text-primary leading-tight">{submission.caregiver.fullName}</p>
-                      <p className="text-[10px] text-on-surface-variant opacity-60">{submission.caregiver.email}</p>
+                      <p className="font-bold text-primary leading-tight">{caregiver.fullName}</p>
+                      <p className="text-[10px] text-on-surface-variant opacity-60">{caregiver.email}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-8 py-6">
-                  <p className="text-sm font-bold text-primary">{submission.exam.title}</p>
-                  <p className="text-[10px] text-secondary font-black uppercase tracking-widest">{submission.exam.certificationType}</p>
+                  <p className="text-sm font-bold text-primary">{exam.title}</p>
+                  <p className="text-[10px] text-secondary font-black uppercase tracking-widest">{exam.certificationType}</p>
                 </td>
                 <td className="px-8 py-6">
                   <p className="text-sm font-medium text-on-surface-variant">
@@ -69,7 +72,8 @@ export default async function ModeratorCertificationsPage() {
                   </Link>
                 </td>
               </tr>
-            )) : (
+              );
+            }) : (
               <tr>
                 <td colSpan={5} className="px-8 py-20 text-center">
                   <div className="flex flex-col items-center gap-4 opacity-30">

@@ -70,7 +70,6 @@ export async function getSupportConversations() {
     ),
     with: {
       conversation: {
-        where: eq(conversations.isSupport, true),
         with: {
           messages: {
             orderBy: [desc(messages.createdAt)],
@@ -81,12 +80,12 @@ export async function getSupportConversations() {
     },
   });
 
-  // Filter out any peers
-  const supportConvos = memberships.filter(m => m.conversation);
+  // Filter out any peers and non-support chats
+  const supportConvos = memberships.filter(m => m.conversation && (m.conversation as any).isSupport);
 
   return supportConvos.map(m => ({
-    ...m.conversation,
-    lastMessage: m.conversation.messages[0] || null,
+    ...(m.conversation as any),
+    lastMessage: (m.conversation as any).messages[0] || null,
   }));
 }
 

@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { redirect } from "next/navigation";
 import AblyClientProvider from "@/components/AblyProvider";
 import { getServerUser } from "@/lib/get-server-user";

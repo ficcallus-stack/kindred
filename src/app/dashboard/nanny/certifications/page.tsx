@@ -27,6 +27,7 @@ const PLANS = [
     description: "Complete your professional profile. Includes Registration Fee ($65) and the Global Care Exam ($45), saving you $15.",
     featured: true,
     buttonText: "Enroll in Elite Bundle",
+    originalPrice: "$110",
     features: [
       "Background Check & Identity Verification",
       "2-Week Global Standards Training",
@@ -118,11 +119,11 @@ export default function CertificationsPage() {
     getMyCertifications().then((certs: any[]) => {
       // Ignore cancelled/pending carts so UI doesn't falsely mark as 'Enrolled'
       const activeCerts = certs.filter(c => c.status !== "pending_payment");
-      setEnrolledTypes(activeCerts.map((c) => c.type));
+      setEnrolledTypes(activeCerts.map((c: any) => c.type));
       
       const sm: Record<string, string> = {};
       const lsm: Record<string, string> = {};
-      certs.forEach((c) => {
+      certs.forEach((c: any) => {
           sm[c.type!] = c.status;
           if (c.lastSubmissionId) lsm[c.type!] = c.lastSubmissionId;
       });
@@ -285,7 +286,7 @@ export default function CertificationsPage() {
           <p className="text-on-surface-variant">Choose the enrollment level that fits your career goals</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {PLANS.map((plan) => {
+          {PLANS.map((plan: any) => {
             const hasEliteBundle = enrolledTypes.includes("elite_bundle");
             const hasRegistration = enrolledTypes.includes("registration");
             const hasExam = enrolledTypes.includes("standards_program");
@@ -346,7 +347,7 @@ export default function CertificationsPage() {
                   </p>
                   {plan.features && (
                     <ul className="space-y-3 mb-8">
-                      {plan.features.map((f) => (
+                      {plan.features.map((f: string) => (
                         <li key={f} className="flex items-center gap-2 text-xs font-medium">
                           <MaterialIcon name="check_circle" className="text-secondary text-sm" fill />
                           {f}

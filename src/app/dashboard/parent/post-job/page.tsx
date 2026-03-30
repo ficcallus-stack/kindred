@@ -296,7 +296,7 @@ export default function PostJobPage() {
             </button>
             <button
               disabled={isSubmitting || !canGoNext()}
-              onClick={step === 5 ? handleSubmit : nextStep}
+              onClick={step === 5 ? handleSubmit : () => nextStep()}
               className="bg-primary text-on-primary px-10 py-3.5 rounded-xl font-headline font-extrabold text-sm shadow-lg shadow-primary/20 hover:opacity-90 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale"
             >
               {isSubmitting ? "Processing..." : step === 5 ? "Post Job Now" : "Next Step"}

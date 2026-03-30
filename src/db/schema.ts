@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, boolean, decimal, integer, pgEnum, primaryKey, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, decimal, integer, pgEnum, primaryKey, jsonb, foreignKey } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ── Enums ──────────────────────────────────────────────────
@@ -31,7 +31,7 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   referralCode: text("referral_code").unique().$defaultFn(() => Math.random().toString(36).substring(2, 8).toUpperCase()),
-  referredBy: text("referred_by").references(() => users.id),
+  referredBy: text("referred_by"),
   referralBalance: integer("referral_balance").default(0).notNull(), // points/cents
   stripeConnectId: text("stripe_connect_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
@@ -40,7 +40,13 @@ export const users = pgTable("users", {
   stripeCustomerId: text("stripe_customer_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  referredByFk: foreignKey({
+    columns: [table.referredBy],
+    foreignColumns: [table.id],
+    name: "users_referred_by_fkey"
+  }),
+}));
 
 export const referrals = pgTable("referrals", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -109,6 +115,7 @@ export const parentProfiles = pgTable("parent_profiles", {
   familyName: text("family_name"),
   familyPhoto: text("family_photo"),
   location: text("location"),
+  bio: text("bio"),
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -326,6 +333,7 @@ export const walletTransactions = pgTable("wallet_transactions", {
   description: text("description"),
   stripeTransferId: text("stripe_transfer_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ── Processed Webhook Events (Idempotency) ────────────────
@@ -511,6 +519,7 @@ export const walletTransactionsRelations = relations(walletTransactions, ({ one 
 
 export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   user: one(users, { fields: [tickets.userId], references: [users.id] }),
+  conversation: one(conversations, { fields: [tickets.conversationId], references: [conversations.id] }),
   messages: many(ticketMessages),
 }));
 

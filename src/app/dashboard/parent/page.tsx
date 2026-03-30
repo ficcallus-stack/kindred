@@ -59,7 +59,7 @@ export default async function FamilyDashboard() {
   const totalPastBookings = await db.select({ count: count() }).from(bookings).where(and(eq(bookings.parentId, userId), eq(bookings.status, "completed")));
 
   const familyName = parentProfile?.familyName || user.fullName || "Your";
-  const familyBio = parentProfile?.bio || "Welcome to your family dashboard. Start by updating your profile and child details to find your perfect match.";
+  const familyBio = "Welcome to your family dashboard. Start by updating your profile and child details to find your perfect match.";
   const location = parentProfile?.location || "Location not set";
 
   return (

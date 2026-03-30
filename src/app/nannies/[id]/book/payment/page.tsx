@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 import { BookingLayout } from "@/components/booking/BookingLayout";
 import { PaymentStep } from "@/components/booking/PaymentStep";
-import { requireUser } from "@/lib/get-server-user";
+import { syncUser } from "@/lib/user-sync";
 import { stripe } from "@/lib/stripe";
 
 export default async function PaymentPage(props: {
@@ -15,7 +15,9 @@ export default async function PaymentPage(props: {
   const searchParams = await props.searchParams;
   const nannyId = params.id;
   const bookingId = searchParams.bookingId;
-  const user = await requireUser();
+  const user = await syncUser();
+
+  if (!user) return redirect("/login");
 
   if (!bookingId) return redirect(`/nannies/${nannyId}/book/schedule`);
 
@@ -26,7 +28,7 @@ export default async function PaymentPage(props: {
       caregiver: true,
       caregiverProfile: true
     }
-  });
+  }) as any;
 
   if (!booking) return notFound();
 
@@ -45,8 +47,8 @@ export default async function PaymentPage(props: {
       <PaymentStep 
         booking={booking} 
         nanny={{
-          name: booking.caregiver.fullName,
-          hourlyRate: booking.caregiverProfile.hourlyRate
+          name: (booking as any).caregiver.fullName,
+          hourlyRate: (booking as any).caregiverProfile.hourlyRate
         }} 
         savedCards={savedCards}
       />

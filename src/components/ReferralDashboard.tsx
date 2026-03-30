@@ -79,10 +79,10 @@ export default function ReferralDashboard({ stats, recentReferrals }: ReferralDa
     try {
       const result = await redeemReferralBalance();
       if (result.success) {
-        showToast(`Success! $${(result.redeemed! / 100).toFixed(2)} has been moved to your wallet.`, "success");
+        showToast(`Success! $${((result as any).redeemed! / 100).toFixed(2)} has been moved to your wallet.`, "success");
         // We might want to refresh the stats here, but revalidatePath should handle it if the parent is a server component or re-fetches.
       } else {
-        showToast(result.error || "Redemption failed.", "error");
+        showToast((result as any).error || "Redemption failed.", "error");
       }
     } catch (error) {
        showToast("An unexpected error occurred during redemption.", "error");

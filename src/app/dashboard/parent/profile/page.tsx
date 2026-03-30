@@ -1,4 +1,5 @@
-import { requireUser } from "@/lib/get-server-user";
+import { syncUser } from "@/lib/user-sync";
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { parentProfiles, children } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -7,8 +8,11 @@ import { cn } from "@/lib/utils";
 import ParentProfileForm from "@/components/dashboard/ParentProfileForm";
 
 export default async function FamilyProfilePage() {
-  const user = await requireUser();
-  const userId = user.uid;
+  const user = await syncUser();
+  if (!user) {
+    redirect("/login");
+  }
+  const userId = user.id;
 
   // 1. Fetch Existing Profile
   const profile = await db.query.parentProfiles.findFirst({

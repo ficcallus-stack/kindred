@@ -38,7 +38,7 @@ export default function FinancialOpsClient({ pending, ledger, summary }: Financi
     setProcessing(txId);
     try {
       await flagPayoutRequest(txId, reason);
-      showToast("Transaction marked for manual review.", "warning");
+      showToast("Transaction marked for manual review.", "info");
       router.refresh();
     } catch (e: any) {
       showToast(e.message || "Failed to flag payout", "error");

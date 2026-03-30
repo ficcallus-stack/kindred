@@ -74,12 +74,12 @@ export default function GlobalCareOverviewPage() {
   useEffect(() => {
     // Check if user is already enrolled or failed
     getMyCertifications().then(certs => {
-      const globalCert = certs.find(c => c.type === 'standards_program');
+      const globalCert = certs.find(c => c.type === 'standards_program') as any;
       if (globalCert) {
         setExamStatus(globalCert.status);
         if (globalCert.status === 'enrolled' || globalCert.status === 'completed' || globalCert.status === 'in_progress') {
           setIsEnrolled(true);
-        } else if (globalCert.status === 'failed') {
+        } else if (globalCert.lastSubmissionStatus === 'failed') {
           setIsFailed(true);
         }
       }

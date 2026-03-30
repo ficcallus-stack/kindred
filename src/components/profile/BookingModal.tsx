@@ -53,36 +53,8 @@ export function BookingModal({ isOpen, onClose, nanny }: BookingModalProps) {
   const { subtotal, fee, total, days } = calculateTotal();
 
   const handleSubmit = async () => {
-    if (total <= 0) {
-      setError("Please select a valid date range.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Import the action dynamically to avoid bundle bloat
-      const { createBookingSession } = await import("@/lib/actions/booking-actions");
-      
-      const { url } = await createBookingSession({
-        caregiverId: nanny.id,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        hoursPerDay: formData.hoursPerDay,
-        totalAmount: Math.round(total * 100), // convert to cents
-        notes: formData.notes
-      });
-
-      if (url) {
-        window.location.href = url;
-      } else {
-        throw new Error("Failed to generate payment link.");
-      }
-    } catch (err: any) {
-      setError(err.message || "Something went wrong. Please try again.");
-      setLoading(false);
-    }
+    alert("This quick-booking feature is currently being updated. Please use the 'Book Now' button on the profile page.");
+    setLoading(false);
   };
 
   if (!isOpen) return null;

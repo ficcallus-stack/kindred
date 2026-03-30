@@ -3,7 +3,7 @@
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
 import { wallets, walletTransactions, users as usersTable } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { requireUser } from "@/lib/get-server-user";
 
 /**
@@ -240,7 +240,7 @@ export async function rejectWithdrawal(transactionId: string, reason: string) {
   // 2. Mark as failed/rejected
   await db.update(walletTransactions)
     .set({ 
-      status: "rejected", 
+      status: "failed", 
       description: `Rejected by Mod: ${reason}` 
     })
     .where(eq(walletTransactions.id, transactionId));

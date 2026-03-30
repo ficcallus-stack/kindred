@@ -113,13 +113,13 @@ export type ReplyToReviewInput = z.infer<typeof replyToReviewSchema>;
 
 // ── Certification Enrollment ───────────────────────────────
 export const enrollCertificationSchema = z.object({
-  type: z.enum(["registration", "elite_bundle", "standards_program"]),
+  type: z.enum(["registration", "elite_bundle", "standards_program", "standards_retake"]),
 });
 
 export type EnrollCertificationInput = z.infer<typeof enrollCertificationSchema>;
 
 export const uploadExamSchema = z.object({
-  certificationType: z.enum(["registration", "elite_bundle", "standards_program"]),
+  certificationType: z.enum(["registration", "elite_bundle", "standards_program", "standards_retake"]),
   title: z.string().min(1).max(200),
   description: z.string().max(1000).optional(),
   passPercentage: z.coerce.number().int().min(1).max(100).default(75),

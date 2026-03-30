@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { syncUser } from "@/lib/user-sync";
 import { redirect } from "next/navigation";
 import NannyDashboardLayout from "./layout-client";

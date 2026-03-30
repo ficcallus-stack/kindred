@@ -14,7 +14,7 @@ export default async function SchedulePage(props: {
   const nanny = await db.query.nannyProfiles.findFirst({
     where: eq(nannyProfiles.id, nannyId),
     with: { user: true }
-  });
+  }) as any;
 
   if (!nanny) return notFound();
 
