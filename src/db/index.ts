@@ -8,7 +8,9 @@ if (!process.env.DATABASE_URL) {
   throw new Error("DATABASE_URL is not set");
 }
 
-const url = process.env.DATABASE_URL;
+const url = process.env.DATABASE_URL.startsWith("DATABASE_URL=") 
+  ? process.env.DATABASE_URL.replace("DATABASE_URL=", "") 
+  : process.env.DATABASE_URL;
 
 // Dynamic DB initialization
 export const db = url.includes("neon.tech") 
