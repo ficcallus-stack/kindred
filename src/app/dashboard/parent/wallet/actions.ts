@@ -24,76 +24,83 @@ export async function getStripeConnectOnboarding() {
 
 /**
  * Fetches transaction history and aggregates financial stats for the parent.
- * For parents, "Earnings" are typically referral redemptions.
+ * Unifies Booking Escrows, Direct Payments, and Referral/Credit Rewards.
  */
 export async function getWalletData() {
   const user = await requireUser();
 
-  // 1. Fetch Basic Wallet & Transactions
+  // 1. Fetch User Profile Info (Platform Credits, IsPremium)
+  const [dbUser] = await db.select({ 
+    platformCredits: usersTable.platformCredits,
+    isPremium: usersTable.isPremium
+  })
+  .from(usersTable)
+  .where(eq(usersTable.id, user.uid))
+  .limit(1);
+
+  // 2. Fetch Native Wallet (Referrals usually)
   const wallet = await db.query.wallets.findFirst({
     where: eq(wallets.id, user.uid),
     with: {
       transactions: {
         orderBy: [desc(walletTransactions.createdAt)],
-        limit: 20,
+        limit: 10,
       }
     }
   });
 
-  // 2. Aggregate Total Referral Redemptions
-  const [totalRedeemed] = await db
-    .select({ total: sum(walletTransactions.amount) })
-    .from(walletTransactions)
-    .where(and(
-      eq(walletTransactions.walletId, user.uid),
-      eq(walletTransactions.type, "earning"),
-      eq(walletTransactions.status, "completed")
-    ));
+  // 3. Fetch Booking Escrows paid by this parent
+  const { bookings } = await import("@/db/schema");
+  const pastBookings = await db.query.bookings.findMany({
+    where: eq(bookings.parentId, user.uid),
+    orderBy: [desc(bookings.createdAt)],
+    limit: 10,
+  });
 
-  // 3. Generate Monthly Chart Data (Last 6 Months)
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
-  sixMonthsAgo.setDate(1);
+  // 4. Transform & Unify Ledger
+  type LedgerItem = { id: string, type: 'earning' | 'payout' | 'escrow' | 'subscription', amount: number, status: string, description: string, createdAt: Date };
+  const unifiedLedger: LedgerItem[] = [];
 
-  const rawMonthly = await db
-    .select({
-      month: sql<string>`TO_CHAR(${walletTransactions.createdAt}, 'Mon')`,
-      monthNum: sql<number>`EXTRACT(MONTH FROM ${walletTransactions.createdAt})`,
-      year: sql<number>`EXTRACT(YEAR FROM ${walletTransactions.createdAt})`,
-      total: sum(walletTransactions.amount)
-    })
-    .from(walletTransactions)
-    .where(and(
-      eq(walletTransactions.walletId, user.uid),
-      eq(walletTransactions.type, "earning"),
-      eq(walletTransactions.status, "completed"),
-      gte(walletTransactions.createdAt, sixMonthsAgo)
-    ))
-    .groupBy(sql`year`, sql`monthNum`, sql`month`)
-    .orderBy(sql`year`, sql`monthNum`);
-
-  // Transform to a stable 6-month array for the chart
-  const months = [];
-  for (let i = 0; i < 6; i++) {
-    const d = new Date();
-    d.setMonth(d.getMonth() - (5 - i));
-    const mLabel = d.toLocaleString('en-US', { month: 'short' });
-    const match = rawMonthly.find(r => r.month === mLabel);
-    months.push({
-      m: mLabel,
-      val: match ? Number(match.total) / 100 : 0,
-      h: match ? Math.max(10, Math.min(100, (Number(match.total) / 100000) * 100)) + "%" : "10%",
-      curr: i === 4,
-      proj: i === 5
+  // Add Wallet Transactions (Referral payouts)
+  if (wallet?.transactions) {
+    wallet.transactions.forEach(t => {
+      unifiedLedger.push({
+        id: t.id,
+        type: t.type === 'earning' ? 'earning' : 'payout',
+        amount: t.amount,
+        status: t.status,
+        description: t.type === 'earning' ? 'Referral Reward' : 'Bank Withdrawal',
+        createdAt: t.createdAt,
+      });
     });
   }
 
+  // Add Bookings as Escrow Items
+  pastBookings.forEach(b => {
+    unifiedLedger.push({
+      id: b.id,
+      type: 'escrow',
+      amount: b.totalAmount, // Cent amounts
+      status: b.status,
+      description: `Nanny Booking (#${b.id.slice(0, 6)})`,
+      createdAt: b.createdAt
+    });
+  });
+
+  // Sort unified ledger
+  unifiedLedger.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  // Aggregate Total Platform Spends (to show savings)
+  const [totalEscrow] = await db.select({ total: sum(bookings.totalAmount) }).from(bookings).where(eq(bookings.parentId, user.uid));
+  
   return {
-    ...wallet,
+    balance: wallet?.balance || 0,
+    platformCredits: dbUser?.platformCredits || 0,
+    isPremium: dbUser?.isPremium || false,
     stats: {
-      totalRedeemed: Number(totalRedeemed?.total || 0) / 100,
-      chart: months,
-      referralBalance: 0, // Will be fetched from users table if needed
-    }
+      totalSpent: Number(totalEscrow?.total || 0) / 100,
+      chart: [] // Cleaned up for new UI
+    },
+    transactions: unifiedLedger.slice(0, 20)
   };
 }

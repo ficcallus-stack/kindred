@@ -65,11 +65,30 @@ export async function createSubscriptionSession(interval: "month" | "year" = "mo
     priceId = price.id;
   }
 
-  // 2. Create Checkout Session
+  // 2. Ensure Stripe Customer Exists
+  let stripeCustomerId = dbUser.stripeCustomerId;
+
+  if (!stripeCustomerId) {
+    const customer = await stripe.customers.create({
+      email: dbUser.email,
+      name: dbUser.fullName,
+      metadata: {
+        userId: user.uid,
+      },
+    });
+    stripeCustomerId = customer.id;
+
+    // Save to DB
+    await db.update(usersTable)
+      .set({ stripeCustomerId })
+      .where(eq(usersTable.id, user.uid));
+  }
+
+  // 3. Create Checkout Session
   const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   
   const session = await stripe.checkout.sessions.create({
-    customer_email: dbUser.email,
+    customer: stripeCustomerId,
     line_items: [
       {
         price: priceId,

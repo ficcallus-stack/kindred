@@ -102,6 +102,22 @@ export default function BookingStep2({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Platform Credits Toggle (Teaser) */}
+          <div className="bg-slate-50 border border-slate-200 p-5 rounded-2xl flex items-center justify-between opacity-70 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 text-purple-600 flex items-center justify-center rounded-xl">
+                 <MaterialIcon name="diamond" />
+              </div>
+              <div>
+                 <p className="font-bold text-slate-700 text-sm">Apply Platform Credits</p>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mt-0.5">Use earned cashback</p>
+              </div>
+            </div>
+            <button type="button" disabled className="px-4 py-2 bg-slate-200 text-slate-500 font-black uppercase tracking-widest text-[10px] rounded-lg cursor-not-allowed">
+              Coming Soon
+            </button>
+          </div>
+
           {/* Stripe Payment Element */}
           <div className="bg-white rounded-2xl p-6 border border-outline-variant/15 shadow-sm">
             <PaymentElement

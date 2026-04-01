@@ -172,7 +172,6 @@ export default async function BrowseNannies({
                       </div>
                       <h3 className="font-headline text-4xl font-black text-primary tracking-tighter italic leading-none group-hover:text-secondary transition-colors">{nanny.name}</h3>
                       <div className="flex flex-col gap-1">
-                         <span className="text-on-surface-variant text-[10px] font-bold opacity-30 uppercase tracking-widest">Elite Caregiver</span>
                       </div>
                     </div>
                   </div>

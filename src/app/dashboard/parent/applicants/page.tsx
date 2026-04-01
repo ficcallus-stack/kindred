@@ -144,11 +144,11 @@ export default function ApplicantsPage() {
                 )}
                 {app.status === "accepted" && (
                   <Link
-                    href={`/dashboard/parent/bookings?caregiverId=${app.caregiverId}`}
-                    className="flex-1 md:flex-none px-6 py-3 bg-primary text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:brightness-110 transition-all active:scale-95 flex items-center gap-2 justify-center shadow-lg"
+                    href={`/dashboard/parent/bookings/create?caregiverId=${app.caregiverId}&isTrial=true`}
+                    className="flex-1 md:flex-none px-6 py-3 bg-amber-500 text-white font-black uppercase tracking-widest text-[10px] rounded-2xl hover:brightness-110 transition-all active:scale-95 flex items-center gap-2 justify-center shadow-lg"
                   >
-                    <MaterialIcon name="event_available" className="text-lg" />
-                    Create Booking
+                    <MaterialIcon name="skateboarding" className="text-lg" />
+                    Schedule Paid Trial
                   </Link>
                 )}
                 <Link

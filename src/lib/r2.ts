@@ -6,20 +6,28 @@ const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
-if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
-  throw new Error(
-    "Missing R2 cloudflare credentials. Please establish R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY in env variables."
-  );
-}
+let _s3Client: S3Client | null = null;
 
-const s3Client = new S3Client({
-  region: "auto",
-  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-  credentials: {
-    accessKeyId: R2_ACCESS_KEY_ID || "",
-    secretAccessKey: R2_SECRET_ACCESS_KEY || "",
-  },
-});
+function getS3Client() {
+  if (_s3Client) return _s3Client;
+
+  if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
+    throw new Error(
+      "Missing R2 cloudflare credentials. Please establish R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, and R2_SECRET_ACCESS_KEY in env variables."
+    );
+  }
+
+  _s3Client = new S3Client({
+    region: "auto",
+    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: R2_ACCESS_KEY_ID || "",
+      secretAccessKey: R2_SECRET_ACCESS_KEY || "",
+    },
+  });
+
+  return _s3Client;
+}
 
 export async function uploadToR2(
   file: Buffer,
@@ -35,7 +43,7 @@ export async function uploadToR2(
     ContentType: contentType,
   });
 
-  await s3Client.send(command);
+  await getS3Client().send(command);
   return fileName;
 }
 
@@ -47,7 +55,16 @@ export async function getPresignedUrl(fileName: string) {
     Key: fileName,
   });
 
-  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  return await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
+}
+
+export function getPublicR2Url(fileName: string) {
+  const customDomain = process.env.R2_PUBLIC_DOMAIN;
+  if (!customDomain) {
+    throw new Error("R2_PUBLIC_DOMAIN is not defined");
+  }
+
+  return `https://${customDomain}/${fileName}`;
 }
 
 export async function createPresignedUploadUrl(fileName: string, contentType: string) {
@@ -59,5 +76,5 @@ export async function createPresignedUploadUrl(fileName: string, contentType: st
     ContentType: contentType, // strictly enforce browser headers
   });
 
-  return await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+  return await getSignedUrl(getS3Client(), command, { expiresIn: 3600 });
 }

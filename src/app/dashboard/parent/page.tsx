@@ -10,6 +10,18 @@ import { eq, desc, and, count } from "drizzle-orm";
 import { db } from "@/db";
 import { format } from "date-fns";
 
+import { FamilyOverviewHero } from "@/components/dashboard/FamilyOverviewHero";
+import { CareTeamGrid } from "@/components/dashboard/CareTeamGrid";
+import { HouseholdManualEditor } from "@/components/dashboard/HouseholdManualEditor";
+import { SeriesManager } from "@/components/dashboard/SeriesManager";
+import { FamilyBudgetWidget } from "@/components/dashboard/FamilyBudgetWidget";
+import { LiveStatusTracker } from "@/components/dashboard/LiveStatusTracker";
+import { CareActivityFeed } from "@/components/dashboard/CareActivityFeed";
+import { Scrapbook } from "@/components/dashboard/Scrapbook";
+import { TrialConversionPrompt } from "@/components/dashboard/TrialConversionPrompt";
+import { getCareTeam, getBookingSeries, getFamilyFinancials, getActivityFeed } from "./care-team/actions";
+import { getScrapbookMilestones } from "../nanny/care-actions";
+
 export default async function FamilyDashboard() {
   const user = await syncUser();
 
@@ -17,16 +29,39 @@ export default async function FamilyDashboard() {
     redirect("/login");
   }
 
-  // Security: Redirect caregivers trying to access parent dashboard
-  if (user.role === "caregiver") {
-    redirect("/dashboard/nanny");
-  }
-
   const userId = user.id;
 
   // 1. Fetch Profile Data
   const parentProfile = await db.query.parentProfiles.findFirst({
     where: eq(parentProfiles.id, userId),
+  });
+
+  // 1b. Fetch Care Team
+  const careTeamMembers = await getCareTeam();
+
+  // 1c. Fetch Booking Series
+  const activeSeries = await getBookingSeries();
+
+  // 1d. Fetch Monthly Financials
+  const familyFinancials = await getFamilyFinancials();
+
+  // 1e. Fetch Activity Ledger (Stage 4)
+  const activityFeed = await getActivityFeed();
+
+  // 1f. Fetch Scrapbook Milestones (Stage 5)
+  const scrapbookMilestones = await getScrapbookMilestones();
+
+  // 1g. Fetch Recent Trials for Conversion (Stage 6)
+  const completedTrial = await db.query.bookings.findFirst({
+    where: and(
+        eq(bookings.parentId, userId),
+        eq(bookings.status, "completed"),
+        eq(bookings.isTrial, true)
+    ),
+    with: {
+        caregiver: true
+    },
+    orderBy: [desc(bookings.endDate)]
   });
 
   // 2. Fetch Children
@@ -68,64 +103,61 @@ export default async function FamilyDashboard() {
       
       <main className="p-6 lg:p-10 max-w-7xl mx-auto space-y-12 animate-in fade-in duration-700">
         
-        {/* 1. Family Identity (Hero) */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-white rounded-[3rem] p-10 shadow-sm border border-outline-variant/10">
-          <div className="lg:col-span-7 space-y-6">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-secondary font-black text-xs tracking-[0.3em] uppercase opacity-70">
-                <MaterialIcon name="location_on" className="text-sm" fill />
-                {location}
-              </div>
-              <h1 className="font-headline text-5xl lg:text-7xl font-black text-primary tracking-tighter leading-none italic">
-                The {familyName} <br/><span className="text-secondary-container">Family Home</span>
-              </h1>
+        {/* 1. Family Identity & Edit Hub */}
+        <FamilyOverviewHero 
+          initialProfile={{
+            familyName: familyName,
+            bio: familyBio,
+            location: location,
+            familyPhoto: parentProfile?.familyPhoto || ""
+          }}
+          userId={userId}
+        />
+
+        {/* 2. My Core Care Team (Overhaul Stage 1) */}
+        <section className="space-y-8 animate-in slide-in-from-bottom duration-700">
+          <div className="flex items-center justify-between px-2">
+            <div>
+               <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic leading-none">The Core Care Team</h2>
+               <p className="text-on-surface-variant text-sm font-medium opacity-60 mt-2">Your trusted, regular caregivers.</p>
             </div>
-            <p className="text-lg text-on-surface-variant leading-relaxed max-w-xl font-medium opacity-60 italic">
-              {familyBio}
-            </p>
-            <div className="flex flex-wrap gap-4">
-              <Link href="/dashboard/parent/profile" className="px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 flex items-center gap-2 hover:bg-slate-900 transition-all">
-                <MaterialIcon name="edit" className="text-sm" />
-                Edit Family Bio
-              </Link>
-              <Link href="/dashboard/parent/location" className="px-8 py-4 bg-surface-container-low text-primary border border-outline-variant/10 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-surface-container-high transition-all flex items-center gap-2">
-                <MaterialIcon name="my_location" className="text-sm" />
-                Primary Location
-              </Link>
-            </div>
-          </div>
-          <div className="lg:col-span-5 relative">
-            <div className="absolute -top-6 -left-6 w-24 h-24 bg-tertiary-fixed rounded-full -z-10 opacity-30 blur-2xl animate-pulse"></div>
-            <div className="relative group">
-              <img 
-                alt={familyName} 
-                className={cn(
-                  "w-full h-[450px] object-cover shadow-2xl rounded-[3rem]",
-                  "clip-path:[polygon(0_0,100%_0,95%_100%,0%_100%)]"
-                )}
-                src={parentProfile?.familyPhoto || "https://images.unsplash.com/photo-1511895426328-dc8714191300?q=80&w=2070&auto=format&fit=crop"} 
-              />
-              <Link 
-                href="/dashboard/parent/profile#photo" 
-                className="absolute inset-0 flex items-center justify-center bg-primary/20 opacity-0 group-hover:opacity-100 backdrop-blur-sm rounded-[3rem] transition-all cursor-pointer"
-              >
-                 <MaterialIcon name="photo_camera" className="text-white text-4xl" />
-              </Link>
-            </div>
-            <div className="absolute -bottom-4 -right-4 bg-surface rounded-3xl p-5 shadow-2xl border border-outline-variant/10 flex items-center gap-4 animate-in slide-in-from-right duration-500">
-              <div className="w-12 h-12 bg-secondary-fixed flex items-center justify-center rounded-2xl text-secondary shadow-inner">
-                <MaterialIcon name="favorite" fill />
-              </div>
-              <div>
-                <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-widest opacity-40">Family Vibe</p>
-                <p className="font-black text-primary tracking-tight">Active & Creative</p>
-              </div>
-            </div>
+            <Link href="/dashboard/parent/care-team" className="text-link font-black text-[10px] uppercase tracking-[0.3em] flex items-center gap-2 hover:underline underline-offset-8 transition-all opacity-40 hover:opacity-100">
+              Manage Team <MaterialIcon name="arrow_forward" className="text-sm" />
+            </Link>
           </div>
         </section>
 
-        {/* 2. Child Mini-Profiles */}
-        <section className="space-y-8">
+        {/* --- RECURRING OVERHAUL SUITE (Stages 2, 3, 4, 6) --- */}
+        <div className="space-y-12">
+          {/* 1a. Trial Conversion Prompt (Stage 6) */}
+          {completedTrial && (
+             <TrialConversionPrompt 
+                caregiverName={completedTrial.caregiver.fullName}
+                caregiverId={completedTrial.caregiver.id}
+             />
+          )}
+
+          {/* 2a. Live Pulse (Final Stage 4) */}
+          <LiveStatusTracker 
+            channelName={`family-presence:${user.id}`} 
+            nannyName={activeSeries[0]?.caregiverName || "Caregiver"} 
+          />
+
+          {/* 2b. Series Manager (Overhaul Stage 2) */}
+          <SeriesManager series={activeSeries} />
+
+          {/* 2c. Financial Hub (Overhaul Stage 3) */}
+          <FamilyBudgetWidget financials={familyFinancials} />
+
+          {/* 2d. Activity Ledger (Final Stage 4) */}
+          <CareActivityFeed events={activityFeed} />
+
+          {/* 2e. Shared Legacy Scrapbook (Final Stage 5) */}
+          <Scrapbook milestones={scrapbookMilestones} />
+        </div>
+
+        {/* 3. Child Mini-Profiles */}
+        <section className="space-y-8 opacity-60 hover:opacity-100 transition-opacity">
           <div className="flex items-center justify-between px-2">
             <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic leading-none">Little Kindreds</h2>
             <Link href="/dashboard/parent/children" className="text-link font-black text-[10px] uppercase tracking-[0.3em] flex items-center gap-2 hover:underline underline-offset-8 transition-all">
@@ -165,8 +197,18 @@ export default async function FamilyDashboard() {
           </div>
         </section>
 
-        {/* 3. Core Navigation Hub (Bento Style) */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        {/* 4. Household Hub (Overhaul Stage 1) */}
+        <section className="space-y-8 animate-in slide-in-from-bottom duration-700">
+          <div className="flex items-center justify-between px-2">
+            <div>
+               <h2 className="font-headline text-3xl font-black text-primary tracking-tighter italic leading-none">Household Hub</h2>
+               <p className="text-on-surface-variant text-sm font-medium opacity-60 mt-2">Core guidelines for your Care Team.</p>
+            </div>
+          </div>
+          <HouseholdManualEditor initialValue={parentProfile?.householdManual || ""} />
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
           {/* Applicants Hub */}
           <div className="lg:col-span-8 space-y-10">
@@ -200,7 +242,7 @@ export default async function FamilyDashboard() {
                         </div>
                         <div className="flex items-center gap-3 w-full md:w-auto">
                           <Link 
-                            href={`/dashboard/parent/messages/${app.caregiverId}`}
+                            href={`/dashboard/messages/user/${app.caregiverId}`}
                             className="p-4 bg-white text-primary rounded-2xl hover:bg-primary hover:text-white transition-all shadow-sm flex items-center justify-center shrink-0"
                           >
                             <MaterialIcon name="chat" fill />
@@ -237,8 +279,9 @@ export default async function FamilyDashboard() {
                   <p className="text-on-surface-variant text-sm font-medium opacity-60">You have <span className="text-primary font-black uppercase tracking-widest">{activeJobsCount.count} listings</span> open.</p>
                 </div>
                 <div className="relative z-10 flex items-center justify-between mt-auto">
-                   <div className="flex -space-x-3">
-                     {[1].map(i => <div key={i} className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-black text-xs border-4 border-white shadow-xl">{activeJobsCount.count}</div>)}
+                   <div className="flex items-center gap-2">
+                     <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-black text-xs border-4 border-white shadow-xl">{activeJobsCount.count}</div>
+                     <span className="text-xs font-bold text-on-surface-variant">Active</span>
                    </div>
                    <Link href="/dashboard/parent/jobs" className="text-primary text-[10px] font-black uppercase tracking-widest flex items-center gap-2 hover:translate-x-1 transition-transform">
                     Manage <MaterialIcon name="chevron_right" />
@@ -273,13 +316,17 @@ export default async function FamilyDashboard() {
               <div className="relative z-10 space-y-8">
                 <div className="flex justify-between items-start">
                   <div className="bg-white/10 p-4 rounded-[1.5rem] shadow-inner">
-                    <MaterialIcon name="workspace_premium" className="text-4xl text-secondary-container" style={{ fontVariationSettings: "'FILL' 1" }} />
+                    <MaterialIcon name={user.isPremium ? "verified" : "workspace_premium"} className="text-4xl text-secondary-container" style={{ fontVariationSettings: "'FILL' 1" }} />
                   </div>
-                  <span className="px-4 py-1 bg-secondary-container text-primary text-[10px] font-black rounded-full uppercase tracking-widest shadow-xl shadow-black/20">Elite Plan</span>
+                  <span className="px-4 py-1 bg-secondary-container text-primary text-[10px] font-black rounded-full uppercase tracking-widest shadow-xl shadow-black/20">
+                    {user.isPremium ? "Active" : "Elite Plan"}
+                  </span>
                 </div>
                 <div>
-                  <h3 className="font-headline text-3xl font-black italic tracking-tighter leading-none">Kindred Elite</h3>
-                  <p className="text-primary-fixed text-sm font-black uppercase tracking-[0.2em] opacity-40 mt-2">$23.00 / month</p>
+                  <h3 className="font-headline text-3xl font-black italic tracking-tighter leading-none">{user.isPremium ? "Elite Status" : "Kindred Elite"}</h3>
+                  <p className="text-primary-fixed text-sm font-black uppercase tracking-[0.2em] opacity-40 mt-2">
+                    {user.isPremium ? "Benefits Unlocked" : "$23.00 / month"}
+                  </p>
                 </div>
                 <div className="space-y-4 pt-4 border-t border-white/5">
                   {["Priority Application Feed", "$1M Liability Buffer", "Advanced Safety Screening"].map(benefit => (
@@ -289,9 +336,15 @@ export default async function FamilyDashboard() {
                     </div>
                   ))}
                 </div>
-                <Link href="/dashboard/parent/subscription" className="block w-full py-6 bg-secondary-container text-primary font-black uppercase tracking-widest text-[11px] rounded-[1.5rem] shadow-xl shadow-black/30 hover:scale-105 active:scale-95 transition-all text-center">
-                  Manage Billing
-                </Link>
+                {user.isPremium ? (
+                  <Link href="/dashboard/parent/subscription" className="block w-full py-6 bg-white/10 text-white font-black uppercase tracking-widest text-[11px] rounded-[1.5rem] hover:bg-white/20 transition-all text-center">
+                    Manage Benefits
+                  </Link>
+                ) : (
+                  <Link href="/dashboard/parent/subscription" className="block w-full py-6 bg-secondary-container text-primary font-black uppercase tracking-widest text-[11px] rounded-[1.5rem] shadow-xl shadow-black/30 hover:scale-105 active:scale-95 transition-all text-center">
+                    Activate Elite
+                  </Link>
+                )}
               </div>
             </div>
 

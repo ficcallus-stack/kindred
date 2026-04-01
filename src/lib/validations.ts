@@ -14,6 +14,8 @@ export const createJobSchema = z.object({
   schedule: z.record(z.string(), z.boolean()).optional(),
   specificDates: z.array(z.string()).optional(),
   stripePaymentIntentId: z.string().min(1, "Payment verification is required"),
+  isFeatured: z.boolean().default(false),
+  isBoosted: z.boolean().default(false),
 }).refine((data) => data.maxRate >= data.minRate, {
   message: "Max rate must be greater than or equal to min rate",
   path: ["maxRate"],

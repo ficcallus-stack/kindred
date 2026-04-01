@@ -25,6 +25,7 @@ const publicRoutes = [
   "/cookies",
   "/terms",
   "/privacy",
+  "/api/ably/auth",
 ];
 
 function isPublicRoute(pathname: string): boolean {

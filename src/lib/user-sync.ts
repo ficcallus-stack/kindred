@@ -13,7 +13,12 @@ export async function syncUser() {
     where: eq(users.id, serverUser.uid),
   });
 
-  if (existingUserById) return existingUserById;
+  if (existingUserById) {
+    // console.log("syncUser: Found user by UID", serverUser.uid);
+    return existingUserById;
+  }
+
+  console.warn("syncUser: User NOT found by UID, checking email...", serverUser.uid);
 
   // 2. Not found by UID: Check by Email (Accounts might have a different UID in DB)
   const fbUser = await adminAuth.getUser(serverUser.uid);

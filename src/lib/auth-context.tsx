@@ -29,6 +29,7 @@ interface AuthContextType {
   role: "parent" | "caregiver" | "admin" | "moderator" | null;
   dbUser: DbUser | null;
   setRole: (role: "parent" | "caregiver" | "admin" | "moderator" | null) => void;
+  setDbUser: (user: DbUser | null) => void;
   signOut: () => Promise<void>;
 }
 
@@ -39,6 +40,7 @@ const AuthContext = createContext<AuthContextType>({
   role: null,
   dbUser: null,
   setRole: () => {},
+  setDbUser: () => {},
   signOut: async () => {},
 });
 
@@ -116,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role,
         dbUser,
         setRole,
+        setDbUser,
         signOut: handleSignOut,
       }}
     >

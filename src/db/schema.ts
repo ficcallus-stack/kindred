@@ -21,6 +21,8 @@ export const ticketStatusEnum = pgEnum("ticket_status", ["open", "in_progress", 
 export const ticketPriorityEnum = pgEnum("ticket_priority", ["low", "medium", "high", "urgent"]);
 export const ticketCategoryEnum = pgEnum("ticket_category", ["general", "safety", "payment", "technical"]);
 export const supportStatusEnum = pgEnum("support_status", ["open", "closed"]);
+export const platformCreditTransactionTypeEnum = pgEnum("platform_credit_transaction_type", ["earned_booking", "earned_referral", "redeemed", "revoked_refund"]);
+export const chatUnlockMethodEnum = pgEnum("chat_unlock_method", ["stripe", "credits", "booking", "premium"]);
 
 // ── Users ──────────────────────────────────────────────────
 export const users = pgTable("users", {
@@ -38,6 +40,8 @@ export const users = pgTable("users", {
   subscriptionStatus: subscriptionStatusEnum("subscription_status"),
   isPremium: boolean("is_premium").default(false).notNull(),
   stripeCustomerId: text("stripe_customer_id"),
+  platformCredits: integer("platform_credits").default(0).notNull(), // New: 15 per USD spent, 100 = 1 USD
+  lastRoleSwitchedAt: timestamp("last_role_switched_at"), // New: For 4-hour bidirectional gate
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -116,8 +120,21 @@ export const parentProfiles = pgTable("parent_profiles", {
   familyPhoto: text("family_photo"),
   location: text("location"),
   bio: text("bio"),
+  householdManual: text("household_manual"), // The persistent "Wiki" for nannies
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ── Care Team (Stage 1 overhaul) ───────────────────────────
+export const careTeam = pgTable("care_team", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  parentId: text("parent_id").notNull().references(() => users.id),
+  caregiverId: text("caregiver_id").notNull().references(() => users.id),
+  status: text("status").default("active").notNull(), // active, archived
+  nickname: text("nickname"), // e.g., "Full-time Nanny", "Date-night regular"
+  privateNotes: text("private_notes"), // For parents to remember things about the nanny
+  createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -130,12 +147,19 @@ export const jobs = pgTable("jobs", {
   budget: text("budget").notNull(), // Display string like "$20-$30/hr"
   minRate: integer("min_rate"),
   maxRate: integer("max_rate"),
+  location: text("location"),
+  duration: text("duration"),
+  childCount: integer("child_count"),
   status: jobStatusEnum("status").default("open").notNull(),
   scheduleType: text("schedule_type").default("recurring").notNull(), // recurring, one_time
   schedule: jsonb("schedule").$type<Record<string, boolean>>().default({}), // The weekly grid
   specificDates: jsonb("specific_dates").$type<string[]>().default([]), // For one_time jobs
   stripePaymentIntentId: text("stripe_payment_intent_id"),
+  isFeatured: boolean("is_featured").default(false).notNull(),
+  isDraft: boolean("is_draft").default(false).notNull(),
+  isBoosted: boolean("is_boosted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ── Applications ───────────────────────────────────────────
@@ -154,6 +178,7 @@ export const bookings = pgTable("bookings", {
   parentId: text("parent_id").notNull().references(() => users.id),
   caregiverId: text("caregiver_id").notNull().references(() => users.id),
   jobId: text("job_id").references(() => jobs.id),
+  seriesId: text("series_id"), // Nullable initially for Stage 2
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   hoursPerDay: integer("hours_per_day").notNull(),
@@ -169,14 +194,43 @@ export const bookings = pgTable("bookings", {
   overtimeMinutes: integer("overtime_minutes").default(0).notNull(),
   latenessMinutes: integer("lateness_minutes").default(0).notNull(),
   overtimeAmount: integer("overtime_amount").default(0).notNull(), // in cents
+  isOvertime: boolean("is_overtime").default(false).notNull(), // Extra shift outside retainer
+  isTrial: boolean("is_trial").default(false).notNull(), // New Step 6 Overhaul: Trial Session
+  retainerAdjustmentId: text("retainer_adjustment_id"), // Link to specific monthly payroll item
 
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Booking Series (Stage 3 overhaul) ──────────────────────
+export const bookingSeries = pgTable("booking_series", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  parentId: text("parent_id").notNull().references(() => users.id),
+  caregiverId: text("caregiver_id").notNull().references(() => users.id),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date"), // Nullable for perpetual
+  startTime: text("start_time").notNull(), // e.g. "09:00"
+  endTime: text("end_time").notNull(), // e.g. "17:00"
+  daysOfWeek: jsonb("days_of_week").$type<number[]>().default([]).notNull(), // [1, 3, 5] for Mon, Wed, Fri
+  nickname: text("nickname"),
+  
+  // Stage 3: Financials
+  retainerAmount: integer("retainer_amount"), // Fixed monthly salary in cents
+  overtimeRate: integer("overtime_rate"), // Hourly overtime rate in cents
+  taxWithholding: boolean("tax_withholding").default(false).notNull(), // Enable payroll tax tracking
+  billingCycle: text("billing_cycle").default("monthly").notNull(), // monthly, bi_weekly
+  
+  status: text("status").default("active").notNull(), // active, paused, cancelled, completed
+  notes: text("notes"),
+  nextBillingDate: timestamp("next_billing_date"), // New: For automated recurring charges
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ── Payments ───────────────────────────────────────────────
 export const payments = pgTable("payments", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   bookingId: text("booking_id").references(() => bookings.id),
+  seriesId: text("series_id").references(() => bookingSeries.id), // New: Track retainer payments
   userId: text("user_id").notNull().references(() => users.id),
   amount: integer("amount").notNull(), // in cents
   stripePaymentIntentId: text("stripe_payment_intent_id"),
@@ -248,6 +302,26 @@ export const ticketMessages = pgTable("ticket_messages", {
   senderId: text("sender_id").notNull().references(() => users.id),
   content: text("content").notNull(),
   isInternal: boolean("is_internal").default(false).notNull(), // for Moderator notes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Chat Unlocks ──────────────────────────────────────────
+export const chatUnlocks = pgTable("chat_unlocks", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  parentId: text("parent_id").notNull().references(() => users.id),
+  caregiverId: text("caregiver_id").notNull().references(() => users.id),
+  unlockedAt: timestamp("unlocked_at").defaultNow().notNull(),
+  method: chatUnlockMethodEnum("method").notNull(),
+});
+
+// ── Platform Credit Transactions ────────────────────────────
+export const platformCreditTransactions = pgTable("platform_credit_transactions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  bookingId: text("booking_id").references(() => bookings.id),
+  amount: integer("amount").notNull(), // Number of credits (can be negative)
+  type: platformCreditTransactionTypeEnum("type").notNull(),
+  description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -416,6 +490,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   parentProfile: one(parentProfiles),
   wallet: one(wallets),
   tickets: many(tickets),
+  careTeamAsParent: many(careTeam, { relationName: "careTeamParent" }),
+  careTeamAsCaregiver: many(careTeam, { relationName: "careTeamCaregiver" }),
 }));
 
 export const nannyProfilesRelations = relations(nannyProfiles, ({ one }) => ({
@@ -454,12 +530,14 @@ export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   caregiver: one(users, { fields: [bookings.caregiverId], references: [users.id], relationName: "caregiverBookings" }),
   caregiverProfile: one(nannyProfiles, { fields: [bookings.caregiverId], references: [nannyProfiles.id] }),
   job: one(jobs, { fields: [bookings.jobId], references: [jobs.id] }),
+  series: one(bookingSeries, { fields: [bookings.seriesId], references: [bookingSeries.id] }),
   payments: many(payments),
   reviews: many(reviews),
 }));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
   booking: one(bookings, { fields: [payments.bookingId], references: [bookings.id] }),
+  series: one(bookingSeries, { fields: [payments.seriesId], references: [bookingSeries.id] }),
   user: one(users, { fields: [payments.userId], references: [users.id] }),
 }));
 
@@ -535,4 +613,32 @@ export const referralsRelations = relations(referrals, ({ one }) => ({
 
 export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   actor: one(users, { fields: [auditLogs.actorId], references: [users.id] }),
+}));
+
+export const careTeamRelations = relations(careTeam, ({ one }) => ({
+  parent: one(users, { fields: [careTeam.parentId], references: [users.id], relationName: "careTeamParent" }),
+  caregiver: one(users, { fields: [careTeam.caregiverId], references: [users.id], relationName: "careTeamCaregiver" }),
+}));
+
+export const bookingSeriesRelations = relations(bookingSeries, ({ one, many }) => ({
+  parent: one(users, { fields: [bookingSeries.parentId], references: [users.id] }),
+  caregiver: one(users, { fields: [bookingSeries.caregiverId], references: [users.id] }),
+  instances: many(bookings),
+  payments: many(payments),
+}));
+
+// ── Care Milestones (Stage 5 Overhaul) ────────────────────
+export const careMilestones = pgTable("care_milestones", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  parentId: text("parent_id").notNull().references(() => users.id),
+  caregiverId: text("caregiver_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  photoUrl: text("photo_url"),
+  type: text("type").default("moment").notNull(), // moment, motor_skill, funny_moment, first_word
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const careMilestonesRelations = relations(careMilestones, ({ one }) => ({
+    parent: one(users, { fields: [careMilestones.parentId], references: [users.id] }),
+    caregiver: one(users, { fields: [careMilestones.caregiverId], references: [users.id] }),
 }));

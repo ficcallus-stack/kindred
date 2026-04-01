@@ -1,0 +1,117 @@
+const postgres = require('postgres');
+
+async function migrate() {
+  // Hardcoded to local docker because environment process is aggressively caching the blocked neon URL
+  const sql = postgres('postgresql://postgres:password@localhost:5433/nannyconnect', {
+    ssl: false,
+    max: 1
+  });
+
+  try {
+    console.log("Connected to localhost Docker database successfully");
+
+    // 1. Ensure columns exist on users table utilizing IF NOT EXISTS for robustness
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "platform_credits" integer DEFAULT 0 NOT NULL;`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_role_switched_at" timestamp;`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_premium" boolean DEFAULT false NOT NULL;`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "referral_balance" integer DEFAULT 0 NOT NULL;`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "stripe_subscription_id" text;`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "stripe_customer_id" text;`;
+
+    // 2. Ensure Enums exist
+    const creditEnumRes = await sql`
+      SELECT n.nspname as schema, t.typname as name
+      FROM pg_type t
+      JOIN pg_namespace n ON n.oid = t.typnamespace
+      WHERE t.typname = 'platform_credit_transaction_type';
+    `;
+    if (creditEnumRes.length === 0) {
+      await sql`CREATE TYPE "platform_credit_transaction_type" AS ENUM ('earned_booking', 'earned_referral', 'redeemed', 'revoked_refund');`;
+      console.log("Created platform_credit_transaction_type enum");
+    }
+
+    const subEnumRes = await sql`
+      SELECT n.nspname as schema, t.typname as name
+      FROM pg_type t
+      JOIN pg_namespace n ON n.oid = t.typnamespace
+      WHERE t.typname = 'subscription_status';
+    `;
+    if (subEnumRes.length === 0) {
+      await sql`CREATE TYPE "subscription_status" AS ENUM ('active', 'past_due', 'canceled', 'incomplete', 'trialing');`;
+      console.log("Created subscription_status enum");
+    }
+
+    // Add enum column
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "subscription_status" "subscription_status";`;
+
+    console.log("Ensured all users columns and core enums exist.");
+
+    // 3. Keep existing table checks
+    const tableRes = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name = 'platform_credit_transactions';
+    `;
+    if (tableRes.length === 0) {
+      // ... existing code ...
+      await sql`
+        CREATE TABLE "platform_credit_transactions" (
+          "id" text PRIMARY KEY NOT NULL,
+          "user_id" text NOT NULL REFERENCES "users"("id"),
+          "booking_id" text REFERENCES "bookings"("id"),
+          "amount" integer NOT NULL,
+          "type" "platform_credit_transaction_type" NOT NULL,
+          "description" text,
+          "created_at" timestamp DEFAULT now() NOT NULL
+        );
+      `;
+      console.log("Created platform_credit_transactions table");
+    }
+
+    // 4. Ensure Chat Unlock Enum exists
+    const chatEnumRes = await sql`
+      SELECT n.nspname as schema, t.typname as name
+      FROM pg_type t
+      JOIN pg_namespace n ON n.oid = t.typnamespace
+      WHERE t.typname = 'chat_unlock_method';
+    `;
+
+    if (chatEnumRes.length === 0) {
+      await sql`CREATE TYPE "chat_unlock_method" AS ENUM ('stripe', 'credits', 'booking', 'premium');`;
+      console.log("Created chat_unlock_method enum");
+    }
+
+    // 5. Ensure chat_unlocks table exists
+    const chatTableRes = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name = 'chat_unlocks';
+    `;
+
+    if (chatTableRes.length === 0) {
+      await sql`
+        CREATE TABLE "chat_unlocks" (
+          "id" text PRIMARY KEY NOT NULL,
+          "parent_id" text NOT NULL REFERENCES "users"("id"),
+          "caregiver_id" text NOT NULL REFERENCES "users"("id"),
+          "unlocked_at" timestamp DEFAULT now() NOT NULL,
+          "method" "chat_unlock_method" NOT NULL
+        );
+      `;
+      console.log("Created chat_unlocks table");
+    }
+
+    // 6. Patch Jobs table with new fields
+    await sql`ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "is_featured" boolean DEFAULT false NOT NULL;`;
+    await sql`ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "is_draft" boolean DEFAULT false NOT NULL;`;
+    await sql`ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "is_boosted" boolean DEFAULT false NOT NULL;`;
+
+    console.log("Migration Phase 5 complete on Localhost Docker");
+  } catch (err) {
+    console.error("Local Docker migration failed:", err);
+  } finally {
+    await sql.end();
+  }
+}
+
+migrate();

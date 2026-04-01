@@ -123,7 +123,7 @@ export default async function BookingSuccessPage(props: {
             View Dashboard
           </Link>
           <Link 
-            href="/dashboard/parent/messages"
+            href={`/dashboard/messages/user/${nanny.id}`}
             className="w-full sm:w-auto px-10 py-5 bg-secondary-fixed text-on-secondary-fixed font-black uppercase tracking-[0.2em] text-[10px] rounded-2xl hover:bg-secondary-fixed/80 transition-all flex items-center justify-center gap-3"
           >
             <MaterialIcon name="chat" />

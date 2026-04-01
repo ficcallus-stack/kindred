@@ -40,3 +40,38 @@ export function useAbly(channelName: string, callback?: (message: Ably.InboundMe
 
   return { channel };
 }
+
+/**
+ * Hook for Ably Presence tracking (Stage 4)
+ */
+export function useAblyPresence(channelName: string, onUpdate?: (members: Ably.PresenceMessage[]) => void) {
+  const [presentMembers, setPresentMembers] = useState<Ably.PresenceMessage[]>([]);
+  const onUpdateRef = useRef(onUpdate);
+
+  useEffect(() => {
+    onUpdateRef.current = onUpdate;
+  }, [onUpdate]);
+
+  useEffect(() => {
+    if (!ablyClient) {
+      ablyClient = new Ably.Realtime({ authUrl: '/api/ably/auth' });
+    }
+
+    const _channel = ablyClient.channels.get(channelName);
+
+    const updatePresence = async () => {
+      const members = await _channel.presence.get();
+      setPresentMembers(members);
+      if (onUpdateRef.current) onUpdateRef.current(members);
+    };
+
+    _channel.presence.subscribe(["enter", "leave", "update"], updatePresence);
+    updatePresence(); // Initial fetch
+
+    return () => {
+      _channel.presence.unsubscribe();
+    };
+  }, [channelName]);
+
+  return { presentMembers, channel: ablyClient?.channels.get(channelName) };
+}

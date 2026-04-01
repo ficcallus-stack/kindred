@@ -10,215 +10,216 @@ interface Step5Props {
   onBack: () => void;
 }
 
+const TOP_MATCHES = [
+  { name: "Sarah B.", rating: 4.9, bio: "Certified Newborn Care Specialist with 8+ years experience...", img: "https://lh3.googleusercontent.com/fife/ALSFd3llt62V2rZt5Z-N1T1o3V4Y8Z2M2E7U7V7l7Y7z7r7_7v7x7p7m7t7_7t7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7" },
+  { name: "Michael K.", rating: 5.0, bio: "Former elementary teacher specializing in homework help...", img: "https://lh3.googleusercontent.com/fife/ALSFd3llt62V2rZt5Z-N1T1o3V4Y8Z2M2E7U7V7l7Y7z7r7_7v7x7p7m7t7_7t7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7" },
+  { name: "Jess R.", rating: 4.8, bio: "Bilingual caregiver with extensive special needs training...", img: "https://lh3.googleusercontent.com/fife/ALSFd3llt62V2rZt5Z-N1T1o3V4Y8Z2M2E7U7V7l7Y7z7r7_7v7x7p7m7t7_7t7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7-7v7w7r7_7r7" },
+];
+
 export default function Step5({ data, onEdit, onSubmit, onBack }: Step5Props) {
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   const TIMES = ["early_morning", "morning", "late_morning", "midday", "early_afternoon", "late_afternoon", "evening", "late_evening"];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in zoom-in-95 duration-500">
-      {/* Summary Cards Column */}
-      <div className="lg:col-span-2 space-y-8">
-        {/* Job Title Card */}
-        <section className="bg-surface-container-lowest p-8 rounded-xl shadow-sm shadow-blue-900/5 transition-all hover:shadow-md border border-outline-variant/10">
-          <div className="flex justify-between items-start mb-4">
-            <h3 className="font-headline font-bold text-on-surface-variant text-sm uppercase tracking-wider">
-              Job Title & Description
-            </h3>
-            <button onClick={() => onEdit(3)} className="text-primary hover:underline text-sm font-semibold">
-              Edit
-            </button>
-          </div>
-          <h2 className="font-headline text-2xl font-bold text-primary mb-3">
-            Experienced Nanny for {data.childCount || 1} Active Child{data.childCount > 1 ? 'ren' : ''} in {data.location || 'Austin'}
-          </h2>
-          <p className="text-on-surface-variant leading-relaxed">
-            {data.description || "Looking for a patient and energetic caregiver to engage our children in creative play, outdoor activities, and light educational tasks."}
-          </p>
-        </section>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Family Details Summary */}
-          <section className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/5">
-            <div className="flex justify-between items-center mb-6">
-              <div className="p-2 bg-primary/5 rounded-lg">
-                <MaterialIcon name="family_restroom" className="text-primary" />
-              </div>
-              <button onClick={() => onEdit(1)} className="text-primary hover:underline text-sm font-semibold">
-                Edit
-              </button>
-            </div>
-            <h3 className="font-headline font-bold text-primary text-xl mb-4">Family Details</h3>
-            <ul className="space-y-4">
-              <li className="flex items-center gap-3 text-on-surface-variant">
-                <span className="w-2.5 h-2.5 rounded-full bg-secondary shadow-sm"></span>
-                <span className="font-bold text-sm tracking-tight">{data.childCount || 1} Child{data.childCount > 1 ? 'ren' : ''}</span>
-              </li>
-              <div className="pl-5 space-y-2 border-l-2 border-outline-variant/20 ml-1">
-                {(data.selectedChildrenIds || []).length > 0 ? (
-                  <p className="text-xs font-bold text-primary opacity-80 mb-2">Selected from profile</p>
-                ) : null}
-                {Array.from({ length: typeof data.childCount === 'number' ? data.childCount : 0 }).map((_, i) => (
-                  <li key={i} className="flex items-center gap-3 text-on-surface-variant text-xs font-medium">
-                    <MaterialIcon name="child_care" className="text-sm text-primary opacity-60" />
-                    <span>
-                      Child {i + 1}: {data[`child${i + 1}Years`] || 0} yrs, {data[`child${i + 1}Months`] || 0} mos
-                    </span>
-                  </li>
-                ))}
-              </div>
-              <li className="flex items-center gap-3 text-on-surface-variant pt-2">
-                <MaterialIcon name="location_on" className="text-secondary" />
-                <span className="font-bold text-sm">Location: {data.location || "Austin, TX"}</span>
-              </li>
-              <li className="flex items-center gap-3 text-on-surface-variant">
-                <MaterialIcon name="calendar_today" className="text-secondary" />
-                <span className="font-bold text-sm">Starts: {data.startDate || "As soon as possible"}</span>
-              </li>
-              {data.stripePaymentIntentId && (
-                <li className="flex items-center gap-3 pt-4 border-t border-outline-variant/10 mt-4 animate-in fade-in duration-700">
-                  <div className="px-3 py-1.5 bg-success/10 text-success rounded-lg flex items-center gap-2 border border-success/20 shadow-sm shadow-success/5">
-                    <MaterialIcon name="verified" className="text-xs" fill />
-                    <span className="text-[10px] font-black uppercase tracking-widest leading-none">Secure Escrow Payment Verified</span>
-                  </div>
-                </li>
-              )}
-            </ul>
-          </section>
-
-          {/* Requirements Summary */}
-          <section className="bg-surface-container-low p-6 rounded-xl border border-outline-variant/5">
-            <div className="flex justify-between items-center mb-6">
-              <div className="p-2 bg-primary/5 rounded-lg">
-                <MaterialIcon name="task_alt" className="text-primary" />
-              </div>
-              <button onClick={() => onEdit(3)} className="text-primary hover:underline text-sm font-semibold">
-                Edit
-              </button>
-            </div>
-            <h3 className="font-headline font-bold text-primary text-xl mb-4">Requirements</h3>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {data.certs?.cpr && (
-                <span className="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-bold rounded-full uppercase tracking-tight flex items-center gap-1">
-                  <MaterialIcon name="medical_services" className="text-[14px]" /> CPR
-                </span>
-              )}
-              {data.certs?.first_aid && (
-                <span className="px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-bold rounded-full uppercase tracking-tight flex items-center gap-1">
-                  <MaterialIcon name="healing" className="text-[14px]" /> First Aid
-                </span>
-              )}
-            </div>
-            <ul className="space-y-2">
-              {Object.entries(data.duties || {})
-                .filter(([_, val]) => val)
-                .map(([name]) => (
-                  <li key={name} className="text-sm text-on-surface-variant flex items-center gap-2">
-                    <MaterialIcon name="check" className="text-sm text-secondary" />
-                    {name}
-                  </li>
-                ))}
-            </ul>
-          </section>
-        </div>
-
-        {/* Schedule & Rates Summary */}
-        <section className="bg-surface-container-lowest p-8 rounded-xl shadow-sm shadow-blue-900/5 border border-outline-variant/10">
-          <div className="flex flex-col md:flex-row justify-between md:items-center gap-6">
-            <div className="flex-1">
-              <h3 className="font-headline font-bold text-primary text-xl mb-4">Schedule & Rates</h3>
-              <div className="grid grid-cols-7 gap-1 mb-6">
-                {DAYS.map((day) => (
-                  <div key={day} className="text-center">
-                    <span className="text-[9px] font-black text-on-surface-variant block mb-1 uppercase tracking-tighter">{day}</span>
-                    <div className="flex flex-col gap-0.5">
-                      {TIMES.map(timeId => (
-                        <div
-                          key={timeId}
-                          className={cn(
-                            "h-3 w-full rounded-[1px]",
-                            data.schedule?.[`${day}-${timeId}`]
-                              ? "bg-secondary"
-                              : "bg-surface-container-high"
-                          )}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-2">
-                  <MaterialIcon name="payments" className="text-primary" />
-                  <span className="font-headline font-bold text-primary">
-                    ${data.minRate || 22} - ${data.maxRate || 28}/hr
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MaterialIcon name="event_repeat" className="text-primary" />
-                  <span className="text-on-surface-variant text-sm font-medium">
-                    {data.duration || "Weekly recurring"}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center">
-              <button onClick={() => onEdit(2)} className="text-primary hover:underline text-sm font-semibold">
-                Edit Details
-              </button>
-            </div>
-          </div>
-        </section>
-
+    <div className="flex flex-col gap-12 animate-in fade-in slide-in-from-bottom-8 duration-700">
+      
+      {/* Header Headline */}
+      <div className="text-center space-y-4 max-w-3xl mx-auto">
+         <span className="px-4 py-1.5 bg-primary/5 text-primary text-[10px] font-black uppercase tracking-widest rounded-full border border-primary/10">Double-Checking the Circle</span>
+         <h1 className="text-4xl md:text-5xl font-black font-headline text-primary tracking-tight leading-none">
+            Finalizing your Kindred request
+         </h1>
+         <p className="text-on-surface-variant text-lg">
+            Review your details and see your potential matches before going live.
+         </p>
       </div>
 
-      {/* Sidebar Info Column */}
-      <aside className="space-y-8">
-        <div className="bg-primary text-on-primary p-8 rounded-xl shadow-2xl shadow-primary/10 relative overflow-hidden">
-          <div className="relative z-10">
-            <div className="mb-4 inline-flex p-3 bg-white/10 rounded-full">
-              <MaterialIcon name="verified_user" fill />
-            </div>
-            <h4 className="font-headline font-bold text-xl mb-3">Safety & Trust</h4>
-            <p className="text-on-primary-container text-sm leading-relaxed mb-6">
-              Every job listing on NannyConnect is reviewed by our moderation team within 12 hours. We
-              ensure all postings meet our community standards.
-            </p>
-            <ul className="space-y-3">
-              <li className="flex gap-2 text-xs font-medium text-white/80">
-                <MaterialIcon name="info" className="text-sm" />
-                Verifying identity...
-              </li>
-              <li className="flex gap-2 text-xs font-medium text-white/80">
-                <MaterialIcon name="info" className="text-sm" />
-                Screening descriptions...
-              </li>
-            </ul>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+        {/* Summary Details (8/12) */}
+        <div className="lg:col-span-8 space-y-10">
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+             {/* Left Column: Core Info */}
+             <div className="space-y-6">
+                <section className="bg-surface-container-lowest p-8 rounded-[2rem] border border-outline-variant/10 shadow-sm relative overflow-hidden group">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                       <MaterialIcon name="description" className="text-primary" />
+                    </div>
+                    <button onClick={() => onEdit(3)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 px-3 py-1.5 rounded-full transition-all">Edit</button>
+                  </div>
+                  <h3 className="font-headline font-bold text-primary text-xl mb-4">Job Description</h3>
+                  <p className="text-sm text-on-surface-variant leading-relaxed line-clamp-4">
+                    {data.description || "No description provided."}
+                  </p>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:scale-125 transition-transform duration-700"></div>
+                </section>
+
+                <section className="bg-surface-container-lowest p-8 rounded-[2rem] border border-outline-variant/10 shadow-sm">
+                   <div className="flex justify-between items-center mb-6">
+                      <div className="w-10 h-10 bg-secondary/10 rounded-xl flex items-center justify-center">
+                         <MaterialIcon name="family_restroom" className="text-secondary" />
+                      </div>
+                      <button onClick={() => onEdit(1)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 px-3 py-1.5 rounded-full transition-all">Edit</button>
+                   </div>
+                   <h3 className="font-headline font-bold text-primary text-xl mb-6">Family Dynamics</h3>
+                   <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center gap-3 bg-surface-container-low px-4 py-3 rounded-2xl border border-outline-variant/5">
+                         <MaterialIcon name="child_care" className="text-secondary" />
+                         <span className="font-bold text-sm tracking-tight">{data.childCount || 1} Child{data.childCount > 1 ? 'ren' : ''}</span>
+                      </div>
+                      <div className="flex items-center gap-3 bg-surface-container-low px-4 py-3 rounded-2xl border border-outline-variant/5">
+                         <MaterialIcon name="location_on" className="text-secondary" />
+                         <span className="font-bold text-sm tracking-tight">{data.location || "Pending..."}</span>
+                      </div>
+                   </div>
+                </section>
+             </div>
+
+             {/* Right Column: Schedule & Rate */}
+             <div className="space-y-6">
+                <section className="bg-surface-container-lowest p-8 rounded-[2rem] border border-outline-variant/10 shadow-sm relative overflow-hidden group">
+                  <div className="flex justify-between items-center mb-6">
+                    <div className="w-10 h-10 bg-tertiary/10 rounded-xl flex items-center justify-center">
+                       <MaterialIcon name="schedule" className="text-tertiary" />
+                    </div>
+                    <button onClick={() => onEdit(2)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 px-3 py-1.5 rounded-full transition-all">Edit</button>
+                  </div>
+                  <h3 className="font-headline font-bold text-primary text-xl mb-4">Availability & Pay</h3>
+                  <div className="flex items-center gap-6 mb-6">
+                    <div className="space-y-1">
+                       <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60 block">Daily Rate</span>
+                       <span className="text-2xl font-black font-headline text-primary tracking-tighter">${data.minRate}-${data.maxRate}/hr</span>
+                    </div>
+                    <div className="w-[1px] h-10 bg-outline-variant/20"></div>
+                    <div className="space-y-1">
+                       <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/60 block">Type</span>
+                       <span className="text-lg font-bold text-on-surface-variant">{data.scheduleType === 'recurring' ? 'Recurring' : 'One-time'}</span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {DAYS.map((day) => (
+                      <div key={day} className="flex flex-col gap-0.5">
+                        {TIMES.map(timeId => (
+                          <div
+                            key={timeId}
+                            className={cn(
+                              "h-1.5 rounded-[1px] transition-all duration-500",
+                              data.schedule?.[`${day}-${timeId}`] ? "bg-secondary scale-110" : "bg-surface-container-high"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="bg-surface-container-lowest p-8 rounded-[2rem] border border-outline-variant/10 shadow-sm">
+                   <div className="flex justify-between items-center mb-6">
+                      <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                         <MaterialIcon name="verified_user" className="text-primary" />
+                      </div>
+                      <button onClick={() => onEdit(3)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:bg-primary/5 px-3 py-1.5 rounded-full transition-all">Edit</button>
+                   </div>
+                   <h3 className="font-headline font-bold text-primary text-xl mb-4">Certifications</h3>
+                   <div className="flex flex-wrap gap-2">
+                       {data.certs?.cpr && (
+                        <span className="px-4 py-2 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center gap-2 border border-emerald-100">
+                          <MaterialIcon name="medical_services" className="text-sm" /> CPR
+                        </span>
+                      )}
+                      {data.certs?.first_aid && (
+                        <span className="px-4 py-2 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center gap-2 border border-emerald-100">
+                          <MaterialIcon name="healing" className="text-sm" /> First Aid
+                        </span>
+                      )}
+                      {data.requestVideo && (
+                        <span className="px-4 py-2 bg-secondary/10 text-secondary text-[10px] font-black rounded-xl uppercase tracking-widest flex items-center gap-2 border border-secondary/20">
+                          <MaterialIcon name="videocam" className="text-sm" /> Video Request
+                        </span>
+                      )}
+                   </div>
+                </section>
+             </div>
           </div>
-          <div className="absolute -right-12 -bottom-12 w-48 h-48 bg-secondary-container rounded-full opacity-10 blur-3xl"></div>
+
+          {/* Premium Upgrades Banner */}
+          {(data.isFeatured || data.isBoosted) && (
+             <div className="bg-secondary text-white p-6 rounded-[2rem] shadow-xl shadow-secondary/20 flex flex-col md:flex-row items-center gap-6 relative overflow-hidden group">
+                <div className="relative z-10 w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center shrink-0">
+                   <MaterialIcon name="auto_awesome" className="text-3xl" fill />
+                </div>
+                <div className="relative z-10 flex-1 text-center md:text-left">
+                   <h4 className="font-headline font-black text-xl mb-1">Premium Performance Enabled</h4>
+                   <p className="text-sm text-white/80 font-medium leading-relaxed">
+                      {data.isFeatured && data.isBoosted 
+                        ? "Your job is Featured & Instant-Boosted. Expect 3x faster applications!" 
+                        : data.isFeatured ? "Featured listing active. You'll stay at the top of the dashboard." : "Instant SMS Boost active. Nearby nannies are being notified."}
+                   </p>
+                </div>
+                <MaterialIcon name="rocket_launch" className="absolute -bottom-4 -right-4 text-7xl opacity-10 group-hover:rotate-12 transition-transform duration-700" />
+             </div>
+          )}
         </div>
 
-        <div className="relative group">
-          <div className="bg-surface-container-low p-8 rounded-xl border border-outline-variant/10 shadow-sm">
-            <p className="italic text-on-surface-variant font-headline text-lg mb-6 leading-relaxed">
-              "The right caregiver doesn't just watch your children; they become an extension of your family's heart."
-            </p>
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200">
-                <img
-                  alt="Founder"
-                  className="w-full h-full object-cover grayscale"
-                  src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYnhWhAOcCbTxQKCiNkR9knaKMSk0uYP6bxbwWFWtBxAlS7moQQ7cvcNBldz7T-jMzKSOdWMF2g4oCqm7ZFWGgmrV0FTDjYI-GR3AeSOgrX764U5cnDkvtjNkExpiCs8WRfge0evO351HyrPVdQHhMWa88QkzbxHWKGA-ql-CGGqvjJyYLWkF7j4YPPXOAPt1rg-yfV7LOFtKPG8joK8BZzh9ZFklHJ0bBuHZwtApInL8LG7WqfkZUBzyXkPnc6HDwa0B-kS6D_J8"
-                />
+        {/* Talent Preview Sidebar (4/12) */}
+        <div className="lg:col-span-4 space-y-8">
+           <div className="bg-surface-container-low p-8 rounded-[2.5rem] border border-outline-variant/10 shadow-sm relative overflow-hidden">
+              <div className="flex items-center gap-2 mb-8">
+                 <div className="w-2 h-2 bg-success rounded-full animate-pulse shadow-[0_0_10px_rgb(34,197,94)]"></div>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-primary italic">Live Match Potential</span>
               </div>
-              <div>
-                <p className="text-sm font-bold text-primary">Elena Rodriguez</p>
-                <p className="text-xs text-on-surface-variant">Founder, NannyConnect</p>
+              <h3 className="font-headline text-2xl font-black text-primary mb-2">Kindred Circle Near You</h3>
+              <p className="text-xs text-on-surface-variant leading-relaxed mb-10">We found <strong>12+ verified caregivers</strong> matching your specific requirements in your area code.</p>
+
+              <div className="space-y-6">
+                 {TOP_MATCHES.map((match, i) => (
+                    <div key={i} className="flex gap-4 items-center group">
+                       <div className="w-14 h-14 rounded-2xl overflow-hidden relative shrink-0 border-2 border-white shadow-md">
+                          <img src={match.img} alt={match.name} className="w-full h-full object-cover blur-[4px] opacity-70 transition-all group-hover:blur-0 group-hover:opacity-100 duration-1000" />
+                          <div className="absolute inset-0 bg-primary/20 mix-blend-color group-hover:bg-transparent transition-colors"></div>
+                       </div>
+                       <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                             <span className="font-bold text-sm text-primary">{match.name.split(' ')[0]} ***</span>
+                             <div className="flex items-center text-[10px] text-amber-500 font-bold">
+                                <MaterialIcon name="star" className="text-sm" fill /> {match.rating}
+                             </div>
+                          </div>
+                          <p className="text-[10px] text-on-surface-variant leading-relaxed italic line-clamp-1">"{match.bio}"</p>
+                       </div>
+                    </div>
+                 ))}
               </div>
-            </div>
-          </div>
-          <div className="absolute -top-4 -right-4 w-12 h-12 bg-secondary rounded-xl opacity-20 hidden md:block"></div>
+
+              <div className="mt-10 pt-8 border-t border-outline-variant/20">
+                 <p className="text-[10px] font-bold text-on-surface-variant text-center uppercase tracking-widest mb-6">Security Clearance</p>
+                 <div className="grid grid-cols-4 gap-4 grayscale opacity-40">
+                    <MaterialIcon name="gpp_good" className="text-xl mx-auto" fill />
+                    <MaterialIcon name="verified" className="text-xl mx-auto" fill />
+                    <MaterialIcon name="security" className="text-xl mx-auto" fill />
+                    <MaterialIcon name="shield" className="text-xl mx-auto" fill />
+                 </div>
+              </div>
+           </div>
+
+           <div className="flex flex-col gap-4">
+              <button 
+                onClick={onSubmit}
+                className="w-full py-6 bg-primary text-on-primary rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-primary/20 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-4 group"
+              >
+                Post Job to Kindred Circle
+                <MaterialIcon name="campaign" className="group-hover:rotate-12 transition-transform" />
+              </button>
+              <button 
+                onClick={onBack}
+                className="w-full py-4 text-on-surface-variant font-bold text-xs hover:bg-surface-container-high rounded-2xl transition-all"
+              >
+                Go Back
+              </button>
+           </div>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }

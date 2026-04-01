@@ -2,8 +2,25 @@
 
 import Link from "next/link";
 import { MaterialIcon } from "@/components/MaterialIcon";
+import { useState } from "react";
+import { createSubscriptionSession } from "@/lib/actions/subscription";
+import { useToast } from "@/components/Toast";
 
 export default function PremiumPage() {
+  const [isLoading, setIsLoading] = useState(false);
+  const { showToast } = useToast();
+
+  const handleSubscribe = async () => {
+    try {
+      setIsLoading(true);
+      const { url } = await createSubscriptionSession("month");
+      window.location.href = url;
+    } catch (err: any) {
+      showToast(err.message || "Something went wrong.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   return (
     <div className="bg-surface font-body text-on-surface">
       {/* Top Navigation Bar */}
@@ -40,11 +57,11 @@ export default function PremiumPage() {
                 Unlock the full potential of KindredCare US with our Premium Family Plan. Professional support for your most precious priority.
               </p>
               <div className="flex flex-col sm:row gap-6 pt-4">
-                <button className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-10 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-2x shadow-primary/20 active:scale-95 transition-all hover:-translate-y-1">
-                  Start Your 7-Day Free Trial
+                <button disabled={isLoading} onClick={handleSubscribe} className="bg-gradient-to-br from-primary to-primary-container text-on-primary px-10 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-2x shadow-primary/20 active:scale-95 transition-all hover:-translate-y-1 disabled:opacity-50">
+                  {isLoading ? "Redirecting..." : "Start Your 7-Day Free Trial"}
                 </button>
                 <div className="flex items-center gap-3 px-4">
-                  <span className="text-4xl font-black text-primary font-headline italic tracking-tighter">$50</span>
+                  <span className="text-4xl font-black text-primary font-headline italic tracking-tighter">$23</span>
                   <span className="text-on-surface-variant font-black uppercase tracking-widest text-[10px] opacity-40">/ month</span>
                 </div>
               </div>
@@ -162,13 +179,13 @@ export default function PremiumPage() {
             <div className="absolute top-0 left-0 w-full h-3 bg-gradient-to-r from-secondary-container via-primary to-tertiary-container"></div>
             <h2 className="text-5xl font-black font-headline text-primary mb-8 tracking-tighter italic">Simple, Transparent Pricing</h2>
             <div className="flex justify-center items-baseline gap-3 mb-12">
-              <span className="text-8xl font-black text-primary font-headline tracking-tighter">$50</span>
+              <span className="text-8xl font-black text-primary font-headline tracking-tighter">$23</span>
               <span className="text-2xl text-on-surface-variant font-black uppercase tracking-widest opacity-40">/ month</span>
             </div>
             <div className="max-w-md mx-auto space-y-10">
               <p className="text-on-surface-variant text-xl italic font-medium opacity-60 leading-relaxed">Cancel anytime. No hidden fees. Start with a 7-day trial and see why thousands of families trust KindredCare US.</p>
-              <button className="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-primary/30 hover:-translate-y-1 hover:shadow-primary/50 transition-all active:scale-95">
-                Start Your 7-Day Free Trial
+              <button disabled={isLoading} onClick={handleSubscribe} className="w-full bg-gradient-to-br from-primary to-primary-container text-on-primary py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm shadow-2xl shadow-primary/30 hover:-translate-y-1 hover:shadow-primary/50 transition-all active:scale-95 disabled:opacity-50">
+                 {isLoading ? "Redirecting..." : "Start Your 7-Day Free Trial"}
               </button>
               <div className="flex flex-wrap justify-center gap-x-12 gap-y-6 pt-8">
                 {[

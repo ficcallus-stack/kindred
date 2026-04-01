@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import { ResumeJobBanner } from "@/components/dashboard/ResumeJobBanner";
 
 interface ParentDashboardLayoutProps {
   children: React.ReactNode;
@@ -11,11 +12,12 @@ interface ParentDashboardLayoutProps {
 }
 
 const NAV_ITEMS = [
-  { id: "overview", label: "Overview", icon: "dashboard", href: "/dashboard/parent" },
-  { id: "family", label: "My Family", icon: "family_restroom", href: "/dashboard/parent/profile" },
+  { id: "overview", label: "Family Hub", icon: "dashboard", href: "/dashboard/parent" },
   { id: "jobs", label: "Job Postings", icon: "work", href: "/dashboard/parent/jobs" },
   { id: "bookings", label: "Bookings", icon: "calendar_today", href: "/dashboard/parent/bookings" },
   { id: "messages", label: "Messages", icon: "chat", href: "/dashboard/messages" },
+  { id: "wallet", label: "Billing & Credits", icon: "account_balance_wallet", href: "/dashboard/parent/wallet" },
+  { id: "help", label: "Help Center", icon: "help_outline", href: "/dashboard/parent/help" },
 ];
 
 export default function ParentDashboardLayout({ children, user }: ParentDashboardLayoutProps) {
@@ -24,6 +26,7 @@ export default function ParentDashboardLayout({ children, user }: ParentDashboar
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen antialiased pb-24 md:pb-0">
+      <ResumeJobBanner />
       {/* Top Navigation Bar */}
       <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm shadow-blue-900/5 h-20">
         <div className="flex justify-between items-center px-4 md:px-8 h-full w-full max-w-screen-2xl mx-auto">

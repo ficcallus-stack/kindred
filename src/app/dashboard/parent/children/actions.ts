@@ -27,7 +27,7 @@ export async function addChild(data: CreateChildInput) {
     throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
   }
 
-  await db.insert(children).values({
+  const [newChild] = await db.insert(children).values({
     parentId: clerkUser.uid,
     name: parsed.data.name,
     age: parsed.data.age,
@@ -35,9 +35,10 @@ export async function addChild(data: CreateChildInput) {
     bio: parsed.data.bio,
     photoUrl: parsed.data.photoUrl,
     specialNeeds: parsed.data.specialNeeds,
-  });
+  }).returning();
 
   revalidatePath("/dashboard/parent");
+  return { success: true, childId: newChild.id };
 }
 
 export async function removeChild(childId: string) {

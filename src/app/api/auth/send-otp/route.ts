@@ -21,12 +21,24 @@ export async function POST(request: NextRequest) {
 
     // Rate limit: max 3 OTPs per email in 15 minutes
     const fifteenMinAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const sixtySecAgo = new Date(Date.now() - 60 * 1000);
+
     const recentOtps = await db.query.emailOtps.findMany({
       where: and(
         eq(emailOtps.email, email),
         gt(emailOtps.createdAt, fifteenMinAgo)
       ),
+      orderBy: (otps, { desc }) => [desc(otps.createdAt)],
     });
+
+    // Hard 60s lockout for deduplication
+    const lastOtp = recentOtps[0];
+    if (lastOtp && lastOtp.createdAt > sixtySecAgo) {
+        return NextResponse.json(
+            { error: "Please wait 60 seconds before requesting another code." },
+            { status: 429 }
+        );
+    }
 
     if (recentOtps.length >= 3) {
       return NextResponse.json(

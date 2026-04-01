@@ -8,9 +8,9 @@ import { revalidatePath } from "next/cache";
 import { enrollCertificationSchema, type EnrollCertificationInput } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import { stripe } from "@/lib/stripe";
+import { PaymentService } from "@/lib/payments/service";
 
 const CERTIFICATION_PRICES: Record<string, { amount: number; name: string }> = {
-  registration: { amount: 6500, name: "Registration Fee" },           // $65
   elite_bundle: { amount: 9500, name: "Elite Bundle" },              // $95
   standards_program: { amount: 4500, name: "Global Care Standards Exam" }, // $45
   standards_retake: { amount: 500, name: "Exam Retake" },             // $5
@@ -87,23 +87,23 @@ export async function enrollCertification(data: EnrollCertificationInput) {
 
   const certId = existingCert?.id || crypto.randomUUID();
 
-  // Create Stripe PaymentIntent
-  const paymentIntent = await stripe.paymentIntents.create({
+  // Create Stripe PaymentIntent safely via PaymentService
+  const { clientSecret, intentId } = await PaymentService.createIntentSafely({
     amount: priceInfo.amount,
-    currency: "usd",
+    userId: clerkUser.uid,
     description: `KindredCare ${priceInfo.name}`,
     metadata: {
-      userId: clerkUser.uid,
       certificationId: certId,
       type: actualType,
     },
+    idempotencyKey: `cert_${clerkUser.uid}_${actualType}`
   });
 
   if (existingCert) {
       await db.update(certifications)
         .set({
             status: "pending_payment",
-            stripePaymentId: paymentIntent.id,
+            stripePaymentId: intentId,
         })
         .where(eq(certifications.id, certId));
   } else {
@@ -112,24 +112,15 @@ export async function enrollCertification(data: EnrollCertificationInput) {
         caregiverId: clerkUser.uid,
         type: actualType as any,
         status: "pending_payment",
-        stripePaymentId: paymentIntent.id,
+        stripePaymentId: intentId,
       });
   }
-
-  // Create payment record
-  await db.insert(payments).values({
-    userId: clerkUser.uid,
-    amount: priceInfo.amount,
-    stripePaymentIntentId: paymentIntent.id,
-    status: "pending",
-    description: priceInfo.name,
-  });
 
   revalidatePath("/dashboard/nanny/certifications");
 
   return {
     certificationId: certId,
-    clientSecret: paymentIntent.client_secret,
+    clientSecret: clientSecret,
   };
 }
 
@@ -222,7 +213,7 @@ export async function submitExamAttempt(submissionId: string, answers: Record<st
         status: "marking",
         submittedAt: new Date(),
       })
-      .where(eq(examSubmissions.id, submissionId));
+      .where(and(eq(examSubmissions.id, submissionId), eq(examSubmissions.caregiverId, clerkUser.uid)));
 
   revalidatePath("/dashboard/nanny/certifications");
   return { success: true };

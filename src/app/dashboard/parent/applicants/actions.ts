@@ -7,6 +7,7 @@ import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { rateLimit } from "@/lib/rate-limit";
 import { sendApplicationStatusEmail } from "@/lib/email";
+import { addToCareTeam } from "../care-team/actions";
 
 export async function acceptApplication(applicationId: string) {
   const clerkUser = await requireUser();
@@ -28,6 +29,9 @@ export async function acceptApplication(applicationId: string) {
   await db.update(applications)
     .set({ status: "accepted" })
     .where(eq(applications.id, applicationId));
+
+  // Stage 6: Automatically add to Care Team (Relationship formalization)
+  await addToCareTeam(app.caregiverId, "New Recruit");
 
   // Notify nanny via email
   try {

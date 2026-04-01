@@ -2,18 +2,15 @@
 
 import { useState, useEffect } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
-import { Button } from "@/components/form/Button";
 import { useToast } from "@/components/Toast";
-import { getWalletData, getPayoutMethod, getStripeConnectOnboarding, withdrawFunds } from "./actions";
+import { getWalletData } from "./actions";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-export default function ParentWalletPage() {
+export default function PlatformCreditsLedger() {
   const [loading, setLoading] = useState(true);
-  const [onboardingLoading, setOnboardingLoading] = useState(false);
-  const [withdrawing, setWithdrawing] = useState(false);
   const [data, setData] = useState<any>(null);
-  const [payoutMethod, setPayoutMethod] = useState<any>(null);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -22,211 +19,198 @@ export default function ParentWalletPage() {
 
   const fetchData = async () => {
     try {
-      const [walletData, method] = await Promise.all([
-        getWalletData(),
-        getPayoutMethod()
-      ]);
+      const walletData = await getWalletData();
       setData(walletData);
-      setPayoutMethod(method);
     } catch (error) {
       console.error(error);
-      showToast("Failed to load wallet data", "error");
+      showToast("Failed to load financial data", "error");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConnectBank = async () => {
-    setOnboardingLoading(true);
-    try {
-      const url = await getStripeConnectOnboarding();
-      window.location.href = url;
-    } catch (error) {
-      console.error(error);
-      showToast("Failed to start onboarding", "error");
-    } finally {
-      setOnboardingLoading(false);
-    }
-  };
-
-  const handleWithdraw = async () => {
-    if (!data?.balance || data.balance <= 0) return;
-    setWithdrawing(true);
-    try {
-      // For now, withdraw everything
-      await withdrawFunds(data.balance);
-      showToast("Withdrawal initiated successfully!", "success");
-      fetchData();
-    } catch (error: any) {
-      showToast(error.message || "Withdrawal failed", "error");
-    } finally {
-      setWithdrawing(false);
-    }
-  };
+  const redeemValueStr = data ? (data.platformCredits / 100).toFixed(2) : "0.00";
 
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="max-w-7xl mx-auto space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700 p-6 md:p-10">
+      
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-4">
         <div>
-          <h1 className="text-4xl font-black font-headline text-primary tracking-tighter italic">Family Wallet</h1>
-          <p className="text-on-surface-variant font-medium opacity-70">Manage your referral rewards and payouts.</p>
+          <h1 className="text-5xl font-black font-headline text-primary tracking-tighter italic mb-4">Billing & Credits</h1>
+          <p className="text-on-surface-variant font-medium opacity-70 max-w-xl leading-relaxed text-lg">
+            Manage your hiring escrows, subscriptions, and platform credits all in one unified ledger.
+          </p>
         </div>
+        <Link href="/dashboard/parent/bookings">
+          <button className="px-8 py-4 bg-primary text-white rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+            Make a Booking
+          </button>
+        </Link>
+      </div>
+
+      <div className="grid lg:grid-cols-12 gap-10">
         
-        {payoutMethod ? (
-          <div className="flex items-center gap-4 p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
-            <div className="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center text-green-600">
-              <MaterialIcon name="account_balance" />
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Linked Bank</p>
-              <p className="font-bold text-primary font-headline italic">{payoutMethod.bankName} •••• {payoutMethod.last4}</p>
-            </div>
-            <button 
-              onClick={handleConnectBank}
-              disabled={onboardingLoading}
-              className="ml-4 text-xs font-bold text-primary hover:underline"
-            >
-              Change
-            </button>
-          </div>
-        ) : (
-          <Button 
-            onClick={handleConnectBank}
-            loading={onboardingLoading}
-            className="rounded-2xl bg-secondary text-white font-headline font-black italic shadow-xl shadow-secondary/20"
-          >
-            Connect Bank Account
-          </Button>
-        )}
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Main Balance Card */}
-        <div className="lg:col-span-2 bg-primary rounded-[3rem] p-12 text-white relative overflow-hidden shadow-2xl shadow-primary/20">
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
-          
-          <div className="relative z-10 space-y-8">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-primary-fixed-dim text-sm font-black uppercase tracking-[0.2em] opacity-60 mb-2">Available Balance</p>
-                <h2 className="text-7xl font-black font-headline tracking-tighter italic">${(data?.balance / 100).toFixed(2)}</h2>
-              </div>
-              <MaterialIcon name="account_balance_wallet" className="text-5xl opacity-20" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-8 pt-8 border-t border-white/10">
-              <div>
-                <p className="text-primary-fixed-dim text-xs font-black uppercase tracking-widest opacity-40 mb-1">Total Redeemed</p>
-                <p className="text-2xl font-bold font-headline italic">${data?.stats?.totalRedeemed?.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-primary-fixed-dim text-xs font-black uppercase tracking-widest opacity-40 mb-1">Referral Milestones</p>
-                <div className="flex items-center gap-2">
-                   <p className="text-2xl font-bold font-headline italic">Level 2</p>
-                   <MaterialIcon name="trending_up" className="text-secondary text-sm" />
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-4 flex gap-4">
-              <Button 
-                onClick={handleWithdraw}
-                loading={withdrawing}
-                disabled={!payoutMethod || !data?.balance || data.balance <= 0}
-                className="bg-white text-primary rounded-2xl px-12 py-4 h-auto font-headline font-black italic text-lg shadow-2xl shadow-black/20 hover:scale-105 active:scale-95 transition-all w-full md:w-auto disabled:opacity-50"
-              >
-                Withdraw to Bank
-              </Button>
-              <Link href="/dashboard/parent/referrals" className="w-full md:w-auto">
-                <Button className="bg-primary-container text-white px-8 h-full rounded-2xl font-bold border border-white/10">
-                  Refer Friends
-                </Button>
-              </Link>
-            </div>
+        {/* 3D Platform Credits Card */}
+        <div className="lg:col-span-5 relative group perspective-[1000px]">
+          <div className="w-full h-full min-h-[380px] bg-gradient-to-br from-indigo-900 via-purple-900 to-primary rounded-[3rem] p-10 text-white relative shadow-2xl transition-transform duration-700 transform-gpu group-hover:[transform:rotateX(5deg)_rotateY(-5deg)] shadow-primary/40 border border-white/10 overflow-hidden">
+            {/* Holographic Overlays */}
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-20 mix-blend-overlay"></div>
+            <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-white/10 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 group-hover:bg-white/20 transition-all duration-700"></div>
             
-            {!payoutMethod && (
-               <p className="text-xs text-primary-fixed-dim opacity-50 flex items-center gap-2">
-                 <MaterialIcon name="info" className="text-sm" />
-                 Please link a bank account to enable manual withdrawals.
-               </p>
-            )}
-          </div>
-        </div>
-
-        {/* Stats Column */}
-        <div className="space-y-8">
-          {/* Chart Placeholder / Activity */}
-          <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-50">
-            <h3 className="text-lg font-black font-headline text-primary italic mb-6">Reward Activity</h3>
-            <div className="flex items-end justify-between h-40 gap-2 mb-4">
-              {data?.stats?.chart?.map((month: any, i: number) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2 group">
-                  <div className="w-full relative bg-slate-50 rounded-lg overflow-hidden h-full">
-                    <div 
-                      className={`absolute bottom-0 w-full transition-all duration-1000 ${month.curr ? 'bg-secondary' : 'bg-primary/20 group-hover:bg-primary/40'}`}
-                      style={{ height: month.h }}
-                    ></div>
+            <div className="relative z-10 flex flex-col h-full justify-between">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2 text-purple-300 font-black uppercase tracking-[0.3em] text-[10px] mb-2">
+                    <MaterialIcon name="diamond" className="text-sm" fill />
+                    Platform Credits
                   </div>
-                  <span className="text-[10px] font-black uppercase text-slate-400">{month.m}</span>
+                  <h2 className="text-7xl font-black font-headline tracking-tighter italic drop-shadow-2xl">
+                    {data?.platformCredits?.toLocaleString() || 0}
+                  </h2>
                 </div>
-              ))}
+                <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20 shadow-inner">
+                   <MaterialIcon name="layers" className="text-3xl" />
+                </div>
+              </div>
+
+              <div className="space-y-6 mt-8">
+                <div className="bg-black/20 p-5 rounded-[2rem] border border-white/10 backdrop-blur-md flex items-center justify-between">
+                   <div>
+                      <p className="text-[10px] text-white/60 font-black uppercase tracking-widest mb-1">Status</p>
+                      <p className="text-xl font-black font-headline italic tracking-tight text-white/90">
+                         Accumulating
+                      </p>
+                   </div>
+                   <button disabled className="px-6 py-4 bg-white/10 text-white/50 rounded-xl font-black uppercase tracking-widest text-[10px] transition-colors shadow-inner cursor-not-allowed">
+                      Redeem (Coming Soon)
+                   </button>
+                </div>
+                
+                <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest flex items-start gap-2 leading-relaxed">
+                  <MaterialIcon name="info" className="text-xs shrink-0" />
+                  Credits automatically accrue from escrow. 15 credits are generated for every $1 spent booking top-tier talent.
+                </p>
+              </div>
             </div>
           </div>
-
-          <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary rounded-full blur-[60px] opacity-20 group-hover:opacity-40 transition-opacity"></div>
-            <h3 className="text-primary-fixed-dim text-[10px] font-black uppercase tracking-[0.2em] mb-4">Pro Tip</h3>
-            <p className="font-bold leading-relaxed mb-6 italic opacity-80">
-              "Redeeming credits to your wallet is required before you can withdraw to your bank account."
-            </p>
-            <Link href="/dashboard/parent/referrals" className="text-xs font-black text-secondary uppercase tracking-widest flex items-center gap-2 group-hover:gap-3 transition-all">
-              Go to Referrals
-              <MaterialIcon name="arrow_forward" />
-            </Link>
-          </div>
         </div>
+
+        {/* Financial Summary Stats */}
+        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-6">
+           <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-outline-variant/10 flex flex-col justify-between">
+             <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
+                <MaterialIcon name="verified_user" className="text-2xl" />
+             </div>
+             <div>
+                <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] mb-2 opacity-50">Kindred Elite Status</p>
+                <div className="flex items-end justify-between">
+                  <p className="text-3xl font-black font-headline italic tracking-tighter text-primary">
+                    {data?.isPremium ? "Active" : "Inactive"}
+                  </p>
+                  {data?.isPremium ? (
+                    <span className="text-xs font-bold text-green-600 bg-green-50 px-3 py-1 rounded-full uppercase tracking-widest">Paid</span>
+                  ) : (
+                    <Link href="/pricing" className="text-[10px] font-black uppercase text-secondary tracking-widest hover:underline">Upgrade</Link>
+                  )}
+                </div>
+             </div>
+           </div>
+
+           <div className="bg-white rounded-[3rem] p-8 shadow-sm border border-outline-variant/10 flex flex-col justify-between relative overflow-hidden">
+             <div className="w-14 h-14 bg-green-50 text-green-600 rounded-2xl flex items-center justify-center mb-6 relative z-10">
+                <MaterialIcon name="payments" className="text-2xl" />
+             </div>
+             <div className="relative z-10">
+                <p className="text-[10px] text-on-surface-variant font-black uppercase tracking-[0.2em] mb-2 opacity-50">Total Hiring Spend</p>
+                <p className="text-4xl font-black font-headline italic tracking-tighter text-primary">
+                  ${data?.stats?.totalSpent?.toFixed(2)}
+                </p>
+             </div>
+             <MaterialIcon name="trending_up" className="absolute -bottom-10 -right-4 text-[120px] text-green-50 z-0 opacity-50" />
+           </div>
+
+           <div className="sm:col-span-2 bg-surface text-on-surface rounded-[3rem] p-8 shadow-inner border border-outline-variant/5">
+             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+               <div>
+                 <h3 className="text-lg font-black font-headline italic mb-1">Help Another Family Find Care</h3>
+                 <p className="text-sm font-medium opacity-60">Gift a friend 5,000 platform credits towards their first premium hire. We'll credit your account as well!</p>
+               </div>
+               <Link href="/dashboard/parent/referrals" className="shrink-0 w-full sm:w-auto">
+                 <button className="w-full px-6 py-4 bg-primary text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-xl hover:scale-105 transition-all">
+                   Share Invite
+                 </button>
+               </Link>
+             </div>
+           </div>
+        </div>
+
       </div>
 
-      {/* Transaction History */}
-      <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-slate-50">
-        <div className="flex justify-between items-center mb-10">
-          <h3 className="text-2xl font-black font-headline text-primary tracking-tighter italic">Recent Transactions</h3>
-          <Button variant="outline" className="text-xs font-black uppercase tracking-widest border-slate-200">View All</Button>
+      {/* Unified Transaction Ledger */}
+      <div className="bg-white rounded-[3rem] p-10 shadow-sm border border-outline-variant/10">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+          <div>
+            <h3 className="text-3xl font-black font-headline text-primary tracking-tighter italic mb-2">Ledger Details</h3>
+            <p className="text-sm font-medium text-on-surface-variant opacity-60">A unified history of your bookings, rewards, and subscriptions.</p>
+          </div>
+          <button className="px-6 py-3 bg-surface-container-low text-primary rounded-xl font-black uppercase tracking-widest text-[10px] hover:bg-slate-200 transition-colors flex items-center gap-2 border border-outline-variant/10">
+            <MaterialIcon name="download" className="text-sm" /> Download CSV
+          </button>
         </div>
 
-        <div className="space-y-1">
+        <div className="space-y-2">
           {data?.transactions?.length > 0 ? data.transactions.map((txn: any) => (
-            <div key={txn.id} className="flex items-center justify-between p-6 rounded-3xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group">
+            <div key={txn.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-[2rem] hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 group gap-4">
               <div className="flex items-center gap-6">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center ${
-                  txn.type === 'earning' ? 'bg-green-50 text-green-600' : 'bg-primary/5 text-primary'
-                }`}>
-                  <MaterialIcon name={txn.type === 'earning' ? 'add_circle' : 'payouts'} />
+                <div className={cn(
+                  "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-inner",
+                  txn.type === 'earning' && 'bg-purple-50 text-purple-600',
+                  txn.type === 'escrow' && 'bg-blue-50 text-blue-600',
+                  txn.type === 'subscription' && 'bg-amber-50 text-amber-600',
+                  txn.type === 'payout' && 'bg-slate-100 text-slate-600'
+                )}>
+                  <MaterialIcon name={
+                    txn.type === 'earning' ? 'diamond' : 
+                    txn.type === 'escrow' ? 'shield' : 
+                    txn.type === 'subscription' ? 'workspace_premium' : 'account_balance'
+                  } />
                 </div>
                 <div>
-                  <p className="font-headline font-extrabold text-primary italic leading-none mb-1">{txn.description}</p>
-                  <p className="text-xs text-slate-400 font-bold">{new Date(txn.createdAt).toLocaleDateString()}</p>
+                  <p className="font-headline font-extrabold text-primary text-lg italic leading-none mb-2">{txn.description}</p>
+                  <p className="text-[10px] text-on-surface-variant opacity-60 font-black uppercase tracking-widest">
+                    {new Date(txn.createdAt).toLocaleDateString()} • {txn.type}
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className={`text-xl font-black font-headline italic ${txn.type === 'earning' ? 'text-green-600' : 'text-primary'}`}>
+              <div className="text-left sm:text-right flex flex-row sm:flex-col justify-between sm:justify-center items-center sm:items-end">
+                <p className={cn(
+                  "text-2xl font-black font-headline italic mb-2",
+                  txn.type === 'earning' ? 'text-purple-600' : 'text-primary'
+                )}>
                   {txn.type === 'earning' ? '+' : '-'}${(txn.amount / 100).toFixed(2)}
                 </p>
-                <div className="flex items-center justify-end gap-1.5">
-                  <div className={`w-1.5 h-1.5 rounded-full ${
-                    txn.status === 'completed' ? 'bg-green-500' : txn.status === 'failed' ? 'bg-red-500' : 'bg-amber-500'
-                  }`}></div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">{txn.status}</span>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    ['completed', 'confirmed', 'paid'].includes(txn.status.toLowerCase()) ? 'bg-green-500' : 
+                    txn.status.toLowerCase() === 'failed' ? 'bg-red-500' : 'bg-amber-500'
+                  )}></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{txn.status}</span>
                 </div>
               </div>
             </div>
           )) : (
-            <div className="py-20 text-center space-y-4">
-              <MaterialIcon name="history" className="text-6xl text-slate-100" />
-              <p className="text-slate-400 font-bold italic tracking-tight">No transactions yet.</p>
+            <div className="py-24 text-center space-y-6 bg-slate-50 rounded-[3rem] border border-dashed border-slate-200">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+                <MaterialIcon name="receipt_long" className="text-4xl text-slate-300" />
+              </div>
+              <div>
+                 <p className="text-primary font-black font-headline italic text-2xl mb-2">Clean Slate</p>
+                 <p className="text-slate-400 font-bold max-w-sm mx-auto">No transaction history found. Post a job to start earning credits!</p>
+              </div>
             </div>
           )}
         </div>

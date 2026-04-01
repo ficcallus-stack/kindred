@@ -6,13 +6,20 @@ import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { jobs, parentProfiles } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { createJobSchema, type CreateJobInput } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 
 import { syncUser } from "@/lib/user-sync";
 import { stripe } from "@/lib/stripe";
 import { sendEscrowReceiptEmail } from "@/lib/email";
+import { users } from "@/db/schema";
+
+export async function checkIsPremium() {
+  const serverUser = await requireUser();
+  const [user] = await db.select().from(users).where(eq(users.id, serverUser.uid)).limit(1);
+  return !!user?.isPremium;
+}
 
 export async function getPaymentIntentStatus(paymentIntentId: string) {
   const user = await requireUser();
@@ -48,7 +55,73 @@ export async function sendReceiptEmail(details: { amount: number; hours: number;
   return { success: true };
 }
 
-export async function createJob(data: CreateJobInput) {
+export async function getLatestJobDraft() {
+  const user = await requireUser();
+  const draft = await db.query.jobs.findFirst({
+    where: (jobs, { and, eq }) => and(eq(jobs.parentId, user.uid), eq(jobs.isDraft, true)),
+    orderBy: (jobs, { desc }) => [desc(jobs.createdAt)]
+  });
+  return draft;
+}
+
+export async function upsertJobDraft(data: any) {
+  const user = await requireUser();
+  
+  // Clean the data - only take what's relevant to jobs table
+  const { location, duration, childCount, minRate, maxRate, certs, duties, description, scheduleType, schedule, specificDates, isFeatured, isBoosted } = data;
+
+  // Check if active draft exists
+  const existingDraft = await getLatestJobDraft();
+
+  const title = duration ? `${duration} Care in ${location || 'Pending Location'}` : "New Job Draft";
+  const budget = `$${minRate || 20}-$${maxRate || 30}/hr`;
+
+  if (existingDraft) {
+    await db.update(jobs).set({
+      location: location || existingDraft.location,
+      duration: duration || existingDraft.duration,
+      childCount: childCount || existingDraft.childCount,
+      minRate: minRate || existingDraft.minRate,
+      maxRate: maxRate || existingDraft.maxRate,
+      description: description || existingDraft.description,
+      scheduleType: scheduleType || existingDraft.scheduleType,
+      schedule: schedule || existingDraft.schedule,
+      specificDates: specificDates || existingDraft.specificDates,
+      isFeatured: isFeatured !== undefined ? isFeatured : existingDraft.isFeatured,
+      isBoosted: isBoosted !== undefined ? isBoosted : existingDraft.isBoosted,
+      title,
+      budget,
+      updatedAt: new Date(),
+    }).where(eq(jobs.id, existingDraft.id));
+    return { id: existingDraft.id };
+  } else {
+    const newId = crypto.randomUUID();
+    await db.insert(jobs).values({
+      id: newId,
+      parentId: user.uid,
+      title,
+      description: description || "",
+      budget,
+      minRate: minRate || 20,
+      maxRate: maxRate || 30,
+      status: "open",
+      isDraft: true,
+      scheduleType: scheduleType || "recurring",
+      schedule: schedule || {},
+      specificDates: specificDates || [],
+      isFeatured: isFeatured || false,
+      isBoosted: isBoosted || false,
+    });
+    return { id: newId };
+  }
+}
+
+export async function deleteJobDraft() {
+  const user = await requireUser();
+  await db.delete(jobs).where(and(eq(jobs.parentId, user.uid), eq(jobs.isDraft, true)));
+}
+
+export async function createJob(data: CreateJobInput & { isFeatured?: boolean; isBoosted?: boolean }) {
   const user = await requireUser();
 
   console.log(`[createJob] Starting for user ${user.uid}. Intent: ${data.stripePaymentIntentId}`);
@@ -67,21 +140,27 @@ export async function createJob(data: CreateJobInput) {
 
   const { location, duration, childCount, minRate, maxRate, certs, duties, description: userDescription, stripePaymentIntentId, scheduleType, schedule, specificDates } = parsed.data;
 
-  // Verify Payment Intent with Stripe
-  try {
-    const paymentIntent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
-    console.log(`[createJob] Stripe Intent Status: ${paymentIntent.status}, Amount: ${paymentIntent.amount}`);
+  const [dbUser] = await db.select().from(users).where(eq(users.id, user.uid)).limit(1);
+  const isPremium = dbUser?.isPremium;
 
-    if (paymentIntent.status === "requires_payment_method") {
-      throw new Error("Your payment authorization is incomplete or mismatched. Please return to Step 4 (Payment) to re-authorize the correct amount.");
-    }
+  // Verify Payment Intent with Stripe ONLY if not Premium
+  if (!isPremium) {
+    if (!stripePaymentIntentId) throw new Error("Payment authorization required for non-premium accounts.");
+    try {
+      const paymentIntent = await stripe.paymentIntents.retrieve(stripePaymentIntentId);
+      console.log(`[createJob] Stripe Intent Status: ${paymentIntent.status}, Amount: ${paymentIntent.amount}`);
 
-    if (!['requires_capture', 'succeeded', 'processing'].includes(paymentIntent.status)) {
-      throw new Error(`Payment verification failed: Status "${paymentIntent.status}" is not valid for posting a job.`);
+      if (paymentIntent.status === "requires_payment_method") {
+        throw new Error("Your payment authorization is incomplete or mismatched. Please return to Step 4 (Payment) to re-authorize the correct amount.");
+      }
+
+      if (!['requires_capture', 'succeeded', 'processing'].includes(paymentIntent.status)) {
+        throw new Error(`Payment verification failed: Status "${paymentIntent.status}" is not valid for posting a job.`);
+      }
+    } catch (err: any) {
+      console.error("[createJob] Stripe Verification Error:", err.message, err.stack);
+      throw new Error(`Escrow verification failed: ${err.message}. If you were already charged, please go back to Step 4 to sync your authorized payment.`);
     }
-  } catch (err: any) {
-    console.error("[createJob] Stripe Verification Error:", err.message, err.stack);
-    throw new Error(`Escrow verification failed: ${err.message}. If you were already charged, please go back to Step 4 to sync your authorized payment.`);
   }
 
   const title = `${duration} Care in ${location}`;
@@ -92,20 +171,45 @@ export async function createJob(data: CreateJobInput) {
   }
   const budget = `$${minRate}-$${maxRate}/hr`;
 
-  await db.insert(jobs).values({
-    id: crypto.randomUUID(),
-    parentId: user.uid,
-    title,
-    description,
-    budget,
-    minRate,
-    maxRate,
-    status: "open",
-    scheduleType,
-    schedule,
-    specificDates,
-    stripePaymentIntentId,
-  });
+  // Try to find existing draft to update instead of fresh insert
+  const draft = await getLatestJobDraft();
+
+  if (draft) {
+    await db.update(jobs).set({
+      title,
+      description,
+      budget,
+      minRate,
+      maxRate,
+      status: "open",
+      scheduleType,
+      schedule,
+      specificDates,
+      stripePaymentIntentId: isPremium ? null : stripePaymentIntentId,
+      isFeatured: data.isFeatured || false,
+      isBoosted: data.isBoosted || false,
+      isDraft: false,
+      createdAt: new Date(),
+    }).where(eq(jobs.id, draft.id));
+  } else {
+    await db.insert(jobs).values({
+      id: crypto.randomUUID(),
+      parentId: user.uid,
+      title,
+      description,
+      budget,
+      minRate,
+      maxRate,
+      status: "open",
+      scheduleType,
+      schedule,
+      specificDates,
+      stripePaymentIntentId: isPremium ? null : stripePaymentIntentId,
+      isFeatured: data.isFeatured || false,
+      isBoosted: data.isBoosted || false,
+      isDraft: false,
+    });
+  }
 
   revalidatePath("/dashboard/parent");
   revalidatePath("/jobs");

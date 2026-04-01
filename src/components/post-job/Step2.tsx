@@ -54,6 +54,13 @@ export default function Step2({ data, updateData, onNext, onBack }: Step2Props) 
 
   const scheduleType = data.scheduleType || "recurring";
 
+  // Mock heatmap intensity: Weekends and evenings are higher demand
+  const getIntensity = (day: string, time: string) => {
+    if (day === "Sat" || day === "Sun") return "bg-amber-100 hover:bg-amber-200 border-amber-200/50 text-amber-900";
+    if (time.includes("evening")) return "bg-orange-50 hover:bg-orange-100 border-orange-100/50 text-orange-900";
+    return "bg-surface-container-low border-outline-variant/10 hover:bg-surface-container-high";
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in fade-in slide-in-from-right-4 duration-500">
       
@@ -126,7 +133,11 @@ export default function Step2({ data, updateData, onNext, onBack }: Step2Props) 
             <h2 className="font-headline text-xl font-bold text-primary truncate">
               {scheduleType === 'recurring' ? 'Weekly Routine' : 'Time Slots per Date'}
             </h2>
-            <div className="flex gap-2">
+            <div className="flex gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded bg-amber-100 border border-amber-200"></div>
+                <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest">High Demand</span>
+              </div>
               <span className="inline-flex items-center px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[9px] font-black uppercase tracking-widest">
                 {scheduleType === 'recurring' ? 'Auto-recurring' : 'One-time match'}
               </span>
@@ -161,10 +172,14 @@ export default function Step2({ data, updateData, onNext, onBack }: Step2Props) 
                           "h-14 rounded-xl flex items-center justify-center transition-all active:scale-95 border",
                           isSelected
                             ? "bg-primary text-on-primary shadow-lg shadow-primary/20 border-transparent"
-                            : "bg-surface-container-low border-outline-variant/10 hover:bg-surface-container-high"
+                            : getIntensity(day, time.id)
                         )}
                       >
-                        {isSelected && <MaterialIcon name="check_circle" className="text-sm" fill />}
+                        {isSelected ? (
+                          <MaterialIcon name="check_circle" className="text-sm shadow-sm" fill />
+                        ) : (
+                          <MaterialIcon name="add" className="text-xs opacity-0 group-hover:opacity-100" />
+                        )}
                       </button>
                     );
                   })}
@@ -200,51 +215,83 @@ export default function Step2({ data, updateData, onNext, onBack }: Step2Props) 
           <h2 className="font-headline text-xl font-bold text-primary mb-6">Rates & Budget</h2>
           <div className="space-y-6">
             <div>
-              <label className="font-label text-xs font-bold text-on-surface-variant tracking-wider uppercase mb-4 block">
-                Hourly Range
+              <label className="font-label text-xs font-bold text-on-surface-variant tracking-wider uppercase mb-8 block">
+                Hourly Range ($/hr)
               </label>
-              <div className="flex items-center gap-4 mb-4">
-                <div className="flex-1 bg-surface-container-lowest p-4 rounded-xl text-center border border-outline-variant/15">
-                  <span className="text-xs text-on-surface-variant block mb-1">Min</span>
-                  <input
-                    type="number"
-                    className="w-full bg-transparent border-none text-center font-headline font-bold text-xl text-primary focus:ring-0 p-0"
-                    value={data.minRate || 20}
-                    onChange={(e) => updateData({ minRate: Number(e.target.value) })}
+              
+              <div className="relative h-20 px-2">
+                {/* Custom Dual Range Interactive Slider */}
+                <div className="absolute top-8 left-0 w-full h-2 bg-surface-container-high rounded-full">
+                   <div 
+                    className="absolute h-full bg-primary rounded-full"
+                    style={{ 
+                      left: `${((Number(data.minRate || 20) - 15) / 35) * 100}%`,
+                      right: `${100 - ((Number(data.maxRate || 35) - 15) / 35) * 100}%` 
+                    }}
                   />
                 </div>
-                <div className="h-[2px] w-4 bg-outline-variant"></div>
-                <div className="flex-1 bg-surface-container-lowest p-4 rounded-xl text-center border border-outline-variant/15">
-                  <span className="text-xs text-on-surface-variant block mb-1">Max</span>
-                  <input
-                    type="number"
-                    className="w-full bg-transparent border-none text-center font-headline font-bold text-xl text-primary focus:ring-0 p-0"
-                    value={data.maxRate || 35}
-                    onChange={(e) => updateData({ maxRate: Number(e.target.value) })}
-                  />
+                
+                <input
+                  type="range"
+                  min="15"
+                  max="50"
+                  step="1"
+                  value={data.minRate || 20}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val < (data.maxRate || 35)) updateData({ minRate: val });
+                  }}
+                  className="absolute top-8 left-0 w-full bg-transparent appearance-none pointer-events-none z-20 cursor-pointer [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:appearance-none"
+                />
+                
+                <input
+                  type="range"
+                  min="15"
+                  max="50"
+                  step="1"
+                  value={data.maxRate || 35}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (val > (data.minRate || 20)) updateData({ maxRate: val });
+                  }}
+                  className="absolute top-8 left-0 w-full bg-transparent appearance-none pointer-events-none z-20 cursor-pointer [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-primary [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:appearance-none"
+                />
+
+                {/* Bubble Tooltips */}
+                <div 
+                  className="absolute top-0 flex flex-col items-center transition-all duration-75"
+                  style={{ left: `${((Number(data.minRate || 20) - 15) / 35) * 100}%`, transform: 'translateX(-50%)' }}
+                >
+                  <span className="px-2 py-1 bg-primary text-white text-[10px] font-bold rounded shadow-sm">${data.minRate || 20}</span>
+                </div>
+                <div 
+                  className="absolute top-0 flex flex-col items-center transition-all duration-75"
+                  style={{ left: `${((Number(data.maxRate || 35) - 15) / 35) * 100}%`, transform: 'translateX(-50%)' }}
+                >
+                  <span className="px-2 py-1 bg-primary text-white text-[10px] font-bold rounded shadow-sm">${data.maxRate || 35}</span>
                 </div>
               </div>
 
-              <div className="relative h-2 bg-surface-container-high rounded-full w-full">
-                <div 
-                  className="absolute h-full bg-primary rounded-full transition-all duration-300" 
-                  style={{ 
-                    left: `${Math.max(0, Math.min(100, ((Number(data.minRate || 20) - 15) / 35) * 100))}%`, 
-                    right: `${Math.max(0, Math.min(100, 100 - ((Number(data.maxRate || 35) - 15) / 35) * 100))}%` 
-                  }}
-                ></div>
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-primary rounded-full shadow-md cursor-pointer hover:scale-110 transition-transform"
-                  style={{ left: `${Math.max(0, Math.min(100, ((Number(data.minRate || 20) - 15) / 35) * 100))}%`, marginLeft: '-12px' }}
-                ></div>
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 w-6 h-6 bg-white border-2 border-primary rounded-full shadow-md cursor-pointer hover:scale-110 transition-transform"
-                  style={{ left: `${Math.max(0, Math.min(100, ((Number(data.maxRate || 35) - 15) / 35) * 100))}%`, marginLeft: '-12px' }}
-                ></div>
+              <div className="flex justify-between mt-4">
+                <div className="text-center">
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Minimum</p>
+                  <p className="text-xl font-headline font-extrabold text-primary">${data.minRate || 20}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Maximum</p>
+                  <p className="text-xl font-headline font-extrabold text-primary">${data.maxRate || 35}</p>
+                </div>
               </div>
-              <p className="text-[11px] text-on-surface-variant mt-4 text-center">
-                Average in your area: <span className="font-bold">$22 - $28/hr</span>
-              </p>
+
+              <div className="mt-8 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                <div className="flex items-center gap-2 mb-2">
+                  <MaterialIcon name="auto_graph" className="text-primary text-sm" />
+                  <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Market Insights</span>
+                </div>
+                <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                  The current market average for your area is <span className="font-bold text-primary">$22 - $28/hr</span>. Your range is <span className="text-emerald-600 font-bold">Competitive</span>.
+                </p>
+              </div>
             </div>
 
             <div className="pt-6 border-t border-outline-variant/20">
@@ -257,11 +304,11 @@ export default function Step2({ data, updateData, onNext, onBack }: Step2Props) 
                 />
                 <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                 <span className="ms-3 font-headline text-sm font-semibold text-primary group-hover:text-primary/80 transition-colors">
-                  Willing to pay more for top-tier certifications
+                  Enable dynamic offers
                 </span>
               </label>
               <p className="text-xs text-on-surface-variant mt-2 leading-relaxed italic">
-                Attract specialists with CPR, Early Childhood Ed, or Special Needs training.
+                Allow highly-qualified candidates (with special certifications) to propose a custom rate above your max.
               </p>
             </div>
           </div>

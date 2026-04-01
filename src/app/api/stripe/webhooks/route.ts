@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
-import { payments, bookings, certifications, processedWebhookEvents } from "@/db/schema";
+import { payments, bookings, certifications, processedWebhookEvents, chatUnlocks } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { grantCreditsForBooking, revokeCreditsForBooking } from "@/lib/actions/credit-service";
+import Stripe from "stripe";
 
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -52,6 +54,9 @@ export async function POST(req: NextRequest) {
           await db.update(bookings)
             .set({ status: "confirmed" })
             .where(eq(bookings.id, bookingId));
+          
+          // Grant platform credits for this booking
+          await grantCreditsForBooking(bookingId);
         }
 
         // Update certification if applicable
@@ -85,6 +90,39 @@ export async function POST(req: NextRequest) {
           .set({ status: "authorized" })
           .where(eq(payments.stripePaymentIntentId, paymentIntent.id));
 
+        break;
+      }
+
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        const bookingId = charge.metadata?.bookingId;
+
+        if (bookingId) {
+          // Revoke platform credits for this booking
+          await revokeCreditsForBooking(bookingId);
+          
+          // Update local payment status
+          await db.update(payments)
+            .set({ status: "refunded" })
+            .where(eq(payments.stripePaymentIntentId, charge.payment_intent as string));
+        }
+        break;
+      }
+
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const { type, parentId, caregiverId } = session.metadata || {};
+
+        if (type === "chat_unlock" && parentId && caregiverId) {
+          // Grant chat access
+          await db.insert(chatUnlocks).values({
+            parentId,
+            caregiverId,
+            method: "stripe",
+          });
+          
+          console.log(`Chat unlocked: Parent ${parentId} -> Caregiver ${caregiverId}`);
+        }
         break;
       }
 

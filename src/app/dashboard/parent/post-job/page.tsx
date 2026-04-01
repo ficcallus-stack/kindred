@@ -9,34 +9,17 @@ import Step2 from "@/components/post-job/Step2";
 import Step3 from "@/components/post-job/Step3";
 import Step4 from "@/components/post-job/Step4";
 import Step5 from "@/components/post-job/Step5";
-import { createJob } from "./actions";
+import { createJob, getLatestJobDraft, upsertJobDraft, deleteJobDraft } from "./actions";
 import { getChildren } from "../children/actions";
 import { getParentProfile } from "../settings/actions";
 import { useToast } from "@/components/Toast";
+import confetti from "canvas-confetti";
 
 export default function PostJobPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [availableChildren, setAvailableChildren] = useState<any[]>([]);
   const { showToast } = useToast();
-
-  useEffect(() => {
-    // Fetch children and profile in parallel
-    Promise.all([
-      getChildren(),
-      getParentProfile()
-    ]).then(([children, profile]) => {
-      setAvailableChildren(children);
-      if (profile || children.length > 0) {
-        setFormData(prev => ({
-          ...prev,
-          location: profile?.location || prev.location,
-          childCount: children.length > 0 ? children.length : prev.childCount,
-          selectedChildrenIds: children.map((c: any) => c.id)
-        }));
-      }
-    }).catch(console.error);
-  }, []);
 
   const [formData, setFormData] = useState({
     childCount: 1,
@@ -49,55 +32,92 @@ export default function PostJobPage() {
     minRate: 20,
     maxRate: 30,
     description: "",
+    isFeatured: false,
+    isBoosted: false,
   });
   const [hasDraft, setHasDraft] = useState(false);
   const router = useRouter();
 
-  // Save to localStorage whenever formData or step changes
+  // 1. Real-time LocalStorage Persistence
   useEffect(() => {
     if (formData.location || formData.description || Object.keys(formData.schedule).length > 0) {
-      const draft = { formData, step };
-      localStorage.setItem("job_posting_draft", JSON.stringify(draft));
+      localStorage.setItem("kindred_job_draft", JSON.stringify({ 
+        ...formData, 
+        step,
+        lastUpdated: new Date().toISOString() 
+      }));
     }
   }, [formData, step]);
 
-  // Check for draft on mount
+  // 2. Initialize and Merge Data
   useEffect(() => {
-    const savedDraft = localStorage.getItem("job_posting_draft");
-    if (savedDraft) {
-      try {
-        const { formData: savedData, step: savedStep } = JSON.parse(savedDraft);
-        // Only flag if there's actual content
-        if (savedData.location || savedData.description) {
+    Promise.all([
+      getChildren(),
+      getParentProfile(),
+      getLatestJobDraft()
+    ]).then(([children, profile, draft]) => {
+      setAvailableChildren(children);
+
+      // Priority 1: LocalStorage (Fastest/Latest)
+      const localDraftRaw = localStorage.getItem("kindred_job_draft");
+      if (localDraftRaw) {
+        try {
+          const localDraft = JSON.parse(localDraftRaw);
+          setFormData(prev => ({ ...prev, ...localDraft }));
+          setStep(localDraft.step || 1);
           setHasDraft(true);
+          showToast("Resumed your recent progress!", "success");
+          return; // Skip cloud draft if local exists
+        } catch (e) {
+          console.error("Local draft error:", e);
         }
-      } catch (e) {
-        console.error("Failed to parse draft", e);
       }
-    }
+      
+      // Priority 2: Cloud Draft
+      if (draft) {
+        setFormData(prev => ({
+          ...prev,
+          ...(draft as any),
+          childCount: (draft as any).childCount || children.length || prev.childCount,
+        }));
+        setHasDraft(true);
+      } else if (profile || children.length > 0) {
+        setFormData(prev => ({
+          ...prev,
+          location: profile?.location || prev.location,
+          childCount: children.length > 0 ? children.length : prev.childCount,
+          selectedChildrenIds: children.map((c: any) => c.id)
+        }));
+      }
+    }).catch(console.error);
   }, []);
 
-  const handleResumeDraft = () => {
-    const savedDraft = localStorage.getItem("job_posting_draft");
-    if (savedDraft) {
-      const { formData: savedData, step: savedStep } = JSON.parse(savedDraft);
-      setFormData(savedData);
-      setStep(savedStep);
-      showToast("Progress resumed!", "success");
+  // Save to DB on step change (Background sync)
+  useEffect(() => {
+    if (step > 1 && (formData.location || formData.description)) {
+      const timer = setTimeout(() => {
+        upsertJobDraft(formData).catch(console.error);
+      }, 5000); // Throttled longer since local is primary
+      return () => clearTimeout(timer);
     }
-    setHasDraft(false);
+  }, [formData, step]);
+
+  const handleResumeDraft = () => {
+    setHasDraft(false); // Already resumed in useEffect
   };
 
-  const handleDiscardDraft = () => {
-    localStorage.removeItem("job_posting_draft");
+  const handleDiscardDraft = async () => {
+    localStorage.removeItem("kindred_job_draft");
+    await deleteJobDraft();
     setHasDraft(false);
     showToast("Draft discarded.", "info");
+    window.location.reload(); 
   };
 
-  const handleSaveAsDraft = () => {
-    const draft = { formData, step };
-    localStorage.setItem("job_posting_draft", JSON.stringify(draft));
-    showToast("Progress saved to your browser!", "success");
+  const handleSaveAsDraft = async () => {
+    localStorage.setItem("kindred_job_draft", JSON.stringify({ ...formData, step }));
+    await upsertJobDraft(formData);
+    showToast("Progress saved!", "success");
   };
 
   const updateData = (newData: any) => {
@@ -148,9 +168,22 @@ export default function PostJobPage() {
     setIsSubmitting(true);
     try {
       await createJob(formData as any);
-      localStorage.removeItem("job_posting_draft"); // Clear draft on success
+      
+      // Celebration!
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ["#3b82f6", "#f59e0b", "#10b981", "#ef4444"]
+      });
+
+      await deleteJobDraft(); // Clear draft on success
       showToast("Job posted successfully!", "success");
-      router.push("/dashboard/parent");
+      
+      // Deliberate delay for confetti satisfaction
+      setTimeout(() => {
+        router.push("/dashboard/parent");
+      }, 2000);
     } catch (error: any) {
       console.error("Failed to create job:", error);
       showToast(error.message || "Failed to post job. Please try again.", "error");
@@ -262,7 +295,7 @@ export default function PostJobPage() {
               {step === 1 && <Step1 availableChildren={availableChildren} data={formData} updateData={updateData} onNext={nextStep} onCancel={() => router.push("/dashboard/parent")} />}
               {step === 2 && <Step2 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
               {step === 3 && <Step3 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
-              {step === 4 && <Step4 data={formData} onNext={(id) => { updateData({ stripePaymentIntentId: id }); nextStep(true); }} onBack={prevStep} />}
+              {step === 4 && <Step4 data={formData} updateData={updateData} onNext={(id) => { updateData({ stripePaymentIntentId: id }); nextStep(true); }} onBack={prevStep} />}
               {step === 5 && <Step5 data={formData} onEdit={goToStep} onBack={prevStep} onSubmit={handleSubmit} />}
             </div>
           </div>

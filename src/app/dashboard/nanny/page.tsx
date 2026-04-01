@@ -5,10 +5,17 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { syncUser } from "@/lib/user-sync";
 import { cn } from "@/lib/utils";
 import { db } from "@/db";
-import { applications, jobs, users, bookings, reviews, conversationMembers, caregiverVerifications, certifications, nannyProfiles } from "@/db/schema";
+import { applications, jobs, users, bookings, reviews, conversationMembers, caregiverVerifications, certifications, nannyProfiles, careTeam, parentProfiles, bookingSeries } from "@/db/schema";
 import { eq, desc, sql, and, count } from "drizzle-orm";
 import { format } from "date-fns";
 import { HiredModalTrigger } from "@/components/dashboard/HiredModalTrigger";
+import { RegularFamiliesGrid } from "@/components/dashboard/RegularFamiliesGrid";
+import { StabilityCalendar } from "@/components/dashboard/StabilityCalendar";
+import { EarningsForecaster } from "@/components/dashboard/EarningsForecaster";
+import { ShiftControls } from "@/components/dashboard/ShiftControls";
+import { MilestoneEditor } from "@/components/dashboard/MilestoneEditor";
+import { getNannyFinancials } from "./financial-actions";
+import { getCareTeam } from "../parent/care-team/actions";
 
 export default async function NannyDashboardHome() {
   const user = await syncUser();
@@ -94,8 +101,9 @@ export default async function NannyDashboardHome() {
   
   // Fetch Nanny Status
   const [verification] = await db.select().from(caregiverVerifications).where(eq(caregiverVerifications.id, user.id));
-  const myCertifications = await db.select().from(certifications).where(eq(certifications.caregiverId, user.id));
-  const hasPaidFee = myCertifications.some(c => (c.type === "registration" || c.type === "elite_bundle") && c.status !== "pending_payment");
+  const myCertifications = await db.query.certifications.findMany({
+    where: eq(certifications.caregiverId, user.id)
+  });
   const hasGlobalCert = myCertifications.some(c => c.type === "standards_program" && c.status === "completed");
   const [profile] = await db.select().from(nannyProfiles).where(eq(nannyProfiles.id, user.id));
 
@@ -113,11 +121,53 @@ export default async function NannyDashboardHome() {
   if (profileCompleteness > 100) profileCompleteness = 100;
 
   let actionState = "none";
-  if (!hasPaidFee) {
-     actionState = "payment";
-  } else if (!verification || verification.status === "none" || verification.status === "draft") {
+  if (!verification || verification.status === "none" || verification.status === "draft") {
      actionState = "verification";
   }
+
+  // Fetch Regular Families (Care Team) - Stage 1 Overhaul
+  const regularFamilies = await db.query.careTeam.findMany({
+    where: and(
+      eq(careTeam.caregiverId, user.id),
+      eq(careTeam.status, "active")
+    ),
+    with: {
+      parent: {
+        with: {
+          parentProfile: true
+        }
+      }
+    }
+  });
+
+  // Fetch Guaranteed Series (Stability Calendar) - Stage 2 Overhaul
+  const seriesShifts = await db.query.bookingSeries.findMany({
+    where: and(
+        eq(bookingSeries.caregiverId, user.id),
+        eq(bookingSeries.status, "active")
+    ),
+    with: {
+        parent: true
+    }
+  });
+
+  // Fetch Monthly Earnings Snapshot - Stage 3 Overhaul
+  const earningsSnapshot = await getNannyFinancials();
+
+  // Fetch Current Active Booking (for Shift Controls - Stage 4)
+  const currentBooking = await db.query.bookings.findFirst({
+    where: and(
+        eq(bookings.caregiverId, user.id),
+        eq(bookings.status, "confirmed"),
+        sql`DATE(${bookings.startDate}) = CURRENT_DATE`
+    ),
+    with: {
+        parent: true
+    }
+  });
+
+  // Fetch Care Teams (To identify families for Milestone posting)
+  const myFamilies = await getCareTeam();
 
   return (
     <div className="space-y-6 pb-20">
@@ -156,50 +206,46 @@ export default async function NannyDashboardHome() {
                     </div>
                   </div>
                   
-                  <Link 
-                    href={`/dashboard/nanny/bookings/${activeBooking.id}`}
-                    className="w-full md:w-auto bg-white text-primary px-6 py-3.5 rounded-xl font-black uppercase tracking-[0.1em] text-[10px] shadow-xl hover:bg-slate-50 active:scale-95 transition-all text-center flex items-center justify-center gap-2 shrink-0"
-                  >
-                    {activeBooking.status === "in_progress" ? "Manage Mode" : "Start Shift"}
-                    <MaterialIcon name="arrow_forward" className="text-sm" />
-                  </Link>
+                  <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto shrink-0 mt-4 md:mt-0">
+                    {(activeBooking as any).isTrial && (
+                       <div className="px-4 py-2 bg-amber-500/20 rounded-xl border border-amber-500/30 text-amber-100 text-[10px] font-black uppercase tracking-widest animate-pulse">
+                          Honeymoon Phase (Trial)
+                       </div>
+                    )}
+                    <Link 
+                      href={`/dashboard/nanny/bookings/${activeBooking.id}`}
+                      className="w-full md:w-auto bg-white text-primary px-6 py-3.5 rounded-xl font-black uppercase tracking-[0.1em] text-[10px] shadow-xl hover:bg-slate-50 active:scale-95 transition-all text-center flex items-center justify-center gap-2"
+                    >
+                      {activeBooking.status === "in_progress" ? "Manage Mode" : "Start Shift"}
+                      <MaterialIcon name="arrow_forward" className="text-sm" />
+                    </Link>
+                  </div>
                 </div>
                 <MaterialIcon name="schedule" className="absolute -right-6 -bottom-8 text-[10rem] opacity-[0.04] text-white -rotate-12 pointer-events-none" />
              </div>
           )}
 
-          {/* Account Activation / Verification Required Banner */}
-          {actionState !== "none" && (
-            <div className={cn(
-              "relative overflow-hidden p-6 rounded-3xl shadow-xl transition-colors",
-              actionState === "payment" ? "bg-error text-white" : "bg-primary text-white"
-            )}>
+          {/* Verification Required Banner */}
+          {actionState === "verification" && (
+            <div className="relative overflow-hidden p-6 rounded-3xl shadow-xl transition-colors bg-primary text-white">
               <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-2">
-                  <span className={cn(
-                     "text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest",
-                     actionState === "payment" ? "bg-white/20" : "bg-secondary-fixed text-secondary-fixed-variant"
-                  )}>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest bg-secondary-fixed text-secondary-fixed-variant">
                      Action Required
                   </span>
                   <h2 className="text-2xl font-bold font-headline leading-tight">
-                    {actionState === "payment" ? "Account Activation Required" : "Identity Verification Required"}
+                    Identity Verification Required
                   </h2>
                   <p className="text-sm max-w-md opacity-90">
-                    {actionState === "payment" 
-                      ? "Your profile is hidden. Complete registration to start receiving booking requests from families."
-                      : "We need to verify your credentials and run a background check before your profile can go live."}
+                    We need to verify your credentials and run a background check before your profile can go live.
                   </p>
                 </div>
                 <Link 
-                   href={actionState === "payment" ? "/dashboard/nanny/certifications" : "/dashboard/nanny/verification"}
-                   className={cn(
-                      "font-bold px-6 py-3 rounded-xl transition-all shadow-lg text-sm whitespace-nowrap text-center flex items-center justify-center gap-2",
-                      actionState === "payment" ? "bg-white text-error hover:bg-slate-50" : "bg-secondary-fixed-dim text-secondary-fixed-variant hover:brightness-105"
-                   )}
+                   href="/dashboard/nanny/verification"
+                   className="font-bold px-6 py-3 rounded-xl transition-all shadow-lg text-sm whitespace-nowrap text-center flex items-center justify-center gap-2 bg-secondary-fixed-dim text-secondary-fixed-variant hover:brightness-105"
                 >
-                  <MaterialIcon name={actionState === "payment" ? "payment" : "verified_user"} className="text-[18px]" />
-                  {actionState === "payment" ? "Activate Account" : "Submit Verification"}
+                  <MaterialIcon name="verified_user" className="text-[18px]" />
+                  Submit Verification
                 </Link>
               </div>
             </div>
@@ -281,6 +327,33 @@ export default async function NannyDashboardHome() {
               </div>
             </div>
           </div>
+
+          {/* Regular Families (Care Team) - Overhaul Stage 1 */}
+          <RegularFamiliesGrid families={regularFamilies.map(f => ({
+            id: f.id,
+            parentId: f.parent.id,
+            familyName: f.parent.fullName.split(" ").pop() || "Unknown",
+            familyPhoto: (f.parent as any).parentProfile?.familyPhoto || "",
+            householdManual: (f.parent as any).parentProfile?.householdManual || null
+          }))} />
+
+          {/* Shift Controls (Final Stage 4) */}
+          {currentBooking && (
+            <ShiftControls 
+              bookingId={currentBooking.id}
+              familyId={currentBooking.parentId}
+              initialCheckIn={currentBooking.checkInTime}
+              initialCheckOut={currentBooking.checkOutTime}
+            />
+          )}
+
+          {/* Milestone Editor (Final Stage 5) */}
+          {myFamilies.length > 0 && (
+             <MilestoneEditor parentId={myFamilies[0].parentId} />
+          )}
+
+          {/* Monthly Earnings Hub (Overhaul Stage 3) */}
+          <EarningsForecaster forecast={earningsSnapshot} />
         </div>
 
         {/* Right Column: Profile Performance Widget & Upsell */}
@@ -322,7 +395,16 @@ export default async function NannyDashboardHome() {
               )}
             </div>
             
-            {/* Action Button */}
+            {/* Stability Calendar (Overhaul Stage 2) */}
+            <StabilityCalendar shifts={seriesShifts.map(s => ({
+              id: s.id,
+              familyName: s.parent.fullName.split(" ").pop() || "Unknown",
+              daysOfWeek: s.daysOfWeek as number[],
+              startTime: s.startTime,
+              endTime: s.endTime
+            }))} />
+
+            {/* Toggle Section */}
             <Link href={`/nannies/${user.id}`} className="block w-full text-center py-3 border-2 border-primary text-primary rounded-xl font-bold text-xs hover:bg-primary hover:text-white transition-all active:scale-95 group">
               <span className="flex items-center justify-center gap-2">
                  <MaterialIcon name="preview" className="text-lg text-primary group-hover:text-white transition-colors" />

@@ -4,8 +4,12 @@ import { db } from "@/db";
 export const dynamic = "force-dynamic";
 import { users, nannyProfiles, certifications } from "@/db/schema";
 import { eq, desc, count, sql } from "drizzle-orm";
+import Link from "next/link";
+import { approveCaregiver, requireReverification } from "./actions";
 
-export default async function CaregiverVetting() {
+export default async function CaregiverVetting({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
+  const { id: selectedId } = await searchParams;
+
   // Fetch real caregivers from DB
   const dbCaregivers = await db.select({
     id: users.id,
@@ -33,6 +37,9 @@ export default async function CaregiverVetting() {
     badge: cg.isVerified || false,
     image: "",
   }));
+
+  // Find the selected caregiver for the sidebar
+  const activeCg = caregivers.find(c => c.id === selectedId) || caregivers[0];
 
   return (
     <div className="pt-24 px-8 pb-12 flex flex-col gap-8 max-w-[1600px]">
@@ -74,9 +81,15 @@ export default async function CaregiverVetting() {
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {caregivers.map((cg) => (
-                  <tr key={cg.id} className={cn("hover:bg-slate-50/50 transition-colors group")}>
+                  <tr 
+                    key={cg.id} 
+                    className={cn(
+                        "hover:bg-slate-50/50 transition-colors group cursor-pointer",
+                        selectedId === cg.id && "bg-primary/5"
+                    )}
+                  >
                     <td className="px-6 py-5">
-                      <div className="flex items-center gap-4">
+                      <Link href={`/admin/caregivers?id=${cg.id}`} className="flex items-center gap-4">
                         <div className={cn("w-12 h-12 rounded-xl overflow-hidden relative border-2 border-transparent transition-all bg-primary/10 flex items-center justify-center")}>
                           {cg.image ? (
                             <img src={cg.image} className="w-full h-full object-cover" alt={cg.name} />
@@ -88,7 +101,7 @@ export default async function CaregiverVetting() {
                           <p className="font-bold text-primary tracking-tight">{cg.name}</p>
                           <p className="text-xs text-on-surface-variant font-medium">{cg.location}</p>
                         </div>
-                      </div>
+                      </Link>
                     </td>
                     <td className="px-6 py-5 text-sm text-on-surface-variant font-medium">{cg.regDate}</td>
                     <td className="px-6 py-5 text-left">
@@ -135,7 +148,7 @@ export default async function CaregiverVetting() {
               </tbody>
             </table>
             <div className="px-6 py-4 flex justify-between items-center bg-slate-50/30 border-t border-slate-50">
-              <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest opacity-60">Showing 4 of 128 caregivers</p>
+              <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest opacity-60">Showing {caregivers.length} of {caregivers.length} caregivers</p>
               <div className="flex gap-2">
                 <button className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-white transition-all border border-slate-200/50 text-slate-400">
                   <MaterialIcon name="chevron_left" className="text-lg" />
@@ -168,71 +181,97 @@ export default async function CaregiverVetting() {
         </div>
 
         {/* Right Sidebar: Quick Profile Review */}
-        <aside className="w-[420px] flex flex-col gap-6">
-          <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.03)] border border-slate-100 sticky top-24">
-            <div className="flex justify-between items-start mb-10">
-              <div>
-                <h3 className="text-2xl font-black text-primary tracking-tight">Quick Review</h3>
-                <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest opacity-60">ID: Marcus Thompson</p>
-              </div>
-              <span className="px-3 py-1.5 bg-error-container text-on-error-container text-[9px] font-black rounded-full tracking-widest uppercase border border-error/10">Action Req.</span>
-            </div>
-
-            <div className="space-y-10">
-              <div className="relative">
-                <div className="w-full h-48 rounded-[2rem] overflow-hidden mb-4 bg-slate-100 shadow-inner">
-                  <img className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAe1HiZ3QrjYNxcn2hfAaRdGRHm-IVE_TORV6s7i9AB43sB-NkQAyYVc_54QJ89c3xi4gyjLsxvoNNZglZwhEptNG-7DJBTmhoNdO93XmTK2m1msP30SrfUyTacAi2ycZjD3F2dPJmr-SqYUdZf663EGv3Aw1QG7XzaZptPz7uj8hfXwST8W2zRIpwLtHVisYsPdm5Vk8l6R7LNnln_c3dQH4knEZAFhR9IycTYzl9ZYuL0hRWOu8Mx-SCNCXfqAgfkx4_-4Gqxkec" alt="Context" />
+        {activeCg && (
+          <aside className="w-[420px] flex flex-col gap-6">
+            <div className="bg-white p-10 rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.03)] border border-slate-100 sticky top-24">
+              <div className="flex justify-between items-start mb-10">
+                <div>
+                  <h3 className="text-2xl font-black text-primary tracking-tight">Quick Review</h3>
+                  <p className="text-xs text-on-surface-variant font-bold uppercase tracking-widest opacity-60">ID: {activeCg.name}</p>
                 </div>
-                <div className="absolute -bottom-6 left-8 flex items-end gap-5">
-                  <img className="w-28 h-28 rounded-3xl border-[6px] border-white shadow-2xl object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyaMAfEZqO181Q9_pRlGM_pxdPWzgqlofvYVVhoTGJu3NvYBpQGDd2K3a232EdVlZBHwmGca2zmfmuqKoL9U2BfxnmOfGmff7cGnRYbye1AsgAz1Pcf2_FbxRscddvew7RnqmjpVTRNbB-GPncmCwtK64PHb2jiXN9a44DQFUuC1x_P3WEAcDVZ1hXx3rTdYzi4xiYbN_Z6ptjoPHxWnW5hwNF-xMAyKhH_R3lA6jbGMiFNK0i82-OxNYiuHpSgtWrtSWiJsyCBNE" alt="User" />
-                  <div className="mb-6">
-                    <h4 className="font-black text-xl text-primary leading-none tracking-tight">Marcus T.</h4>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Joined Oct 2023</p>
+                {activeCg.idStatus === "PENDING" && (
+                    <span className="px-3 py-1.5 bg-error-container text-on-error-container text-[9px] font-black rounded-full tracking-widest uppercase border border-error/10">Action Req.</span>
+                )}
+              </div>
+
+              <div className="space-y-10">
+                <div className="relative">
+                  <div className="w-full h-48 rounded-[2rem] overflow-hidden mb-4 bg-slate-100 shadow-inner">
+                    <img className="w-full h-full object-cover" src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=1000&auto=format&fit=crop" alt="Context" />
                   </div>
-                </div>
-              </div>
-
-              <div className="pt-8 space-y-5">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant opacity-60">Uploaded Documents</h4>
-                {[
-                  { title: "State ID / Passport", sub: "Exp: Jan 2028 • 1.2 MB", icon: "badge", iconColor: "text-error", check: false, view: true },
-                  { title: "CPR/First Aid Cert.", sub: "Blurry: Needs Re-upload", icon: "badge", iconColor: "text-blue-500", warn: true, edit: true },
-                  { title: "Immunization Record", sub: "Validated by System", icon: "verified_user", iconColor: "text-tertiary-fixed-dim", check: true }
-                ].map((doc, i) => (
-                  <div key={i} className={cn("group cursor-pointer bg-slate-50 p-4 rounded-2xl flex items-center justify-between border-2 border-transparent hover:border-primary/10 transition-all", doc.warn && "border-error/20 bg-error/5")}>
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                        <MaterialIcon name={doc.icon} className={doc.iconColor} />
-                      </div>
-                      <div>
-                        <p className="text-sm font-black text-primary">{doc.title}</p>
-                        <p className={cn("text-[10px] font-bold uppercase tracking-tight", doc.warn ? "text-error" : "text-on-surface-variant opacity-60")}>
-                          {doc.sub}
-                        </p>
-                      </div>
+                  <div className="absolute -bottom-6 left-8 flex items-end gap-5">
+                    <div className="w-28 h-28 rounded-3xl border-[6px] border-white shadow-2xl bg-primary/10 flex items-center justify-center">
+                        <span className="text-3xl font-black text-primary">{activeCg.name.charAt(0)}</span>
                     </div>
-                    <MaterialIcon name={doc.check ? "check_circle" : doc.view ? "visibility" : "edit"} className={cn("transition-colors", doc.check ? "text-on-tertiary-fixed-variant" : "text-slate-300 group-hover:text-primary")} />
+                    <div className="mb-6">
+                      <h4 className="font-black text-xl text-primary leading-none tracking-tight">{activeCg.name}</h4>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 tracking-widest">Joined {activeCg.regDate}</p>
+                    </div>
                   </div>
-                ))}
-              </div>
+                </div>
 
-              <div className="pt-6 grid grid-cols-2 gap-4">
-                <button className="py-4 rounded-2xl border-2 border-slate-100 font-black text-xs uppercase tracking-widest text-on-surface-variant hover:bg-slate-50 transition-all active:scale-95">Flag Issues</button>
-                <button className="py-4 rounded-2xl bg-primary text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:brightness-110 transition-all active:scale-95">Approve Profile</button>
+                <div className="pt-8 space-y-5">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant opacity-60">Uploaded Documents</h4>
+                  {[
+                    { title: "State ID / Passport", sub: "Exp: Jan 2028 • 1.2 MB", icon: "badge", iconColor: "text-error", check: activeCg.isVerified, view: true },
+                    { title: "CPR/First Aid Cert.", sub: "Blurry: Needs Re-upload", icon: "badge", iconColor: "text-blue-500", warn: !activeCg.isVerified, edit: true },
+                    { title: "Immunization Record", sub: "Validated by System", icon: "verified_user", iconColor: "text-tertiary-fixed-dim", check: activeCg.isVerified }
+                  ].map((doc, i) => (
+                    <div key={i} className={cn("group cursor-pointer bg-slate-50 p-4 rounded-2xl flex items-center justify-between border-2 border-transparent hover:border-primary/10 transition-all", doc.warn && "border-error/20 bg-error/5")}>
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                          <MaterialIcon name={doc.icon} className={doc.iconColor} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-primary">{doc.title}</p>
+                          <p className={cn("text-[10px] font-bold uppercase tracking-tight", doc.warn ? "text-error" : "text-on-surface-variant opacity-60")}>
+                            {doc.sub}
+                          </p>
+                        </div>
+                      </div>
+                      <MaterialIcon name={doc.check ? "check_circle" : doc.view ? "visibility" : "edit"} className={cn("transition-colors", doc.check ? "text-on-tertiary-fixed-variant" : "text-slate-300 group-hover:text-primary")} />
+                    </div>
+                  ))}
+                </div>
+
+                <form className="pt-6 grid grid-cols-2 gap-4">
+                  <input type="hidden" name="id" value={activeCg.id} />
+                  <button 
+                    formAction={async (formData) => {
+                        'use server';
+                        const id = formData.get('id') as string;
+                        await requireReverification(id);
+                    }}
+                    className="py-4 rounded-2xl border-2 border-slate-100 font-black text-xs uppercase tracking-widest text-on-surface-variant hover:bg-slate-50 transition-all active:scale-95"
+                  >
+                    Flag / Re-verify
+                  </button>
+                  <button 
+                    formAction={async (formData) => {
+                        'use server';
+                        const id = formData.get('id') as string;
+                        await approveCaregiver(id);
+                    }}
+                    className="py-4 rounded-2xl bg-primary text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-primary/20 hover:brightness-110 transition-all active:scale-95 disabled:opacity-50"
+                    disabled={activeCg.isVerified}
+                  >
+                    Approve Profile
+                  </button>
+                </form>
               </div>
             </div>
-          </div>
 
-          <div className="bg-error-container/20 p-6 rounded-[2rem] flex gap-5 border border-error/10">
-            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
-               <MaterialIcon name="campaign" className="text-error text-2xl" />
+            <div className="bg-error-container/20 p-6 rounded-[2rem] flex gap-5 border border-error/10">
+              <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm shrink-0">
+                 <MaterialIcon name="campaign" className="text-error text-2xl" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-on-error-container">Compliance Warning</p>
+                <p className="text-sm font-medium text-on-error-container/80 mt-1 leading-relaxed">{activeCg.name}'s check returned a non-critical traffic violation flag. Review Checkr report page 4.</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-black uppercase tracking-widest text-on-error-container">Compliance Warning</p>
-              <p className="text-sm font-medium text-on-error-container/80 mt-1 leading-relaxed">Marcus Thompson's check returned a non-critical traffic violation flag. Review Checkr report page 4.</p>
-            </div>
-          </div>
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   );

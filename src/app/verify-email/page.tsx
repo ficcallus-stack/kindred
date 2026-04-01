@@ -9,18 +9,28 @@ export default function VerifyEmailPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [sent, setSent] = useState(false);
+  const initialSendRef = useRef(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
   const router = useRouter();
   const { user, dbUser } = useAuth();
 
   // Send OTP on mount
   useEffect(() => {
-    if (user && !sent) {
-      sendOTP();
-      setSent(true);
+    if (user && !initialSendRef.current) {
+      // Robust deduplication using sessionStorage to prevent double-fire on hydration/re-mount
+      const sessionKey = `kindred_otp_sent_${user.uid}`;
+      const lastSent = sessionStorage.getItem(sessionKey);
+      const isRecentlySent = lastSent && (Date.now() - parseInt(lastSent) < 30000); // 30s throttle
+
+      if (!isRecentlySent) {
+        initialSendRef.current = true;
+        sessionStorage.setItem(sessionKey, Date.now().toString());
+        sendOTP();
+      } else {
+        initialSendRef.current = true; // Mark as sent if it was recently sent in another mount
+        setResendCooldown(60); 
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   // Cooldown timer

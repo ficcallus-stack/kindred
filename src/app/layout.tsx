@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/Toast";
 import { AuthProvider } from "@/lib/auth-context";
 import CookieBanner from "@/components/CookieBanner";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
+import { AuthGuard } from "@/components/providers/AuthGuard";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -91,6 +92,7 @@ export default function RootLayout({
         </head>
         <body className="antialiased bg-surface text-on-surface font-body min-h-screen flex flex-col">
           <ToastProvider>
+            <AuthGuard />
             <PostHogProvider>
               <main className="flex-grow">
                 {children}

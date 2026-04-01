@@ -9,22 +9,12 @@ import { enrollCertification, getMyCertifications } from "./actions";
 
 const PLANS = [
   {
-    id: "registration",
-    icon: "how_to_reg",
-    title: "Registration Fee",
-    price: "$65",
-    priceRaw: 65,
-    description: "Required for all active caregivers. Covers essential background check and professional onboarding.",
-    featured: false,
-    buttonText: "Pay Fee Only",
-  },
-  {
     id: "elite_bundle",
     icon: "verified",
     title: "Elite Bundle",
     price: "$95",
     priceRaw: 95,
-    description: "Complete your professional profile. Includes Registration Fee ($65) and the Global Care Exam ($45), saving you $15.",
+    description: "Complete your professional profile. Includes the Global Care Exam ($45) and an exclusive visibility boost, saving you $15.",
     featured: true,
     buttonText: "Enroll in Elite Bundle",
     originalPrice: "$110",
@@ -232,7 +222,7 @@ export default function CertificationsPage() {
               Elevate Your Care to <span className="text-secondary italic">Global Standards</span>
             </h1>
             <p className="text-lg text-on-surface-variant leading-relaxed mb-8 max-w-2xl">
-              Join our elite intensive program designed to refine your professional practice. Transition from a local caregiver to an internationally certified household management expert.
+              Join our elite intensive program designed to refine your professional practice. Certified caregivers receive 3x more inquiries from high-net-worth families.
             </p>
           </div>
           <div className="lg:w-2/5 relative">
