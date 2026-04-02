@@ -1,8 +1,9 @@
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { db } from "@/db";
 export const dynamic = "force-dynamic";
-import { payments, users, bookings } from "@/db/schema";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { payments, users, bookings, bookingSeries } from "@/db/schema";
+import { desc, eq, inArray, sql, lte, and } from "drizzle-orm";
+import BillingTrigger from "./BillingTrigger";
 
 export const metadata = {
   title: "Finance | Kindred Core Admin",
@@ -39,6 +40,21 @@ export default async function AdminPaymentsPage() {
   }).from(bookings).where(inArray(bookings.status, ['pending', 'in_progress', 'confirmed']));
 
   const totalEscrow = Number(escrowResult?.total || 0) / 100;
+
+  // Manual Billing Metrics
+  const now = new Date();
+  const dueSeries = await db.select({
+    id: bookingSeries.id,
+    amount: bookingSeries.retainerAmount
+  })
+  .from(bookingSeries)
+  .where(and(
+    eq(bookingSeries.status, 'active'),
+    lte(bookingSeries.nextBillingDate, now)
+  ));
+
+  const dueCount = dueSeries.length;
+  const totalDueAmount = dueSeries.reduce((acc, s) => acc + (s.amount || 0), 0) / 100;
 
   const statusColors: Record<string, { text: string, dot: string }> = {
     pending: { text: "text-amber-500", dot: "bg-amber-500" },
@@ -192,6 +208,43 @@ export default async function AdminPaymentsPage() {
           <button className="mt-8 w-full border border-primary/20 text-primary py-3 rounded-lg text-xs font-bold hover:bg-white transition-all uppercase tracking-widest">
             Access Audit Logs
           </button>
+        </div>
+      </section>
+
+      {/* Manual Billing Control Center */}
+      <section className="bg-white p-8 rounded-xl border-2 border-primary/10 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-12 opacity-[0.03] pointer-events-none">
+          <MaterialIcon name="account_balance_wallet" className="text-[120px] text-primary" />
+        </div>
+        
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 relative z-10">
+          <div className="max-w-xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary/10 text-primary text-[10px] font-black uppercase tracking-widest mb-4 border border-secondary/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+              Retainer Billing Hub
+            </div>
+            <h4 className="text-2xl font-black text-primary font-headline mb-3 tracking-tight">Manual Invoicing Engine</h4>
+            <p className="text-sm text-outline font-medium leading-relaxed">
+              Automated billing has been deactivated. Use this console to manually trigger the monthly retainer engine. 
+              The system scans for all families whose billing cycle has expired and attempts off-session Stripe charges.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-6 lg:min-w-[400px]">
+             <div className="flex-1 text-center sm:text-left bg-surface-container/30 p-5 rounded-2xl border border-outline-variant/10 w-full">
+                <span className="block text-[10px] font-bold text-outline uppercase tracking-widest mb-1">Pending Volume</span>
+                <span className="text-2xl font-black text-primary font-headline">
+                  ${totalDueAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="block text-[10px] font-medium text-outline/60 mt-1 italic">
+                  Estimating across {dueCount} families
+                </span>
+             </div>
+             
+             <div className="flex-1 w-full">
+                <BillingTrigger dueCount={dueCount} />
+             </div>
+          </div>
         </div>
       </section>
 
