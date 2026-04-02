@@ -41,7 +41,8 @@ export const users = pgTable("users", {
   isPremium: boolean("is_premium").default(false).notNull(),
   stripeCustomerId: text("stripe_customer_id"),
   platformCredits: integer("platform_credits").default(0).notNull(), // New: 15 per USD spent, 100 = 1 USD
-  lastRoleSwitchedAt: timestamp("last_role_switched_at"), // New: For 4-hour bidirectional gate
+  lastRoleSwitchedAt: timestamp("last_role_switched_at"), 
+  lastActive: timestamp("last_active").defaultNow(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -245,6 +246,7 @@ export const conversations = pgTable("conversations", {
   isSupport: boolean("is_support").default(false).notNull(), // To distinguish peer vs mod chats
   supportStatus: supportStatusEnum("support_status").default("open").notNull(),
   assignedModeratorId: text("assigned_moderator_id").references(() => users.id),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -262,8 +264,11 @@ export const messages = pgTable("messages", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   conversationId: text("conversation_id").notNull().references(() => conversations.id),
   senderId: text("sender_id").notNull().references(() => users.id),
-  content: text("content").notNull(),
-  imageUrl: text("image_url"),
+  content: text("content"),
+  fileUrl: text("file_url"),
+  fileType: text("file_type"), // image, video, document
+  fileName: text("file_name"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -642,3 +647,10 @@ export const careMilestonesRelations = relations(careMilestones, ({ one }) => ({
     parent: one(users, { fields: [careMilestones.parentId], references: [users.id] }),
     caregiver: one(users, { fields: [careMilestones.caregiverId], references: [users.id] }),
 }));
+
+// ── Newsletter Subscribers ─────────────────────────────────
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email: text("email").notNull().unique(),
+  subscribedAt: timestamp("subscribed_at").defaultNow().notNull(),
+});

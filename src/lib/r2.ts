@@ -59,12 +59,14 @@ export async function getPresignedUrl(fileName: string) {
 }
 
 export function getPublicR2Url(fileName: string) {
-  const customDomain = process.env.R2_PUBLIC_DOMAIN;
-  if (!customDomain) {
-    throw new Error("R2_PUBLIC_DOMAIN is not defined");
+  const publicUrl = process.env.NEXT_PUBLIC_R2_PUBLIC_URL;
+  if (!publicUrl) {
+    throw new Error("NEXT_PUBLIC_R2_PUBLIC_URL is not defined");
   }
 
-  return `https://${customDomain}/${fileName}`;
+  // Ensure no double slashes if publicUrl ends with /
+  const base = publicUrl.endsWith('/') ? publicUrl.slice(0, -1) : publicUrl;
+  return `${base}/${fileName}`;
 }
 
 export async function createPresignedUploadUrl(fileName: string, contentType: string) {

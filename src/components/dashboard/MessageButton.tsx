@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createConversation } from "@/app/dashboard/messages/actions";
+import { getOrCreateConversation } from "@/app/dashboard/messages/actions";
 import { useToast } from "@/components/Toast";
 import { MaterialIcon } from "@/components/MaterialIcon";
 
@@ -28,8 +28,8 @@ export default function MessageButton({
     setLoading(true);
 
     try {
-      const result = await createConversation({ recipientId });
-      router.push(`/dashboard/messages/${result.conversationId}`);
+      const conversationId = await getOrCreateConversation(recipientId);
+      router.push(`/dashboard/messages/${conversationId}`);
     } catch (error: any) {
       if (error.message.includes("PREMIUM_REQUIRED")) {
         showToast("Premium membership required to message nannies before hiring.", "error");

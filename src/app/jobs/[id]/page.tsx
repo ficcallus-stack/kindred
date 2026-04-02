@@ -207,7 +207,7 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
                <div className="relative z-10">
                 <h4 className="font-headline text-2xl font-black text-primary mb-4 tracking-tighter italic">Questions?</h4>
                 <p className="text-xs font-medium text-on-surface-variant opacity-60 italic leading-relaxed mb-6">Our concierge team is standing by to help you land this role.</p>
-                <a className="text-primary text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-3 hover:translate-x-2 transition-transform cursor-pointer">
+                <a href="/dashboard/support" className="text-primary text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-3 hover:translate-x-2 transition-transform cursor-pointer">
                   Contact Support
                   <MaterialIcon name="arrow_forward" />
                 </a>

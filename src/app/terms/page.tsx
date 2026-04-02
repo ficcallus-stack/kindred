@@ -227,9 +227,9 @@ export default function TermsOfServicePage() {
                 <h2 className="font-headline text-3xl font-bold text-primary mb-6">Questions about these clauses?</h2>
                 <p className="text-on-surface-variant text-lg mb-10 max-w-2xl mx-auto">Our legal and support teams are available to help clarify any section of this agreement to ensure you feel legally confident using our platform.</p>
                 <div className="flex flex-col sm:flex-row gap-6 justify-center">
-                  <button className="bg-primary text-white px-10 py-4 text-xs font-black uppercase tracking-widest rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all">
+                  <a href="/dashboard/support" className="bg-primary text-white px-10 py-4 text-xs font-black uppercase tracking-widest rounded-2xl hover:shadow-xl hover:-translate-y-1 transition-all inline-block">
                     Contact Support
-                  </button>
+                  </a>
                   <button className="bg-surface-container-high text-primary px-10 py-4 text-xs font-black uppercase tracking-widest rounded-2xl hover:bg-surface-container-highest transition-all">
                     Download PDF
                   </button>

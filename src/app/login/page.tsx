@@ -172,7 +172,7 @@ export default function LoginPage() {
                 <p className="text-on-surface-variant text-sm font-medium opacity-60">Enter your credentials to access your private enclave.</p>
               </div>
               
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form method="POST" onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <label className="block text-[10px] font-black font-label uppercase tracking-[0.2em] text-primary/40 ml-1" htmlFor="email">Email Address</label>
                   <input 

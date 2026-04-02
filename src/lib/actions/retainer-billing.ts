@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { bookingSeries, payments, users } from "@/db/schema";
+import { bookingSeries, payments, users, auditLogs } from "@/db/schema";
 import { stripe } from "@/lib/stripe";
 import { eq, and, lte, isNotNull } from "drizzle-orm";
 import { addMonths } from "date-fns";
@@ -91,8 +91,14 @@ export async function processMonthlyRetainers() {
     } catch (error: any) {
       console.error(`[Billing Engine] Failed to process billing for series ${series.id}:`, error.message);
       
-      // Log failure in audit log (Stage 1 overhaul)
-      // await db.insert(auditLogs)...
+      // Log failure in audit log
+      await db.insert(auditLogs).values({
+        actorId: "system",
+        action: "RETAINER_BILLING_FAILED",
+        entityType: "booking_series",
+        entityId: series.id,
+        metadata: { error: error.message, parentId: series.parentId },
+      }).catch(() => {}); // Don't let audit logging break the billing loop
 
       results.push({ seriesId: series.id, status: "failed", error: error.message });
     }

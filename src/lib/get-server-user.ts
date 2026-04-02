@@ -17,7 +17,7 @@ export async function getServerUser(): Promise<ServerUser | null> {
 
     if (!sessionCookie) return null;
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, false);
     return {
       uid: decoded.uid,
       email: decoded.email || null,

@@ -1,82 +1,17 @@
-import { Suspense } from "react";
-import MessagesClient from "./MessagesClient";
-import { getServerUser } from "@/lib/get-server-user";
-import { redirect } from "next/navigation";
-import { db } from "@/db";
-import { users, conversations, conversationMembers } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { MessageCircle } from "lucide-react";
 
-export default async function MessagesPage() {
-  const serverUser = await getServerUser();
-  if (!serverUser) {
-    redirect("/login");
-  }
-
-  // Fetch full user record
-  const currentUser = await db.query.users.findFirst({
-    where: eq(users.id, serverUser.uid),
-  });
-
-  if (!currentUser) {
-    redirect("/login");
-  }
-
-  // Fetch initial conversations for this user
-  const userConvos = await db.select({
-    id: conversations.id,
-    isSupport: conversations.isSupport,
-    updatedAt: conversations.updatedAt,
-    isArchived: conversationMembers.isArchived,
-  })
-  .from(conversations)
-  .innerJoin(conversationMembers, eq(conversations.id, conversationMembers.conversationId))
-  .where(and(
-    eq(conversationMembers.userId, currentUser.id),
-    eq(conversations.isSupport, false)
-  ))
-  .orderBy(desc(conversations.updatedAt));
-
-  // Fetch support conversations
-  const supportConvos = await db.select({
-    id: conversations.id,
-    isSupport: conversations.isSupport,
-    updatedAt: conversations.updatedAt,
-  })
-  .from(conversations)
-  .innerJoin(conversationMembers, eq(conversations.id, conversationMembers.conversationId))
-  .where(and(
-    eq(conversationMembers.userId, currentUser.id),
-    eq(conversations.isSupport, true)
-  ))
-  .orderBy(desc(conversations.updatedAt));
-
-  // Get other members for each conversation to show names/photos
-  const enrichedConvos = await Promise.all(userConvos.map(async (convo) => {
-    const members = await db.select({
-      id: users.id,
-      fullName: users.fullName,
-      profileImageUrl: users.profileImageUrl,
-    })
-    .from(conversationMembers)
-    .innerJoin(users, eq(conversationMembers.userId, users.id))
-    .where(and(
-      eq(conversationMembers.conversationId, convo.id),
-      // eq(users.id, currentUser.id) // This is wrong, we want the OTHER user
-    ));
-    
-    const otherMember = members.find(m => m.id !== currentUser.id);
-    return { ...convo, otherMember };
-  }));
-
+export default function MessagesPage() {
   return (
-    <Suspense fallback={<div className="h-screen flex items-center justify-center">Loading Messages...</div>}>
-      <MessagesClient 
-        initialConversations={enrichedConvos}
-        supportConversations={supportConvos}
-        currentUser={currentUser}
-      />
-    </Suspense>
+    <div className="flex-1 flex flex-col items-center justify-center p-12 text-center bg-white h-full">
+      <div className="w-24 h-24 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center mb-6 shadow-sm">
+        <MessageCircle size={32} className="text-slate-300" />
+      </div>
+      <h2 className="text-xl font-semibold text-slate-800 tracking-tight">Your Conversations</h2>
+      <p className="text-sm text-slate-500 max-w-sm mt-3 leading-relaxed">
+        Select a conversation from the sidebar or start a new chat from a caregiver's profile to begin messaging securely.
+      </p>
+    </div>
   );
 }

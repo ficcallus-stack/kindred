@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MaterialIcon } from "./MaterialIcon";
+import { NewsletterForm } from "./NewsletterForm";
 
 export default function Footer() {
   return (
@@ -43,16 +44,7 @@ export default function Footer() {
         <div>
           <h4 className="text-primary font-black mb-8 text-[11px] uppercase tracking-[0.2em] font-headline opacity-60">Newsletter</h4>
           <p className="text-on-surface-variant text-sm mb-6 max-w-[220px] font-medium leading-relaxed opacity-80">Get the latest parenting tips and caregiver insights.</p>
-          <div className="flex bg-white rounded-2xl p-2 border border-primary/5 shadow-2xl shadow-primary/5">
-            <input
-              className="flex-1 bg-transparent border-none focus:ring-0 text-primary text-sm font-bold px-4 placeholder:text-slate-300"
-              placeholder="Email Address"
-              type="email"
-            />
-            <button className="bg-primary text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-slate-900 transition-colors shadow-lg">
-              <MaterialIcon name="arrow_forward" className="text-xl" />
-            </button>
-          </div>
+          <NewsletterForm />
         </div>
       </div>
       

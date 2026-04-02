@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
           </div>
 
           {!sent ? (
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form method="POST" onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label className="block text-xs font-black uppercase tracking-widest text-primary/40 px-1">Email Address</label>
                 <input

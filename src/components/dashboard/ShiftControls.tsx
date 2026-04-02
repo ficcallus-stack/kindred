@@ -1,9 +1,9 @@
 "use client";
 
 import { MaterialIcon } from "@/components/MaterialIcon";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { useAblyPresence } from "@/hooks/useAbly";
+import { createAblyClient } from "@/lib/ably";
 import { clockInAction, clockOutAction } from "@/lib/actions/booking-actions";
 
 interface ShiftControlsProps {
@@ -18,14 +18,22 @@ export function ShiftControls({ bookingId, familyId, initialCheckIn, initialChec
   const [checkedOut, setCheckedOut] = useState(!!initialCheckOut);
   const [loading, setLoading] = useState(false);
   
-  const { channel } = useAblyPresence(`family-presence:${familyId}`);
+  const channelRef = useRef<any>(null);
+
+  useEffect(() => {
+    const client = createAblyClient(familyId);
+    if (client) {
+      channelRef.current = client.channels.get(`family-presence:${familyId}`);
+    }
+    return () => { client?.close(); };
+  }, [familyId]);
 
   const handleStartShift = async () => {
     setLoading(true);
     try {
       await clockInAction(bookingId);
-      if (channel) {
-         await channel.presence.enter({ status: "On Shift" });
+      if (channelRef.current) {
+         await channelRef.current.presence.enter({ status: "On Shift" });
       }
       setCheckedIn(true);
     } finally {
@@ -37,8 +45,8 @@ export function ShiftControls({ bookingId, familyId, initialCheckIn, initialChec
     setLoading(true);
     try {
       await clockOutAction(bookingId);
-      if (channel) {
-         await channel.presence.leave();
+      if (channelRef.current && channelRef.current.state === 'attached') {
+         await channelRef.current.presence.leave();
       }
       setCheckedOut(true);
     } finally {

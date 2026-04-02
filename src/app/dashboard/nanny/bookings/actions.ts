@@ -10,8 +10,8 @@ import { revalidatePath } from "next/cache";
  * Admin view of all bookings (last 30 days).
  */
 export async function getAllBookingsAdmin() {
-  const clerkUser = await requireUser();
-  const [userRecord] = await db.select().from(users).where(eq(users.id, clerkUser.uid));
+  const firebaseUser = await requireUser();
+  const [userRecord] = await db.select().from(users).where(eq(users.id, firebaseUser.uid));
   
   if (!userRecord || (userRecord.role !== "moderator" && userRecord.role !== "admin")) {
     throw new Error("Unauthorized");
@@ -156,8 +156,8 @@ export async function checkOut(bookingId: string) {
  * Allows moderators to manually set times if nanny forgets.
  */
 export async function moderatorManualSessionUpdate(bookingId: string, checkIn: Date | null, checkOut: Date | null) {
-  const clerkUser = await requireUser();
-  const [userRecord] = await db.select().from(users).where(eq(users.id, clerkUser.uid));
+  const firebaseUser = await requireUser();
+  const [userRecord] = await db.select().from(users).where(eq(users.id, firebaseUser.uid));
   
   if (!userRecord || (userRecord.role !== "moderator" && userRecord.role !== "admin")) {
     throw new Error("Unauthorized: Only moderators or admins can override session times.");

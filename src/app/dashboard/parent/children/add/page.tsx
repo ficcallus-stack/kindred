@@ -114,7 +114,7 @@ export default function AddChildPage() {
           {/* Main Form Column (8/12) */}
           <div className="lg:col-span-8 flex flex-col gap-10">
             <div className="bg-white/90 backdrop-blur-2xl p-10 lg:p-14 rounded-[3rem] border border-white shadow-[0_32px_80px_rgba(0,0,0,0.03)]">
-              <form onSubmit={handleSubmit} className="space-y-12">
+              <form method="POST" onSubmit={handleSubmit} className="space-y-12">
                 
                 {/* Quick Identification */}
                 <div className="space-y-8">

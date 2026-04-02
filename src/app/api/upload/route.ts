@@ -1,42 +1,34 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/get-server-user";
-import { uploadToR2 } from "@/lib/r2";
+import { getServerUser } from "@/lib/get-server-user";
+import { createPresignedUploadUrl } from "@/lib/r2";
+import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: Request) {
   try {
-    const user = await requireUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+    const serverUser = await getServerUser();
+    if (!serverUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const formData = await req.formData();
-    const file = formData.get("file") as File;
+    const { fileName, fileType, fileSize } = await req.json();
 
-    if (!file) {
-      return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+    // Enforce limits
+    if (fileType.startsWith('image/') && fileSize > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "Image too large (Max 10MB)" }, { status: 400 });
+    }
+    if (fileType.startsWith('video/') && fileSize > 50 * 1024 * 1024) {
+      return NextResponse.json({ error: "Video too large (Max 50MB)" }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const extension = fileName.split('.').pop();
+    const key = `messages/${serverUser.uid}/${uuidv4()}.${extension}`;
     
-    // Safety check for critical environment variable
-    if (!process.env.NEXT_PUBLIC_R2_PUBLIC_URL) {
-      console.error("CRITICAL: NEXT_PUBLIC_R2_PUBLIC_URL is missing in .env.local");
-      return NextResponse.json({ 
-        error: "Server Configuration Error: NEX_PUBLIC_R2_PUBLIC_URL is missing. Please enable 'Public Development URL' in Cloudflare and add it to your .env.local." 
-      }, { status: 500 });
-    }
-
-    // Scoped filename for security
-    const secureFileName = `${user.uid}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, "_")}`;
-    const key = `profiles/${secureFileName}`;
-
-    await uploadToR2(buffer, key, file.type);
+    const uploadUrl = await createPresignedUploadUrl(key, fileType);
     
-    const publicUrl = `${process.env.NEXT_PUBLIC_R2_PUBLIC_URL}/${key}`;
+    return NextResponse.json({ uploadUrl, key });
 
-    return NextResponse.json({ publicUrl });
   } catch (error: any) {
-    console.error("Direct upload error:", error);
-    return NextResponse.json({ error: error.message || "Failed to upload file"}, { status: 500 });
+    console.error("Upload API Error:", error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

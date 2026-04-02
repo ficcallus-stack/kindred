@@ -278,7 +278,7 @@ export function RejectedState({ user, verification }: StatusScreenProps) {
               Fix and Resubmit
               <MaterialIcon name="refresh" />
             </Link>
-            <Link href="/dashboard/messages" className="px-10 py-5 bg-surface-container-low text-primary font-black uppercase tracking-widest text-[10px] rounded-[1.5rem] hover:bg-surface-dim transition-all italic active:scale-95 shadow-sm">
+            <Link href="/dashboard/messages?tab=support" className="px-10 py-5 bg-surface-container-low text-primary font-black uppercase tracking-widest text-[10px] rounded-[1.5rem] hover:bg-surface-dim transition-all italic active:scale-95 shadow-sm">
               Speak with Concierge
             </Link>
           </div>
@@ -333,9 +333,9 @@ export function RejectedState({ user, verification }: StatusScreenProps) {
                     </div>
                 ))}
             </div>
-            <button className="text-primary font-black uppercase tracking-widest text-[10px] italic underline decoration-secondary decoration-4 underline-offset-8 hover:text-secondary transition-colors">
+            <Link href="/dashboard/messages?tab=support" className="text-primary font-black uppercase tracking-widest text-[10px] italic underline decoration-secondary decoration-4 underline-offset-8 hover:text-secondary transition-colors">
               Dispatch Concierge Chat
-            </button>
+            </Link>
           </div>
         </div>
       </section>

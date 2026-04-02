@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { users, nannyProfiles, parentProfiles } from "@/db/schema";
-import { eq, and, sql, lte, desc } from "drizzle-orm";
+import { eq, and, sql, lte, desc, gte } from "drizzle-orm";
 import BrowseFilters from "@/components/BrowseFilters";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Navbar from "@/components/Navbar";
@@ -12,7 +12,7 @@ import { getServerUser } from "@/lib/get-server-user";
 export default async function BrowseNannies({ 
   searchParams 
 }: { 
-  searchParams: Promise<{ location?: string, rate?: string, lat?: string, lng?: string, distance?: string, page?: string, skip?: string }> 
+  searchParams: Promise<{ location?: string, rate?: string, lat?: string, lng?: string, distance?: string, page?: string, skip?: string, exp?: string }> 
 }) {
   const user = await getServerUser();
   const userId = user?.uid;
@@ -40,6 +40,17 @@ export default async function BrowseNannies({
   const page = params.page ? parseInt(params.page) : 1;
   const limit = 10;
   const offset = (page - 1) * limit;
+
+  // Parse experience filter (e.g. "3-5" -> min 3, "10+" -> min 10)
+  let minExp: number | undefined;
+  if (params.exp) {
+    const expVal = params.exp;
+    if (expVal.endsWith('+')) {
+      minExp = parseInt(expVal);
+    } else if (expVal.includes('-')) {
+      minExp = parseInt(expVal.split('-')[0]);
+    }
+  }
 
   // We only use distance calculation if coordinates are present AND we didn't skip discovery
   const useProximity = !!(lat && lng && !isSkipped);
@@ -75,7 +86,8 @@ export default async function BrowseNannies({
     and(
       eq(users.role, "caregiver"),
       distanceSql ? lte(distanceSql, searchDistance) : (locationLabel ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationLabel + '%'})` : undefined),
-      params.rate ? lte(sql`CAST(${nannyProfiles.hourlyRate} AS NUMERIC)`, maxRateFilter) : undefined
+      params.rate ? lte(sql`CAST(${nannyProfiles.hourlyRate} AS NUMERIC)`, maxRateFilter) : undefined,
+      minExp ? gte(nannyProfiles.experienceYears, minExp) : undefined
     )
   )
   .orderBy(distanceSql ? sql`${distanceSql} ASC` : desc(nannyProfiles.experienceYears))

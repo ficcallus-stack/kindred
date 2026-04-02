@@ -161,7 +161,7 @@ function IdentityStep({ user, onNext, isSubmitting }: any) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-16 pb-20">
+        <form method="POST" onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-16 pb-20">
             <header className="relative">
                 <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 1 of 5</span>
                 <h1 className="text-5xl md:text-6xl font-headline font-black text-primary mb-6 leading-tight tracking-tighter italic">Identity Verification</h1>

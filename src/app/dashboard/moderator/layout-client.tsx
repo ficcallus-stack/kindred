@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
@@ -22,14 +23,42 @@ const NAV_ITEMS = [
 
 export default function ModeratorDashboardLayoutClient({ children, user }: LayoutProps) {
   const pathname = usePathname();
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Persistence of sidebar state
+  useEffect(() => {
+    const saved = localStorage.getItem("mod-sidebar-collapsed");
+    if (saved) setIsCollapsed(saved === "true");
+  }, []);
+
+  const toggleSidebar = () => {
+    const next = !isCollapsed;
+    setIsCollapsed(next);
+    localStorage.setItem("mod-sidebar-collapsed", String(next));
+  };
 
   return (
-    <div className="bg-surface font-body text-on-surface min-h-screen antialiased flex">
+    <div className="bg-surface font-body text-on-surface min-h-screen antialiased flex overflow-x-hidden">
       {/* Sidebar Navigation */}
-      <aside className="fixed left-0 top-0 h-screen w-64 z-50 bg-slate-50 border-r border-slate-200/50 flex flex-col p-4 gap-2 font-headline text-sm antialiased">
-        <div className="px-2 py-6 mb-4">
-          <h1 className="text-xl font-extrabold text-blue-950 tracking-tight leading-none italic">Moderator Hub</h1>
-          <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">Trust & Safety Team</p>
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 h-screen z-50 bg-slate-50 border-r border-slate-200/50 flex flex-col p-4 gap-2 font-headline text-sm transition-all duration-500 ease-in-out",
+          isCollapsed ? "w-20" : "w-64"
+        )}
+      >
+        <div className={cn("px-2 py-6 mb-4 flex items-center justify-between", isCollapsed ? "justify-center" : "")}>
+          {!isCollapsed && (
+            <div className="animate-in fade-in slide-in-from-left-2 duration-500">
+              <h1 className="text-xl font-extrabold text-blue-950 tracking-tight leading-none italic">Moderator Hub</h1>
+              <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mt-1">Trust & Safety Team</p>
+            </div>
+          )}
+          <button 
+            onClick={toggleSidebar}
+            className="p-2 text-slate-400 hover:bg-slate-200 hover:text-primary rounded-xl transition-all"
+          >
+            <MaterialIcon name={isCollapsed ? "menu_open" : "menu"} />
+          </button>
         </div>
         
         <nav className="flex-1 space-y-1">
@@ -39,8 +68,10 @@ export default function ModeratorDashboardLayoutClient({ children, user }: Layou
               <Link
                 key={item.id}
                 href={item.href}
+                title={isCollapsed ? item.label : ""}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group",
+                  isCollapsed ? "justify-center" : "",
                   isActive
                     ? "bg-white text-blue-900 shadow-sm border border-slate-200/50 font-bold translate-x-1"
                     : "text-slate-600 hover:text-blue-800 hover:bg-blue-50/50"
@@ -51,40 +82,60 @@ export default function ModeratorDashboardLayoutClient({ children, user }: Layou
                   className={cn("text-[20px]", isActive ? "text-blue-900" : "text-slate-400 group-hover:text-blue-600")} 
                   fill={isActive}
                 />
-                <span>{item.label}</span>
+                {!isCollapsed && <span className="animate-in fade-in slide-in-from-left-1 duration-300">{item.label}</span>}
               </Link>
             );
           })}
         </nav>
 
         <div className="mt-auto border-t border-slate-200/50 pt-4 space-y-1">
-          <button className="w-full mb-4 py-3 bg-gradient-to-br from-primary to-primary-container text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-primary/10 hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95 italic">
-            <MaterialIcon name="bolt" className="text-sm" fill />
-            Quick Verify
-          </button>
+          {!isCollapsed && (
+            <button className="w-full mb-4 py-3 bg-gradient-to-br from-primary to-primary-container text-white rounded-xl font-bold text-[10px] uppercase tracking-widest shadow-lg shadow-primary/10 hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-95 italic animate-in fade-in zoom-in-95 duration-500">
+               <MaterialIcon name="bolt" className="text-sm" fill />
+               Quick Verify
+            </button>
+          )}
           
           <Link 
             href="/dashboard/moderator/settings"
-            className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-800 hover:bg-blue-50/50 rounded-lg transition-all duration-200"
+            title={isCollapsed ? "Settings" : ""}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-blue-800 hover:bg-blue-50/50 rounded-lg transition-all duration-200",
+              isCollapsed ? "justify-center" : ""
+            )}
           >
             <MaterialIcon name="settings" className="text-[20px] text-slate-400" />
-            <span>Settings</span>
+            {!isCollapsed && <span>Settings</span>}
           </Link>
           
           <Link 
             href="/login"
-            className="flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-error hover:bg-error/5 rounded-lg transition-all duration-200"
+            title={isCollapsed ? "Sign Out" : ""}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 text-slate-600 hover:text-error hover:bg-error/5 rounded-lg transition-all duration-200",
+              isCollapsed ? "justify-center" : ""
+            )}
           >
             <MaterialIcon name="logout" className="text-[20px] text-slate-400" />
-            <span>Sign Out</span>
+            {!isCollapsed && <span>Sign Out</span>}
           </Link>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 ml-64 min-h-screen relative">
+      <main 
+        className={cn(
+          "flex-1 min-h-screen relative transition-all duration-500 ease-in-out",
+          isCollapsed ? "ml-20" : "ml-64"
+        )}
+      >
         {/* Top App Bar (Glass) */}
-        <header className="fixed top-0 right-0 left-64 z-40 bg-white/80 backdrop-blur-xl flex items-center justify-between px-8 py-3 h-16 shadow-sm shadow-blue-900/5 border-b border-slate-100">
+        <header 
+          className={cn(
+            "fixed top-0 right-0 z-40 bg-white/80 backdrop-blur-xl flex items-center justify-between px-8 py-3 h-16 shadow-sm shadow-blue-900/5 border-b border-slate-100 transition-all duration-500 ease-in-out",
+            isCollapsed ? "left-20" : "left-64"
+          )}
+        >
           <div className="flex items-center gap-4">
             <span className="text-xs font-black text-blue-950 uppercase tracking-widest italic leading-none">
               {NAV_ITEMS.find(i => pathname === i.href)?.label || "Moderator Hub"}
@@ -94,7 +145,7 @@ export default function ModeratorDashboardLayoutClient({ children, user }: Layou
               <MaterialIcon name="search" className="text-xl" />
               <input 
                 type="text" 
-                placeholder="Search candidates..." 
+                placeholder="Search resources..." 
                 className="bg-transparent border-none outline-none text-sm font-medium w-64 placeholder:text-slate-300"
               />
             </div>
@@ -106,13 +157,10 @@ export default function ModeratorDashboardLayoutClient({ children, user }: Layou
                 <MaterialIcon name="notifications" className="text-xl group-hover:scale-110 transition-transform" />
                 <span className="absolute top-2 right-2 w-2 h-2 bg-secondary rounded-full border-2 border-white"></span>
               </button>
-              <button className="p-2 text-slate-400 hover:bg-slate-50 rounded-full transition-colors">
-                <MaterialIcon name="help_outline" className="text-xl" />
-              </button>
             </div>
             
             <div className="flex items-center gap-3 pl-4 border-l border-slate-100">
-              <div className="text-right">
+              <div className="text-right hidden sm:block">
                 <p className="text-xs font-bold text-blue-950 leading-none">{user?.fullName || "Moderator"}</p>
                 <p className="text-[9px] text-slate-500 uppercase font-black tracking-widest mt-1">Personnel ID: {user?.id?.slice(0, 6) || "TEAM"}</p>
               </div>
@@ -125,8 +173,8 @@ export default function ModeratorDashboardLayoutClient({ children, user }: Layou
           </div>
         </header>
 
-        {/* Page Content */}
-        <div className="pt-24 pb-12 px-8 max-w-7xl mx-auto">
+        {/* Page Content - NOW FULL WIDTH */}
+        <div className="pt-24 pb-12 px-10 w-full animate-in fade-in duration-1000">
           {children}
         </div>
       </main>

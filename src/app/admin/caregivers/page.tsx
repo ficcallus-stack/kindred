@@ -33,6 +33,7 @@ export default async function CaregiverVetting({ searchParams }: { searchParams:
     regDate: new Date(cg.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     idStatus: cg.isVerified ? "VERIFIED" : "PENDING",
     bgStatus: cg.isVerified ? "Clear" : "Not Started",
+    isVerified: cg.isVerified || false,
     references: "0/3",
     badge: cg.isVerified || false,
     image: "",

@@ -198,9 +198,9 @@ export default function VerificationPage() {
         <div className="relative z-10 space-y-8 max-w-2xl mx-auto">
           <h2 className="text-4xl md:text-5xl font-black font-headline tracking-tighter italic">Need Help with Verification?</h2>
           <p className="text-xl opacity-80 leading-relaxed italic font-medium">Our care specialists are available 24/7 to assist you with the onboarding and trust calibration process.</p>
-          <button className="bg-white text-primary px-12 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-2xl hover:-translate-y-1 transition-all active:scale-95">
+          <a href="/dashboard/support" className="bg-white text-primary px-12 py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-sm shadow-2xl hover:-translate-y-1 transition-all active:scale-95 inline-block text-center">
             Contact Support
-          </button>
+          </a>
         </div>
         {/* Background Glints */}
         <div className="absolute -top-20 -left-20 w-64 h-64 bg-white/5 rounded-full blur-[80px]"></div>

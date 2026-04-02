@@ -38,6 +38,12 @@ export default function GlobalError({
             Try Again
           </button>
           <a
+            href="/dashboard/support"
+            className="px-8 py-4 bg-secondary text-primary font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl shadow-black/5 hover:scale-105 transition-all"
+          >
+            Contact Support
+          </a>
+          <a
             href="/"
             className="px-8 py-4 bg-surface-container-low text-primary font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-surface-container-high transition-all"
           >

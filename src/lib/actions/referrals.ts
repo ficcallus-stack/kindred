@@ -7,10 +7,10 @@ import { eq, and, count, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function getReferralStats() {
-  const clerkUser = await requireUser();
+  const firebaseUser = await requireUser();
 
   const user = await db.query.users.findFirst({
-    where: eq(users.id, clerkUser.uid),
+    where: eq(users.id, firebaseUser.uid),
     with: {
       parentProfile: true,
       nannyProfile: true,
@@ -28,22 +28,22 @@ export async function getReferralStats() {
   const [invitedCount] = await db
     .select({ count: count() })
     .from(users)
-    .where(eq(users.referredBy, clerkUser.uid));
+    .where(eq(users.referredBy, firebaseUser.uid));
 
   // Onboarded (Caregivers who are verified OR Parents who have verified email)
   // For simplicity, let's look at the referrals table status
   const [onboardedCount] = await db
     .select({ count: count() })
     .from(referrals)
-    .where(and(eq(referrals.referrerId, clerkUser.uid), eq(referrals.status, "signed_up")));
+    .where(and(eq(referrals.referrerId, firebaseUser.uid), eq(referrals.status, "signed_up")));
 
   const [successfulCount] = await db
     .select({ count: count() })
     .from(referrals)
-    .where(and(eq(referrals.referrerId, clerkUser.uid), eq(referrals.status, "completed")));
+    .where(and(eq(referrals.referrerId, firebaseUser.uid), eq(referrals.status, "completed")));
 
   const recent = await db.query.referrals.findMany({
-    where: eq(referrals.referrerId, clerkUser.uid),
+    where: eq(referrals.referrerId, firebaseUser.uid),
     orderBy: [desc(referrals.createdAt)],
     limit: 5,
     with: {
@@ -57,7 +57,7 @@ export async function getReferralStats() {
       onboarded: onboardedCount.count,
       successful: successfulCount.count,
       balance: user.referralBalance,
-      referralCode: user.referralCode || "KINDRED" + clerkUser.uid.slice(0, 4),
+      referralCode: user.referralCode || "KINDRED" + firebaseUser.uid.slice(0, 4),
       fullName: user.fullName,
       photo: photo || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.fullName}`,
       role: user.role,

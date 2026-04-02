@@ -3,6 +3,7 @@
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useState } from "react";
 
 interface RegularFamily {
   id: string;
@@ -17,10 +18,34 @@ interface RegularFamiliesGridProps {
 }
 
 export function RegularFamiliesGrid({ families }: RegularFamiliesGridProps) {
+  const [activeManual, setActiveManual] = useState<{ name: string; content: string } | null>(null);
   if (families.length === 0) return null;
 
   return (
     <div className="space-y-4">
+      {/* Household Manual Modal */}
+      {activeManual && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setActiveManual(null)}>
+          <div className="bg-white rounded-[3rem] p-10 max-w-lg w-full mx-6 shadow-2xl max-h-[80vh] overflow-y-auto relative animate-in zoom-in-95 duration-300" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setActiveManual(null)} className="absolute top-6 right-6 p-2 text-slate-300 hover:text-slate-600 transition-colors">
+              <MaterialIcon name="close" />
+            </button>
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-14 h-14 bg-secondary/10 rounded-2xl flex items-center justify-center">
+                <MaterialIcon name="menu_book" className="text-secondary text-2xl" />
+              </div>
+              <div>
+                <h3 className="font-headline font-black text-primary text-xl tracking-tight italic">Household Guide</h3>
+                <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40">The {activeManual.name} Family</p>
+              </div>
+            </div>
+            <div className="text-on-surface-variant text-sm leading-relaxed whitespace-pre-wrap font-medium italic">
+              {activeManual.content}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between px-2">
         <h3 className="text-sm font-bold text-primary font-headline uppercase tracking-widest leading-none">Your Regular Families</h3>
         <span className="text-[10px] font-black text-secondary uppercase tracking-[0.2em] opacity-40">Stage 1: Recurring Care</span>
@@ -58,7 +83,7 @@ export function RegularFamiliesGrid({ families }: RegularFamiliesGridProps) {
                
                {family.householdManual ? (
                  <button 
-                  onClick={() => alert(`HOUSEHOLD MANUAL\n\n${family.householdManual}`)} // Temporary alert for Phase 1 proof-of-concept
+                  onClick={() => setActiveManual({ name: family.familyName, content: family.householdManual! })}
                   className="flex-1 py-3 bg-secondary text-primary rounded-xl font-black uppercase tracking-widest text-[9px] shadow-lg shadow-black/5 flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-95 transition-all"
                  >
                    <MaterialIcon name="menu_book" className="text-xs" />

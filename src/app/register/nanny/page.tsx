@@ -76,7 +76,7 @@ export default function NannyRegistration() {
           <h2 className="text-2xl font-headline font-bold text-navy mb-4">Account Role Conflict</h2>
           <p className="text-on-surface-variant text-sm leading-relaxed mb-8">
             You are currently registered as a <strong>Parent</strong>. 
-            To register as a Caregiver or Nanny, you must either create a new account with a different email address or contact support to convert your existing account.
+            To register as a Caregiver or Nanny, you must either create a new account with a different email address or <Link href="/dashboard/support" className="text-primary underline font-black">contact support</Link> to convert your existing account.
           </p>
           <div className="space-y-3 flex flex-col items-center">
              <button

@@ -146,12 +146,12 @@ export default function SafetyResources() {
           <h2 className="font-headline text-4xl font-black mb-6 text-primary tracking-tighter">Still have questions?</h2>
           <p className="text-on-surface-variant text-xl mb-12 opacity-80 leading-relaxed font-medium">Our Trust & Safety team is available 24/7 to help you navigate any situation or answer your questions about our vetting process.</p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
-            <button className="bg-secondary-fixed text-on-secondary-fixed px-12 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg hover:shadow-secondary/40 transition-all active:scale-95">
+            <a href="/dashboard/support" className="bg-secondary-fixed text-on-secondary-fixed px-12 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg hover:shadow-secondary/40 transition-all active:scale-95 inline-block text-center">
               Contact Support
-            </button>
-            <button className="bg-white text-primary px-12 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg hover:shadow-primary/10 transition-all border border-primary/10 active:scale-95">
+            </a>
+            <a href="/dashboard/parent/help" className="bg-white text-primary px-12 py-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-lg hover:shadow-primary/10 transition-all border border-primary/10 active:scale-95 inline-block text-center">
               Visit Help Center
-            </button>
+            </a>
           </div>
         </div>
         <MaterialIcon name="quiz" className="absolute -right-16 -top-16 text-[300px] opacity-5 -rotate-12" />

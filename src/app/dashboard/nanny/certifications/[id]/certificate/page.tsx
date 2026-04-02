@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { getSubmissionDetails } from "@/app/dashboard/moderator/actions";
 import { useAuth } from "@/lib/auth-context";
+import Link from "next/link";
 
 interface CertificatePageProps {
   params: {
@@ -36,7 +37,7 @@ export default function CertificatePage({ params }: CertificatePageProps) {
       <div className="min-h-screen flex flex-col items-center justify-center bg-surface p-6 text-center">
         <MaterialIcon name="error_outline" className="text-6xl text-error mb-4" />
         <h1 className="text-2xl font-headline font-bold text-primary">Certificate Not Available</h1>
-        <p className="text-on-surface-variant mt-2 max-w-md">This certificate is only issued for passed exams. Please contact support if you believe this is an error.</p>
+        <p className="text-on-surface-variant mt-2 max-w-md">This certificate is only issued for passed exams. Please <Link href="/dashboard/support" className="text-primary underline font-black">contact support</Link> if you believe this is an error.</p>
       </div>
     );
   }

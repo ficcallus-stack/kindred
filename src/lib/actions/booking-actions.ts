@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { bookings, nannyProfiles, users } from "@/db/schema";
+import { eq as eqOp } from "drizzle-orm";
 import { eq, and } from "drizzle-orm";
 import { stripe } from "@/lib/stripe";
 import { createBookingSchema } from "@/lib/validations";
@@ -24,14 +25,22 @@ export async function initBookingAction(data: {
   const start = new Date(data.startDate);
   const end = new Date(data.endDate);
   
-  // Calculate default total to reserve space (will be refined in Step 2)
+  // Calculate hours and estimated total from caregiver's hourly rate
+  const caregiverProfile = await db.query.nannyProfiles.findFirst({
+    where: eqOp(nannyProfiles.id, data.caregiverId),
+  });
+  const hourlyRate = parseFloat(caregiverProfile?.hourlyRate || "0");
+  const diffDays = Math.max(1, Math.ceil(Math.abs(end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const hoursPerDay = data.refinedSchedule?.hoursPerDay || 8;
+  const estimatedTotal = Math.round(diffDays * hoursPerDay * hourlyRate * 100); // cents
+
   const [newBooking] = await db.insert(bookings).values({
     parentId: user.uid,
     caregiverId: data.caregiverId,
     startDate: start,
     endDate: end,
-    hoursPerDay: 8, // Placeholder
-    totalAmount: 0, // Placeholder
+    hoursPerDay,
+    totalAmount: estimatedTotal,
     refinedSchedule: data.refinedSchedule,
     status: "pending",
   }).returning();

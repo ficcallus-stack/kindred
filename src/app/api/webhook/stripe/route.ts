@@ -2,7 +2,7 @@ import { stripe } from "@/lib/stripe";
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { users as usersTable, certifications, payments } from "@/db/schema";
+import { users as usersTable, certifications, payments, processedWebhookEvents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { sendSubscriptionSuccessEmail } from "@/lib/email";
 
@@ -24,6 +24,14 @@ export async function POST(req: Request) {
   }
 
   const session = event.data.object as any;
+
+  // Idempotency: Skip already-processed events
+  const existing = await db.query.processedWebhookEvents.findFirst({
+    where: eq(processedWebhookEvents.eventId, event.id),
+  });
+  if (existing) {
+    return new NextResponse(null, { status: 200 });
+  }
 
   // 1. Handle Successful Checkout (New Subscription)
   if (event.type === "checkout.session.completed") {
@@ -107,6 +115,12 @@ export async function POST(req: Request) {
         .where(eq(payments.stripePaymentIntentId, paymentIntent.id));
     }
   }
+
+  // Record processed event for idempotency
+  await db.insert(processedWebhookEvents).values({
+    eventId: event.id,
+    eventType: event.type,
+  }).onConflictDoNothing();
 
   return new NextResponse(null, { status: 200 });
 }

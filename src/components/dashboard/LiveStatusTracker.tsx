@@ -2,17 +2,15 @@
 
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
-import { useAblyPresence } from "@/hooks/useAbly";
 import { useState, useEffect } from "react";
 
 interface LiveStatusTrackerProps {
-  channelName: string; // family-presence:parent-id
+  channelName: string;
   nannyName: string;
+  isActive?: boolean;
 }
 
-export function LiveStatusTracker({ channelName, nannyName }: LiveStatusTrackerProps) {
-  const { presentMembers } = useAblyPresence(channelName);
-  const isActive = presentMembers.length > 0;
+export function LiveStatusTracker({ channelName, nannyName, isActive = false }: LiveStatusTrackerProps) {
   const [tickerTime, setTickerTime] = useState(new Date().toLocaleTimeString());
 
   useEffect(() => {

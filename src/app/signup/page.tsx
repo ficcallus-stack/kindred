@@ -277,7 +277,7 @@ export default function SignUpPage() {
               </div>
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-6 mt-8">
+              <form method="POST" onSubmit={handleSubmit} className="space-y-6 mt-8">
                 <div className="space-y-2">
                   <label className="font-label text-xs font-black text-primary/40 px-1 uppercase tracking-widest">Full Name</label>
                   <input 

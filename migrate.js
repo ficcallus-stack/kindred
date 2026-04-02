@@ -106,7 +106,80 @@ async function migrate() {
     await sql`ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "is_draft" boolean DEFAULT false NOT NULL;`;
     await sql`ALTER TABLE "jobs" ADD COLUMN IF NOT EXISTS "is_boosted" boolean DEFAULT false NOT NULL;`;
 
-    console.log("Migration Phase 5 complete on Localhost Docker");
+    // 7. Push Missing Users columns
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_active" timestamp DEFAULT now();`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "stripe_connect_id" text;`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "updated_at" timestamp DEFAULT now();`;
+
+    // 8. Ensure notifications table exists
+    const notifTableRes = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name = 'notifications';
+    `;
+    if (notifTableRes.length === 0) {
+      await sql`
+        CREATE TABLE "notifications" (
+          "id" text PRIMARY KEY NOT NULL,
+          "user_id" text NOT NULL REFERENCES "users"("id"),
+          "type" text NOT NULL,
+          "title" text NOT NULL,
+          "message" text NOT NULL,
+          "is_read" boolean DEFAULT false NOT NULL,
+          "link_url" text,
+          "created_at" timestamp DEFAULT now() NOT NULL
+        );
+      `;
+      console.log("Created notifications table");
+    }
+
+    // 9. Ensure newsletter_subscribers table exists
+    const newsTableRes = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name = 'newsletter_subscribers';
+    `;
+    if (newsTableRes.length === 0) {
+      await sql`
+        CREATE TABLE "newsletter_subscribers" (
+          "id" text PRIMARY KEY NOT NULL,
+          "email" text NOT NULL UNIQUE,
+          "subscribed_at" timestamp DEFAULT now() NOT NULL
+        );
+      `;
+      console.log("Created newsletter_subscribers table");
+    }
+
+    // 10. Ensure messages table exists and has all columns
+    const messagesTableRes = await sql`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_name = 'messages';
+    `;
+    if (messagesTableRes.length === 0) {
+        await sql`
+          CREATE TABLE "messages" (
+            "id" text PRIMARY KEY NOT NULL,
+            "conversation_id" text NOT NULL REFERENCES "conversations"("id"),
+            "sender_id" text NOT NULL REFERENCES "users"("id"),
+            "content" text,
+            "file_url" text,
+            "file_type" text,
+            "file_name" text,
+            "metadata" jsonb,
+            "created_at" timestamp DEFAULT now() NOT NULL
+          );
+        `;
+        console.log("Created messages table");
+    } else {
+        await sql`ALTER TABLE "messages" ADD COLUMN IF NOT EXISTS "file_url" text;`;
+        await sql`ALTER TABLE "messages" ADD COLUMN IF NOT EXISTS "file_type" text;`;
+        await sql`ALTER TABLE "messages" ADD COLUMN IF NOT EXISTS "file_name" text;`;
+        await sql`ALTER TABLE "messages" ADD COLUMN IF NOT EXISTS "metadata" jsonb;`;
+        console.log("Messages table columns verified!");
+    }
+
+    console.log("Migration Phase 6.2 complete on Localhost Docker");
   } catch (err) {
     console.error("Local Docker migration failed:", err);
   } finally {

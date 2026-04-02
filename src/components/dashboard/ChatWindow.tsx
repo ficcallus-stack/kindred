@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { sendMessage, uploadMessageAttachment, checkChatAccess, createChatUnlockSession } from "@/app/dashboard/messages/actions";
@@ -10,12 +10,14 @@ import { format } from "date-fns";
 import { createAblyClient } from "@/lib/ably";
 import { 
   Send, Loader2, Paperclip, X, Image as ImageIcon, 
-  Maximize2, CheckCheck, Wifi, WifiOff, Globe, AlertCircle, Search
+  Maximize2, CheckCheck, Wifi, WifiOff, Globe, AlertCircle, Search,
+  FileText, Film, File
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { useAuth } from "@/lib/auth-context";
 
 interface ChatWindowProps {
   conversationId: string;
@@ -45,13 +47,14 @@ export function ChatWindow({
   otherMember,
   isSupport = false 
 }: ChatWindowProps) {
+  const { firebaseUser } = useAuth();
   const [messages, setMessages] = useState<AppMessage[]>(
     initialMessages.map(m => ({
       id: m.id,
       senderId: m.senderId,
       content: m.content,
-      imageUrls: m.imageUrl ? [m.imageUrl] : [],
-      type: m.imageUrl ? 'image' : 'text',
+      imageUrls: m.fileUrl ? [m.fileUrl] : [],
+      type: m.fileUrl ? 'image' : 'text',
       createdAt: new Date(m.createdAt).getTime(),
       status: 'sent'
     }))
@@ -67,7 +70,6 @@ export function ChatWindow({
   // File Upload State
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 
@@ -90,63 +92,104 @@ export function ChatWindow({
     verifyAccess();
   }, [conversationId, otherMember, isSupport]);
 
-  // 2. Ably Realtime Setup
+  // 2. Ably Realtime Setup with Token Injection (Fixing Disconnection)
   useEffect(() => {
-    if (!currentUser || hasAccess === false) return;
+    if (!currentUser || hasAccess === false || !firebaseUser) return;
     
-    const client = createAblyClient(currentUser.id);
-    ably.current = client;
+    let isMounted = true;
 
-    if (client) {
-      client.connection.on('connected', () => setConnectionState('connected'));
-      client.connection.on('connecting', () => setConnectionState('connecting'));
-      client.connection.on('disconnected', () => setConnectionState('disconnected'));
-      client.connect();
+    async function initAbly() {
+      try {
+        const idToken = await firebaseUser!.getIdToken();
+        if (!isMounted) return;
 
-      const channelName = `conversation:${conversationId}`;
-      chatChannel.current = client.channels.get(channelName);
+        const client = createAblyClient(currentUser.id, idToken);
+        if (!client) return;
 
-      // Subscribe to Messages
-      chatChannel.current.subscribe('message', (msg: any) => {
-        if (msg.clientId !== currentUser.id) {
-          setMessages(prev => {
-            if (prev.some(m => m.id === msg.data.id)) return prev;
-            return [...prev, { ...msg.data, createdAt: msg.data.timestamp || Date.now(), status: 'sent' }];
-          });
-        }
-      });
+        ably.current = client;
 
-      // Subscribe to Typing
-      chatChannel.current.subscribe('typing', (msg: any) => {
-        if (msg.clientId !== currentUser.id) setIsPartnerTyping(msg.data.isTyping);
-      });
-
-      // Presence
-      if (otherMember?.id) {
-        chatChannel.current.presence.subscribe('enter', (m: any) => {
-          if (m.clientId === otherMember.id) setIsPartnerPresent(true);
+        client.connection.on('connected', () => isMounted && setConnectionState('connected'));
+        client.connection.on('connecting', () => isMounted && setConnectionState('connecting'));
+        client.connection.on('disconnected', () => isMounted && setConnectionState('disconnected'));
+        client.connection.on('failed', (err) => {
+          console.error("[ABLY CLIENT] Fatal Error:", err);
+          if (isMounted) setError(err.reason?.message || "Connection failed");
         });
-        chatChannel.current.presence.subscribe('leave', (m: any) => {
-          if (m.clientId === otherMember.id) setIsPartnerPresent(false);
-        });
-        chatChannel.current.presence.get((err: any, members: any) => {
-          if (!err && members) {
-            setIsPartnerPresent(members.some((m: any) => m.clientId === otherMember.id));
+
+        const channelName = `conversation:${conversationId}`;
+        const channel = client.channels.get(channelName);
+        chatChannel.current = channel;
+
+        // Subscribe to Messages
+        channel.subscribe('message', (msg: any) => {
+          if (isMounted && msg.clientId !== currentUser.id) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === msg.data.id)) return prev;
+              return [...prev, { ...msg.data, createdAt: msg.data.timestamp || Date.now(), status: 'sent' }];
+            });
           }
         });
-      }
 
-      chatChannel.current.presence.enter();
+        // Subscribe to Typing
+        channel.subscribe('typing', (msg: any) => {
+          if (isMounted && msg.clientId !== currentUser.id) setIsPartnerTyping(msg.data.isTyping);
+        });
+
+        // Presence
+        if (otherMember?.id) {
+          channel.presence.subscribe('enter', (m: any) => {
+            if (m.clientId === otherMember.id && isMounted) setIsPartnerPresent(true);
+          });
+          channel.presence.subscribe('leave', (m: any) => {
+            if (m.clientId === otherMember.id && isMounted) setIsPartnerPresent(false);
+          });
+          channel.presence.get()
+            .then((members: any) => {
+              if (members && isMounted) {
+                setIsPartnerPresent(members.some((m: any) => m.clientId === otherMember.id));
+              }
+            })
+            .catch((err: any) => console.warn("[ABLY] Presence Get Error:", err));
+
+          // Simply enter presence. Ably handles the attachment internally.
+          // This is safer than adding manual 'on(attached)' listeners that leak.
+          try {
+            channel.presence.enter();
+          } catch (e) {
+            console.warn("[ABLY] Presence Enter Error:", e);
+          }
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          console.error("Ably Init Failed:", err);
+          setError(err.message);
+        }
+      }
     }
 
+    initAbly();
+
     return () => {
-      if (chatChannel.current) {
-        chatChannel.current.presence.leave();
-        chatChannel.current.unsubscribe();
+      isMounted = false;
+      const channel = chatChannel.current;
+
+      // Nullify references so async callbacks don't fire on unmounted components
+      chatChannel.current = null;
+      ably.current = null;
+
+      if (channel) {
+        try {
+          channel.unsubscribe();
+          // Detach specifically this conversation's channel
+          if (channel.state === 'attached' || channel.state === 'attaching') {
+             channel.detach();
+          }
+        } catch (e) {
+          console.warn("[ABLY CLEANUP] Channel Detach Error:", e);
+        }
       }
-      if (ably.current) ably.current.close();
     };
-  }, [currentUser, conversationId, hasAccess, otherMember]);
+  }, [currentUser, conversationId, hasAccess, otherMember, firebaseUser]);
 
   // 3. Message Handlers
   const handleSendMessage = async () => {
@@ -170,7 +213,6 @@ export function ChatWindow({
     try {
       await sendMessage({ conversationId, content: text });
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'sent' } : m));
-      chatChannel.current.publish('message', { ...msg, status: 'sent', timestamp: Date.now() });
     } catch (err: any) {
       setError(err.message);
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'error' } : m));
@@ -192,7 +234,7 @@ export function ChatWindow({
     };
 
     setMessages(prev => [...prev, optimisticMsg]);
-    setIsPreviewOpen(false);
+    // No modal trigger, images appear in the strip
 
     try {
       const uploadPromises = selectedFiles.map(async (file) => {
@@ -203,8 +245,8 @@ export function ChatWindow({
 
       const urls = await Promise.all(uploadPromises);
 
-      // Save first image to DB (schema limitation to 1 per message record)
-      await sendMessage({ conversationId, content: "Shared images", imageUrl: urls[0] });
+      // Save first image to DB (aligning with server's fileUrl property)
+      await sendMessage({ conversationId, content: "Shared images", fileUrl: urls[0] });
 
       const finalMsg: AppMessage = {
         ...optimisticMsg,
@@ -213,7 +255,6 @@ export function ChatWindow({
       };
 
       setMessages(prev => prev.map(m => m.id === tempId ? finalMsg : m));
-      chatChannel.current.publish('message', { ...finalMsg, status: 'sent', timestamp: Date.now() });
     } catch (err: any) {
       setError(err.message);
       setMessages(prev => prev.map(m => m.id === tempId ? { ...m, status: 'error' } : m));
@@ -234,16 +275,35 @@ export function ChatWindow({
     setTypingTimeout(setTimeout(() => sendTypingStatus(false), 2000));
   };
 
-  const onFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []).slice(0, 4);
-    if (files.length > 0) {
-      const valid = files.filter(f => f.size <= 5 * 1024 * 1024);
-      setSelectedFiles(valid);
-      setPreviewUrls(valid.map(f => URL.createObjectURL(f)));
-      setIsPreviewOpen(true);
+  const onFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const files = Array.from(e.target.files || []);
+      console.log("[ChatWindow] Initial selection:", files.map(f => `${f.name} (${(f.size/1024/1024).toFixed(2)}MB)`));
+
+      if (files.length === 0) return;
+
+      const MAX_SIZE = 25 * 1024 * 1024; // 25MB
+      const tooLarge = files.filter(f => f.size > MAX_SIZE);
+      const valid = files.filter(f => f.size <= MAX_SIZE);
+
+      if (tooLarge.length > 0) {
+        setError(`Limit: 25MB. Too large: ${tooLarge.map(f => f.name).join(", ")}`);
+      }
+
+      if (valid.length > 0) {
+        setSelectedFiles(prev => [...prev, ...valid].slice(0, 8));
+        setPreviewUrls(prev => [...prev, ...valid.map(f => {
+          if (f.type.startsWith('image/')) return URL.createObjectURL(f);
+          return "file_placeholder"; // Non-image indicator
+        })].slice(0, 8));
+      }
+    } catch (err: any) {
+      console.error("[ChatWindow] Selection Error:", err);
+      setError("Failed to process selection. Try a standard image format.");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
+  }, []);
 
   const handleUnlock = async () => {
     if (!otherMember?.id) return;
@@ -251,74 +311,56 @@ export function ChatWindow({
     if (url) window.location.href = url;
   };
 
+  // 4. Auto-Scroll Logic: User requested to STOP forced scrolling
+  // We only scroll to bottom if the user is already very close to the bottom
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (scrollRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      
+      // Only force scroll if they were already at the bottom or if IT'S THEIR OWN MESSAGE
+      // Actually, user said STOP it completely. I'll comment it out or make it very subtle.
+      /*
+      if (isAtBottom) {
+         scrollRef.current.scrollTop = scrollHeight;
+      }
+      */
+    }
   }, [messages, isPartnerTyping]);
 
   return (
-    <section className="flex-1 flex flex-col bg-[#e5ddd5] relative overflow-hidden font-body">
+    <section className="flex-1 flex flex-col bg-[#f0f2f5] relative overflow-hidden font-body">
       {/* WA Pattern Overlay */}
-      <div className="absolute inset-0 opacity-40 pointer-events-none bg-[url('https://pub-d33c13728d81440088421e0298b11617.r2.dev/wa-bg.png')] bg-repeat"></div>
-
-      {/* Header */}
-      <div className="h-20 bg-white/80 backdrop-blur-md border-b flex items-center justify-between px-8 shrink-0 z-20 shadow-sm relative">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary/5 rounded-2xl flex items-center justify-center font-black text-primary border border-outline-variant/10 relative">
-             {otherMember?.fullName?.charAt(0) || (isSupport ? "S" : "?")}
-             {isPartnerPresent && (
-               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full border-4 border-white transition-all scale-100"></div>
-             )}
-          </div>
-          <div>
-            <h1 className="font-headline text-lg font-black text-primary tracking-tight leading-none italic uppercase">
-               {otherMember?.fullName || (isSupport ? "KindredCare Support" : "Secure Room")}
-            </h1>
-            <p className={cn(
-              "text-[10px] uppercase font-black tracking-widest mt-1.5 flex items-center gap-2",
-              isPartnerTyping ? "text-primary animate-pulse" : (isPartnerPresent ? "text-emerald-600" : "text-slate-400")
-            )}>
-              {isPartnerTyping ? 'Typing...' : (isPartnerPresent ? 'Online Now' : 'Last seen recently')}
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4">
-           <div className="hidden lg:flex flex-col items-end opacity-40">
-              <span className="text-[9px] font-black uppercase tracking-[0.2em]">{connectionState}</span>
-              <div className="flex gap-1 mt-1 font-black text-[10px]">
-                 {connectionState === 'connected' ? <Globe size={11} className="text-emerald-500" /> : <WifiOff size={11} />}
-              </div>
-           </div>
-           <button className="p-2.5 text-slate-400 hover:text-primary transition-all"><Search size={22} /></button>
-        </div>
-      </div>
+      <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://pub-d33c13728d81440088421e0298b11617.r2.dev/wa-bg.png')] bg-repeat"></div>
 
       {/* Main Feed */}
       <div className="flex-1 relative overflow-hidden">
         {hasAccess === false ? (
           <ChatPaywallGate nannyName={otherMember?.fullName || "Caregiver"} onUnlock={handleUnlock} />
         ) : hasAccess === true ? (
-           <ScrollArea className="h-full px-6 py-8 relative z-10">
+           <ScrollArea className="h-full px-6 py-8 relative z-10" ref={scrollRef}>
               <div className="max-w-4xl mx-auto space-y-8 pb-10">
                  <div className="flex justify-center mb-10">
-                    <span className="bg-amber-50 text-amber-700 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-amber-100 shadow-sm shadow-amber-900/5">
-                       Audit History Enabled • Secured via Ably
+                    <span className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-full border border-slate-200/50 shadow-sm">
+                       Secure Intelligence Feed • {connectionState}
                     </span>
                  </div>
 
                  {messages.map((msg, i) => {
                     const isMe = msg.senderId === currentUser.id;
                     return (
-                      <div key={i} className={cn("flex animate-in slide-in-from-bottom-2 duration-300", isMe ? "justify-end" : "justify-start")}>
+                      <div key={i} className={cn("flex animate-in fade-in duration-500", isMe ? "justify-end" : "justify-start")}>
                         <div className={cn(
                           "relative group max-w-[80%] transition-all",
-                          msg.type === 'image' ? "w-full max-w-[450px]" : "px-6 py-4 rounded-[2rem] shadow-sm",
-                          isMe ? (msg.type === 'image' ? "" : "bg-primary text-white rounded-br-none") : "bg-white text-blue-900 border border-outline-variant/10 rounded-bl-none"
+                          msg.type === 'image' ? "w-full max-w-[450px]" : "px-6 py-4 rounded-[1.5rem] shadow-sm",
+                          isMe 
+                            ? (msg.type === 'image' ? "" : "bg-primary text-white rounded-br-none") 
+                            : "bg-white text-blue-900 border border-slate-100 rounded-bl-none shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
                         )}>
                           {msg.type === 'image' ? (
                             <div className="space-y-3">
                                <div className={cn(
-                                 "grid gap-2 overflow-hidden rounded-[2.5rem] shadow-2xl bg-black/5 w-full border-4 border-white",
+                                 "grid gap-2 overflow-hidden rounded-[2.5rem] shadow-2xl bg-black/5 w-full border-4 border-white transform transition-transform group-hover:scale-[1.02]",
                                  msg.imageUrls?.length === 1 ? "grid-cols-1" : "grid-cols-2"
                                )}>
                                  {msg.imageUrls?.map((url, idx) => (
@@ -343,9 +385,9 @@ export function ChatWindow({
                             </div>
                           ) : (
                             <div>
-                               <p className="text-[15px] leading-relaxed font-semibold italic">{msg.content}</p>
+                               <p className="text-[14px] leading-relaxed font-bold italic tracking-tight">{msg.content}</p>
                                <div className="flex items-center justify-end gap-2 mt-2">
-                                  <span className={cn("text-[8px] font-black uppercase tracking-widest", isMe ? "text-white/60" : "text-slate-400")}>
+                                  <span className={cn("text-[8px] font-black uppercase tracking-widest", isMe ? "text-white/60" : "text-slate-300")}>
                                      {format(msg.createdAt, 'HH:mm')}
                                   </span>
                                   {isMe && <CheckCheck size={14} className={msg.status === 'sent' ? (isMe ? "text-white" : "text-emerald-500") : "text-white/30"} />}
@@ -356,7 +398,6 @@ export function ChatWindow({
                       </div>
                     );
                  })}
-                 <div ref={scrollRef} />
               </div>
            </ScrollArea>
         ) : (
@@ -366,83 +407,107 @@ export function ChatWindow({
         )}
       </div>
 
-      {/* Input Overlay */}
+      {/* Preview Strip - Force Visible */}
+      {selectedFiles.length > 0 && (
+         <div className="px-6 py-6 bg-white border-t-4 border-primary/20 flex items-center gap-6 relative z-50 shadow-[0_-20px_50px_rgba(37,99,235,0.1)]">
+            <div className="flex-1 flex gap-4 overflow-x-auto pb-1 scrollbar-hide">
+              {previewUrls.map((url, idx) => {
+                 const file = selectedFiles[idx];
+                 const isImage = file?.type.startsWith('image/');
+                 const isVideo = file?.type.startsWith('video/');
+
+                 return (
+                    <div key={idx} className="relative w-32 h-32 rounded-2xl overflow-hidden shadow-xl border-4 border-white transform hover:scale-105 transition-all group shrink-0 bg-slate-100 flex items-center justify-center">
+                       {isImage ? (
+                          <img 
+                            src={url} 
+                            alt="Preview" 
+                            className="w-full h-full object-cover" 
+                          />
+                       ) : (
+                          <div className="flex flex-col items-center gap-2 p-2">
+                             {isVideo ? <Film className="text-blue-500" size={32} /> : <FileText className="text-slate-400" size={32} />}
+                             <span className="text-[8px] font-black uppercase text-slate-500 truncate w-24 text-center line-clamp-1">{file?.name}</span>
+                          </div>
+                       )}
+                       <button 
+                          onClick={() => {
+                             const nf = [...selectedFiles]; nf.splice(idx,1); setSelectedFiles(nf);
+                             const nu = [...previewUrls]; nu.splice(idx,1); setPreviewUrls(nu);
+                             if (url !== "file_placeholder") URL.revokeObjectURL(url);
+                          }}
+                          className="absolute top-1 right-1 w-8 h-8 bg-black/80 hover:bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg transition-all scale-75 group-hover:scale-100 opacity-0 group-hover:opacity-100"
+                       >
+                          <X size={14} />
+                       </button>
+                    </div>
+                 );
+              })}
+            </div>
+            <div className="flex flex-col items-end gap-1">
+               <span className="text-[9px] font-black uppercase tracking-widest text-primary/40 italic leading-none">{selectedFiles.length} Selections</span>
+               <button 
+                  onClick={() => { setSelectedFiles([]); setPreviewUrls([]); }}
+                  className="text-[9px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 transition-colors"
+               >
+                  Clear All
+               </button>
+            </div>
+            {inputText.trim() === "" && (
+              <Button 
+                onClick={handleSendImages}
+                className="h-14 px-8 bg-primary text-white rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] shadow-xl hover:-translate-y-1 active:translate-y-0 transition-all font-headline italic"
+              >
+                Send {selectedFiles.length} Items
+              </Button>
+            )}
+         </div>
+       )}
+
       {hasAccess === true && (
-        <footer className="p-6 bg-white shrink-0 z-20 flex items-center gap-4 border-t shadow-[0_-8px_40px_rgba(0,0,0,0.04)]">
-           <input type="file" multiple accept="image/*" className="hidden" ref={fileInputRef} onChange={onFileSelect} />
+        <footer className="p-6 bg-white shrink-0 z-20 flex items-center gap-4 border-t border-slate-100 shadow-[0_-8px_40px_rgba(37,99,235,0.05)]">
+           <input 
+             type="file" 
+             multiple 
+             accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip" 
+             className="hidden" 
+             ref={fileInputRef} 
+             onChange={onFileSelect} 
+           />
            <Button 
              variant="ghost" 
              size="icon" 
-             className="h-14 w-14 rounded-3xl text-slate-400 hover:text-primary hover:bg-primary/5 transition-all shadow-sm active:scale-95"
+             className="h-12 w-12 rounded-2xl text-slate-400 hover:text-primary hover:bg-slate-50 transition-all active:scale-95"
              onClick={() => fileInputRef.current?.click()}
            >
-             <Paperclip size={24} />
+             <Paperclip size={20} />
            </Button>
 
-           <div className="flex-1 bg-slate-100 rounded-[2rem] px-8 py-1 border-2 border-transparent focus-within:border-primary/20 focus-within:bg-white transition-all shadow-inner">
+           <div className="flex-1 bg-slate-50 rounded-[1.5rem] px-6 py-1 border border-slate-200 focus-within:border-primary/20 focus-within:bg-white transition-all">
               <Input 
                 value={inputText}
                 onChange={(e) => handleInputUpdate(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                placeholder="Compose a secure message..."
-                className="bg-transparent border-none focus-visible:ring-0 text-[15px] font-black italic h-14 px-0 text-primary tracking-tight"
+                placeholder="Type a secure intelligence report..."
+                className="bg-transparent border-none focus-visible:ring-0 text-[14px] font-black italic h-12 px-0 text-blue-950 tracking-tight"
               />
            </div>
 
            <Button 
              onClick={handleSendMessage}
              disabled={!inputText.trim()}
-             className="h-14 w-14 rounded-[2rem] bg-primary text-white hover:scale-110 active:scale-90 transition-all shadow-2xl shadow-primary/40 flex items-center justify-center p-0"
+             className="h-12 w-12 rounded-[1.5rem] bg-primary text-white hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center justify-center p-0"
            >
-             <Send size={24} className="ml-1" />
+             <Send size={20} className="ml-1" />
            </Button>
         </footer>
       )}
 
       {/* Modals */}
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-4xl bg-white/95 backdrop-blur-3xl p-0 border-none overflow-hidden rounded-[4rem] shadow-2xl">
-          <div className="bg-primary text-white p-10 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-               <ImageIcon size={28} className="text-white/80" />
-               <h3 className="text-3xl font-black font-headline italic tracking-tighter uppercase leading-none">Share Photos ({selectedFiles.length})</h3>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsPreviewOpen(false)} className="text-white hover:bg-white/20 rounded-full h-12 w-12">
-              <X size={28} />
-            </Button>
-          </div>
-          <div className="p-12">
-            <ScrollArea className="max-h-[45vh] mb-10">
-               <div className="grid grid-cols-2 gap-8 px-2">
-                 {previewUrls.map((url, idx) => (
-                   <div key={idx} className="relative aspect-video rounded-[2.5rem] overflow-hidden shadow-2xl group border-8 border-white group transition-all hover:scale-105 active:rotate-1">
-                      <Image src={url} alt="Preview" fill className="object-cover" />
-                      <button 
-                         onClick={() => {
-                            const nf = [...selectedFiles]; nf.splice(idx,1); setSelectedFiles(nf);
-                            const nu = [...previewUrls]; nu.splice(idx,1); setPreviewUrls(nu);
-                            if (nf.length === 0) setIsPreviewOpen(false);
-                         }}
-                         className="absolute top-4 right-4 p-3 bg-red-500 text-white rounded-full transition-all opacity-0 group-hover:opacity-100 shadow-xl"
-                      >
-                         <X size={20} />
-                      </button>
-                   </div>
-                 ))}
-               </div>
-            </ScrollArea>
-            <div className="flex justify-end gap-6">
-               <Button onClick={() => setIsPreviewOpen(false)} variant="ghost" className="rounded-2xl px-10 h-14 font-black uppercase tracking-widest text-[11px] opacity-40 hover:opacity-100">Cancel</Button>
-               <Button onClick={handleSendImages} className="bg-primary hover:scale-[1.05] active:scale-95 transition-all text-white rounded-[2rem] px-16 h-20 text-xl font-black italic tracking-tighter shadow-[0_20px_40px_rgba(37,99,235,0.3)] uppercase">
-                  <Send className="mr-4" /> Finalize & Send
-               </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Image Fullscreen Preview */}
 
       <Dialog open={!!fullscreenImage} onOpenChange={() => setFullscreenImage(null)}>
-        <DialogContent className="max-w-[98vw] h-[95vh] bg-black/90 backdrop-blur-xl border-none shadow-none p-0 flex items-center justify-center rounded-[4rem]">
+        <DialogContent className="max-w-[98vw] h-[95vh] bg-black/90 backdrop-blur-xl border-none shadow-none p-0 flex items-center justify-center rounded-[2rem]">
            {fullscreenImage && (
              <div className="relative w-full h-full flex items-center justify-center p-12">
                <Image src={fullscreenImage} alt="Large" fill className="object-contain" priority />

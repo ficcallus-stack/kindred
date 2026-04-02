@@ -265,7 +265,7 @@ export default function FAQPage() {
                 <div className="mt-8 p-6 bg-secondary-fixed rounded-2xl rounded-tl-[1.5rem] rounded-br-[1.5rem] rounded-tr-[0.75rem] rounded-bl-[0.75rem]">
                   <p className="font-headline font-bold text-on-secondary-fixed mb-2">Need direct help?</p>
                   <p className="text-on-secondary-fixed-variant text-sm mb-4 leading-relaxed">Our concierge team is available 24/7 for our community.</p>
-                  <button className="w-full bg-on-secondary-fixed text-white py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-all">Contact Us</button>
+                  <a href="/dashboard/support" className="w-full bg-on-secondary-fixed text-white py-2 rounded-lg font-bold text-sm hover:opacity-90 transition-all text-center block">Contact Us</a>
                 </div>
               </div>
             </aside>
@@ -329,14 +329,14 @@ export default function FAQPage() {
               Our KindredCare concierge team is here to help you find the peace of mind your family deserves. Reach out anytime.
             </p>
             <div className="flex flex-col sm:flex-row justify-center gap-4 pt-4">
-              <button className="bg-primary text-white px-10 py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg active:scale-95">
+              <a href="/dashboard/support" className="bg-primary text-white px-10 py-4 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-primary/90 transition-all shadow-lg active:scale-95">
                 <MaterialIcon name="mail" />
                 Contact Support
-              </button>
-              <button className="bg-white text-primary px-10 py-4 rounded-xl font-bold border border-primary/10 flex items-center justify-center gap-2 hover:bg-surface-container-low transition-all shadow-sm active:scale-95">
+              </a>
+              <a href="/dashboard/support" className="bg-white text-primary px-10 py-4 rounded-xl font-bold border border-primary/10 flex items-center justify-center gap-2 hover:bg-surface-container-low transition-all shadow-sm active:scale-95">
                 <MaterialIcon name="chat_bubble" />
                 Live Chat
-              </button>
+              </a>
             </div>
           </div>
         </section>

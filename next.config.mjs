@@ -41,7 +41,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.mapbox.com",
               "img-src 'self' data: blob: https://*.googleusercontent.com https://api.dicebear.com https://*.stripe.com https://*.mapbox.com https://*.r2.dev https://*.cloudflarestorage.com",
               "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com",
-              "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com wss://*.firebaseio.com https://*.stripe.com wss://*.ably.io https://*.ably.io https://realtime.ably.io https://*.mapbox.com",
+              "connect-src 'self' https://*.firebaseio.com https://*.googleapis.com https://*.firebaseapp.com wss://*.firebaseio.com https://*.stripe.com wss://*.ably.io https://*.ably.io https://realtime.ably.io wss://*.ably.net https://*.ably.net https://*.ably-realtime.com https://*.mapbox.com https://us.i.posthog.com",
               "frame-src 'self' https://*.stripe.com https://*.firebaseapp.com",
               "worker-src 'self' blob:",
               "object-src 'none'",

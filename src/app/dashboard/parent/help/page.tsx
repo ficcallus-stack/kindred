@@ -130,9 +130,9 @@ export default function HelpCenterPage() {
               Our Family Concierge team is available 24/7 to help you optimize your care search or resolve billing discrepancies.
             </p>
           </div>
-          <button className="px-12 py-6 bg-white text-primary rounded-[2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl hover:scale-110 active:scale-95 transition-all">
+          <a href="/dashboard/messages?tab=support" className="px-12 py-6 bg-white text-primary rounded-[2rem] font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl hover:scale-110 active:scale-95 transition-all inline-block text-center">
             Chat with Concierge
-          </button>
+          </a>
         </div>
       </div>
 

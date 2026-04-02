@@ -1,9 +1,10 @@
 "use client";
 
 import { MaterialIcon } from "@/components/MaterialIcon";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { createCareMilestoneAction } from "@/app/dashboard/nanny/care-actions";
+import { getPublicR2Url } from "@/lib/r2";
 
 interface MilestoneEditorProps {
   parentId: string;
@@ -14,20 +15,40 @@ export function MilestoneEditor({ parentId }: MilestoneEditorProps) {
   const [content, setContent] = useState("");
   const [type, setType] = useState("moment");
   const [loading, setLoading] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
+      let photoUrl: string | null = null;
+
+      // Upload photo if selected
+      if (photoFile) {
+        const res = await fetch("/api/upload", {
+          method: "POST",
+          body: JSON.stringify({ fileName: photoFile.name, fileType: photoFile.type, fileSize: photoFile.size })
+        });
+        if (res.ok) {
+          const { uploadUrl, key } = await res.json();
+          await fetch(uploadUrl, { method: "PUT", body: photoFile, headers: { "Content-Type": photoFile.type } });
+          photoUrl = getPublicR2Url(key);
+        }
+      }
+
       await createCareMilestoneAction({
         parentId,
         content,
         type,
-        photoUrl: null, // Placeholder for future upload logic
+        photoUrl,
       });
       setOpen(false);
       setContent("");
       setType("moment");
+      setPhotoFile(null);
+      setPhotoPreview(null);
     } finally {
       setLoading(false);
     }
@@ -82,6 +103,22 @@ export function MilestoneEditor({ parentId }: MilestoneEditorProps) {
            className="w-full h-32 p-6 bg-slate-50 border-2 border-transparent focus:border-primary/20 rounded-[2rem] text-sm italic font-medium text-primary outline-none resize-none transition-all"
            required
          />
+
+         {/* Photo Upload */}
+         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => {
+           const f = e.target.files?.[0];
+           if (f) { setPhotoFile(f); setPhotoPreview(URL.createObjectURL(f)); }
+         }} />
+         <button type="button" onClick={() => fileRef.current?.click()} className="w-full py-4 bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl text-xs font-bold text-slate-400 hover:border-primary/30 hover:text-primary transition-all flex items-center justify-center gap-2">
+           <MaterialIcon name="add_a_photo" />
+           {photoPreview ? "Change Photo" : "Attach Photo (Optional)"}
+         </button>
+         {photoPreview && (
+           <div className="relative w-full h-40 rounded-2xl overflow-hidden">
+             <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+             <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(null); }} className="absolute top-2 right-2 p-1.5 bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors"><MaterialIcon name="close" className="text-sm" /></button>
+           </div>
+         )}
 
          <button 
            type="submit"

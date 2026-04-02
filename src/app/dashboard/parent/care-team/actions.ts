@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { auditLogs, careTeam, parentProfiles, users, bookingSeries } from "@/db/schema";
+import { auditLogs, careTeam, parentProfiles, users, bookingSeries, bookings } from "@/db/schema";
 import { generateSeriesInstances } from "@/lib/series-logic";
 import { calculateMonthlyFinancials } from "@/lib/financial-logic";
 import { requireUser } from "@/lib/get-server-user";
@@ -241,8 +241,8 @@ export async function cancelBookingSeries(seriesId: string) {
       eq(bookingSeries.parentId, user.uid)
     ));
 
-  // Optionally delete future pending instances
-  // await db.delete(bookings).where(and(eq(bookings.seriesId, seriesId), eq(bookings.status, "pending")));
+  // Clean up future pending booking instances
+  await db.delete(bookings).where(and(eq(bookings.seriesId, seriesId), eq(bookings.status, "pending")));
 
   revalidatePath("/dashboard/parent");
   return { success: true };
