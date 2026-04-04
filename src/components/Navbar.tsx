@@ -107,7 +107,7 @@ export default function Navbar() {
               <>
                 {/* Support Button */}
                 <Link
-                  href="/dashboard/messages/support"
+                  href="/dashboard/messages"
                   className="w-11 h-11 rounded-full bg-primary/5 text-primary flex items-center justify-center hover:bg-primary/10 transition-all shadow-sm border border-primary/10 relative"
                   title="Live Support"
                 >

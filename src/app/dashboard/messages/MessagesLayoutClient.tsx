@@ -11,6 +11,7 @@ import { createAblyClient } from "@/lib/ably";
 import { Realtime } from "ably";
 import { cn } from "@/lib/utils";
 import { Loader2, Wifi, WifiOff, ChevronLeft } from "lucide-react";
+import { type User } from "firebase/auth";
 
 // Our simplified context for app-specific state (like currentUser)
 const MessagesContext = createContext<{
@@ -50,7 +51,8 @@ export default function MessagesLayoutClient({
 
   // 1. Get Token (Standard handshake identity)
   useEffect(() => {
-    const unsubscribe = auth.onIdTokenChanged(async (user) => {
+    if (!auth) return;
+    const unsubscribe = auth.onIdTokenChanged(async (user: User | null) => {
       if (user) {
         try {
           const token = await user.getIdToken();

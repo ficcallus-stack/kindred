@@ -16,10 +16,33 @@ export async function POST(request: Request) {
 
     const { role, fullName, referralCode } = await request.json();
 
-    // Check if user already exists
-    const existingUser = await db.query.users.findFirst({
+    // Check if user already exists by ID
+    let existingUser = await db.query.users.findFirst({
       where: eq(users.id, serverUser.uid),
     });
+
+    // If not found by ID, check by Email (Identity Migration / Conflict Handling)
+    if (!existingUser) {
+        const fbUser = await adminAuth.getUser(serverUser.uid);
+        const userEmail = fbUser.email || serverUser.email || "";
+
+        if (userEmail) {
+            const userByEmail = await db.query.users.findFirst({
+                where: eq(users.email, userEmail),
+            });
+
+            if (userByEmail) {
+                // Conflict: Migrate existing record to the new Firebase UID
+                const [migrated] = (await db
+                    .update(users)
+                    .set({ id: serverUser.uid, updatedAt: new Date() })
+                    .where(eq(users.id, userByEmail.id))
+                    .returning()) as any[];
+                existingUser = migrated;
+                console.log(`[Sync] Migrated user ${userEmail} from old ID to new UID ${serverUser.uid}`);
+            }
+        }
+    }
 
     if (existingUser) {
       // Update role if provided and different

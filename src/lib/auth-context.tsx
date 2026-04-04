@@ -66,6 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!auth) return;
+    
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       if (fbUser) {
         setUser({
@@ -102,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [syncSession]);
 
   const handleSignOut = useCallback(async () => {
+    if (!auth) return;
     await firebaseSignOut(auth);
     setUser(null);
     setFirebaseUser(null);

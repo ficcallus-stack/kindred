@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
+import Navbar from "@/components/Navbar";
 
 // Step Components
 import ProfileStep from "@/components/registration/ProfileStep";
@@ -108,17 +109,7 @@ export default function NannyRegistration() {
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen">
-      {/* Transactional Nav */}
-      <header className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm">
-        <div className="flex justify-between items-center h-20 px-8 max-w-7xl mx-auto">
-          <Link href="/" className="text-2xl font-extrabold tracking-tight text-primary font-headline text-slate-900">
-            KindredCare US
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-on-surface-variant font-label text-sm uppercase font-bold tracking-widest opacity-60">Nanny Onboarding</span>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="pt-32 pb-20 px-4">
         <div className="max-w-4xl mx-auto">
