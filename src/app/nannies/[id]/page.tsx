@@ -14,6 +14,7 @@ import { ProfileGallery } from "@/components/profile/ProfileGallery";
 import { NannyAvailability } from "@/components/profile/NannyAvailability";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { isNannyLive, isNannyProfileComplete } from "@/lib/nanny-guards";
 
 export const dynamic = 'force-dynamic';
 
@@ -116,13 +117,61 @@ export default async function NannyPublicProfile({ params }: { params: Promise<{
     ? (nannyReviews.reduce((acc: number, r: any) => acc + (r.rating || 0), 0) / nannyReviews.length).toFixed(1)
     : "0";
 
+  const isLive = isNannyLive(nanny);
+  const isOwnProfile = currentUser?.id === id;
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'moderator';
+
+  // Public Restriction: If not live and not authorized to view, show review page
+  if (!isLive && !isOwnProfile && !isAdmin) {
+    return (
+      <div className="bg-surface min-h-screen">
+        <Navbar />
+        <main className="pt-40 pb-20 px-6 max-w-3xl mx-auto text-center">
+          <div className="bg-secondary/10 w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-10 text-secondary">
+             <MaterialIcon name="verified_user" className="text-5xl" />
+          </div>
+          <h1 className="text-4xl font-headline font-black text-primary tracking-tighter italic mb-6">Profile Under Review</h1>
+          <p className="text-lg text-on-surface-variant leading-relaxed mb-10 opacity-70">
+            KindredCare maintains elite safety standards. This caregiver's profile is currently undergoing our mandatory 7-point identity and background verification process.
+          </p>
+          <Link href="/nannies" className="text-primary font-black uppercase tracking-widest text-xs flex items-center justify-center gap-2 hover:gap-4 transition-all">
+            <MaterialIcon name="arrow_back" /> Back to Caregiver Directory
+          </Link>
+        </main>
+      </div>
+    );
+  }
+
   const displayName = nanny.name.split(' ')[0] + (nanny.name.split(' ')[1] ? ` ${nanny.name.split(' ')[1][0]}.` : "");
 
   return (
     <div className="bg-surface min-h-screen font-body text-on-surface antialiased">
       <Navbar />
 
-      <main className="pt-32 pb-20 px-6 max-w-7xl mx-auto">
+      {/* Mandatory "Not Live" Notification Bar */}
+      {!isLive && (isOwnProfile || isAdmin) && (
+        <div className="fixed top-0 left-0 right-0 z-[60] pt-20">
+          <div className="bg-error text-on-error px-6 py-4 shadow-2xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <MaterialIcon name="warning" fill />
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest leading-none">Your Profile is Not Live</p>
+                <p className="text-[9px] font-medium opacity-80 leading-tight">
+                  {!nanny.isVerified ? "Awaiting identity verification." : "Please complete your mandatory profile fields (Bio, Rate, Location, and Photos) to start accepting jobs."}
+                </p>
+              </div>
+            </div>
+            <Link 
+              href={!nanny.isVerified ? "/dashboard/nanny/verification" : "/dashboard/profile"}
+              className="bg-white/20 hover:bg-white/30 backdrop-blur-md px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all"
+            >
+              {!nanny.isVerified ? "Verify Identity" : "Complete Profile"}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      <main className={cn("pb-20 px-6 max-w-7xl mx-auto", !isLive ? "pt-40" : "pt-32")}>
         {/* Profile Header Section */}
         <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start mb-20">
           

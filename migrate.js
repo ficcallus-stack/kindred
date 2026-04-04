@@ -1,16 +1,15 @@
-const postgres = require('postgres');
+const { neon } = require('@neondatabase/serverless');
 
 async function migrate() {
-  // Hardcoded to local docker because environment process is aggressively caching the blocked neon URL
-  const sql = postgres('postgresql://postgres:password@localhost:5433/nannyconnect', {
-    ssl: false,
-    max: 1
-  });
+  // Using Neon Serverless driver for better cloud compatibility
+  const sql = neon('postgresql://neondb_owner:npg_bX6BvM1QSnEZ@ep-bold-truth-a41ga1z8-pooler.us-east-1.aws.neon.tech/neondb');
 
   try {
-    console.log("Connected to localhost Docker database successfully");
+    console.log("Connected to Neon via Serverless Driver successfully");
 
     // 1. Ensure columns exist on users table utilizing IF NOT EXISTS for robustness
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "profile_image_url" text;`;
+    await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified" boolean DEFAULT false NOT NULL;`;
     await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "platform_credits" integer DEFAULT 0 NOT NULL;`;
     await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "last_role_switched_at" timestamp;`;
     await sql`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_premium" boolean DEFAULT false NOT NULL;`;
@@ -179,11 +178,9 @@ async function migrate() {
         console.log("Messages table columns verified!");
     }
 
-    console.log("Migration Phase 6.2 complete on Localhost Docker");
+    console.log("Migration complete on Neon Production");
   } catch (err) {
-    console.error("Local Docker migration failed:", err);
-  } finally {
-    await sql.end();
+    console.error("Neon Production migration failed:", err);
   }
 }
 

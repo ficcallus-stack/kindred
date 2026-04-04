@@ -3,14 +3,26 @@ import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { db } from "@/db";
-import { jobs, users } from "@/db/schema";
+import { jobs, users, nannyProfiles } from "@/db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { syncUser } from "@/lib/user-sync";
+import { canViewJobs } from "@/lib/nanny-guards";
+import { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Available Jobs | KindredCare Marketplace",
+  robots: "noindex, nofollow", // Default to noindex for safety, override for authorized
+};
 
 export default async function JobsPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const user = await syncUser();
+  const profile = user?.role === 'caregiver' 
+    ? await db.query.nannyProfiles.findFirst({ where: eq(nannyProfiles.id, user.id) })
+    : null;
 
-  if (!user || (user.role !== "caregiver" && user.role !== "admin")) {
+  const isAuthorized = canViewJobs(user as any, profile as any);
+
+  if (!isAuthorized) {
     return (
       <div className="bg-surface min-h-screen flex flex-col">
         <Navbar />
@@ -18,17 +30,17 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
           <div className="bg-error-container text-on-error-container p-6 rounded-full mb-8 shadow-xl">
              <MaterialIcon name="security" className="text-6xl" fill />
           </div>
-          <h1 className="text-4xl font-headline font-black text-primary tracking-tight mb-4">Access Restricted</h1>
+          <h1 className="text-4xl font-headline font-black text-primary tracking-tight mb-4">Verification Required</h1>
           <p className="text-lg text-on-surface-variant max-w-lg mx-auto mb-10 leading-relaxed">
-            For the strict privacy and safety of our families, only rigorously vetted <strong>Caregivers</strong> and Admins can view available job listings and family details.
+            For the strict privacy and safety of our families, only <strong>Verified Caregivers</strong>, Admins, and Moderators can view available job listings and family details.
           </p>
           {!user ? (
             <Link href="/login" className="bg-primary text-on-primary px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl hover:-translate-y-1 transition-transform">
               Sign In to View Jobs
             </Link>
           ) : (
-             <Link href="/dashboard" className="bg-secondary text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl hover:-translate-y-1 transition-transform">
-              Return to Dashboard
+              <Link href="/dashboard/nanny/verification" className="bg-secondary text-white px-8 py-4 rounded-xl font-bold uppercase tracking-widest text-sm shadow-xl hover:-translate-y-1 transition-transform">
+              Complete Verification
             </Link>
           )}
         </main>
