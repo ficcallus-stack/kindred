@@ -12,7 +12,7 @@ interface Step4Props {
   onBack: () => void;
 }
 
-function Step4Inner({ data, updateData, onNext, total, paymentIntentId, hours, subtotal, fee, featuredFee, boostFee, isUpdatingIntent }: { data: any, updateData: any, onNext: (id: string) => void, total: number, paymentIntentId: string, hours: number, subtotal: number, fee: number, featuredFee: number, boostFee: number, isUpdatingIntent: boolean }) {
+function Step4Inner({ data, updateData, onNext, total, paymentIntentId, hours, subtotal, fee, featuredFee, boostFee, priorityFee, isUpdatingIntent }: { data: any, updateData: any, onNext: (id: string) => void, total: number, paymentIntentId: string, hours: number, subtotal: number, fee: number, featuredFee: number, boostFee: number, priorityFee: number, isUpdatingIntent: boolean }) {
   const stripe = useStripe();
   const elements = useElements();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -91,10 +91,10 @@ function Step4Inner({ data, updateData, onNext, total, paymentIntentId, hours, s
                 <span className="text-on-surface-variant">Service fee</span>
                 <span className="font-bold text-primary">${fee.toFixed(2)}</span>
               </div>
-              {(featuredFee > 0 || boostFee > 0) && (
+              {(featuredFee > 0 || boostFee > 0 || priorityFee > 0) && (
                 <div className="flex justify-between text-sm text-secondary font-bold">
                   <span>Premium Upgrades</span>
-                  <span>+${(featuredFee + boostFee).toFixed(2)}</span>
+                  <span>+${(featuredFee + boostFee + priorityFee).toFixed(2)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-black pt-2 border-t border-outline-variant/10">
@@ -268,6 +268,12 @@ function Step4Inner({ data, updateData, onNext, total, paymentIntentId, hours, s
                     <span>$5.00</span>
                   </div>
                 )}
+                {priorityFee > 0 && (
+                  <div className="flex justify-between text-secondary font-bold">
+                    <span className="text-sm">Fast-Track Priority</span>
+                    <span>$10.00</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-3xl font-black pt-4 border-t border-white/5">
                   <span className="font-headline tracking-tighter">Deposit Due</span>
                   <span className="font-headline tracking-tighter">${total.toFixed(2)}</span>
@@ -323,12 +329,13 @@ export default function Step4({ data, updateData, onNext, onBack }: Step4Props &
   const [alreadyAuthorizedInfo, setAlreadyAuthorizedInfo] = useState<{ id: string; amount: number } | null>(null);
 
   const minRate = data.minRate || 25;
-  const hours = Object.values(data.schedule || {}).filter(Boolean).length * 2;
+  const hours = Object.values(data.schedule || {}).filter(Boolean).length * 2 || 4; // Default to 4h if no schedule
   const subtotal = minRate * hours;
   const fee = 5.0;
   const featuredFee = data.isFeatured ? 10.0 : 0;
   const boostFee = data.isBoosted ? 5.0 : 0;
-  const total = subtotal + fee + featuredFee + boostFee;
+  const priorityFee = data.isFastTrack ? 10.0 : 0;
+  const total = subtotal + fee + featuredFee + boostFee + priorityFee;
 
   useEffect(() => {
     let isMounted = true;
@@ -369,8 +376,26 @@ export default function Step4({ data, updateData, onNext, onBack }: Step4Props &
           setIsLoading(false);
           return;
         }
+
+        // 1. Check if we already have a payment intent ID in the draft
+        if (data.stripePaymentIntentId && data.stripePaymentIntentId !== "premium_waived") {
+           try {
+              const status = await getPaymentIntentStatus(data.stripePaymentIntentId);
+              // If it's already authorized/paid, we can skip fresh creation
+              if (['requires_capture', 'succeeded', 'processing'].includes(status.status)) {
+                 if (status.amount >= (total - 0.01)) { // Allow 1 cent rounding diff
+                    setAlreadyAuthorizedInfo({ id: status.id, amount: status.amount });
+                    setPaymentIntentId(status.id);
+                    setIsLoading(false);
+                    return;
+                 }
+              }
+           } catch (e) {
+              console.warn("Failed to verify existing PI, will create new one", e);
+           }
+        }
         
-        // 1. Create fresh intent
+        // 2. Create fresh intent if nothing reusable was found
         const res = await fetch("/api/stripe/create-payment-intent", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -485,6 +510,7 @@ export default function Step4({ data, updateData, onNext, onBack }: Step4Props &
         fee={fee} 
         featuredFee={featuredFee}
         boostFee={boostFee}
+        priorityFee={priorityFee}
         isUpdatingIntent={isUpdatingIntent}
       />
     </StripeProvider>

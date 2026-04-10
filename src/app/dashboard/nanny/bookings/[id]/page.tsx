@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
 import { getBookingDetail } from "../actions";
+import { notFound } from "next/navigation";
+import { getBookingActivities, getScrapbookMilestones } from "../../care-actions";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -14,6 +15,10 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
   const family = booking.parent as any;
   const profile = family?.parentProfile;
   const children = family?.children || [];
+  
+  // Fetch activity ledger and scrapbook data
+  const activities = await getBookingActivities(booking.id);
+  const scrapbook = await getScrapbookMilestones();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 space-y-12 animate-in fade-in duration-1000">
@@ -23,14 +28,14 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
           <div className="flex items-center gap-8">
              <div className="w-24 h-24 rounded-[2rem] overflow-hidden border-4 border-white/20 shadow-2xl group-hover:scale-110 transition-transform duration-700">
                 <img 
-                  src={profile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${family.fullName}`} 
+                  src={profile?.familyPhoto || `/illustrations/family_${(booking.id.charCodeAt(0) % 4) + 1}.png`} 
                   alt="Family"
                   className="w-full h-full object-cover"
                 />
              </div>
              <div>
                 <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-white text-[10px] font-black uppercase tracking-widest mb-4">
-                  Confirmed Session
+                  {booking.status === "in_progress" ? "Active Session" : (booking.status === "paid" || booking.status === "confirmed" ? "Confirmed Session" : "Pending Session")}
                 </span>
                 <h1 className="text-5xl font-extrabold font-headline tracking-tighter italic">The {family.fullName.split(" ").pop()} Family</h1>
                 <p className="text-white/60 text-lg font-medium mt-2 leading-none italic">
@@ -58,13 +63,20 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
         {/* Main Control Panel */}
         <div className="lg:col-span-8 space-y-12">
           
-          {/* SESSION CONTROL CARD */}
           <BookingSessionClient 
             bookingId={booking.id} 
             status={booking.status} 
             checkInTime={booking.checkInTime} 
             checkOutTime={booking.checkOutTime}
+            scheduledStart={booking.startDate}
             scheduledEnd={booking.endDate}
+            initialActivities={activities as any[]}
+            initialScrapbook={scrapbook as any[]}
+            family={family}
+            profile={profile}
+            children={children}
+            hoursPerDay={booking.hoursPerDay}
+            totalAmount={booking.totalAmount}
           />
 
           {/* HOUSEHOLD DETAILS */}
@@ -84,13 +96,13 @@ export default async function BookingDetailPage({ params }: { params: Promise<{ 
                        <div>
                           <p className="font-headline font-black text-xl italic text-primary leading-none">{child.name}</p>
                           <p className="text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-widest mt-1">
-                            {Number(format(new Date(), "yyyy")) - Number(format(new Date(child.dateOfBirth), "yyyy"))} Years Old
+                            {child.age} Years Old
                           </p>
                        </div>
                     </div>
-                    {child.notes && (
+                    {child.bio && (
                       <div className="bg-surface-container-low p-4 rounded-2xl border border-outline-variant/5">
-                        <p className="text-xs font-medium text-primary italic leading-relaxed">"{child.notes}"</p>
+                        <p className="text-xs font-medium text-primary italic leading-relaxed">"{child.bio}"</p>
                       </div>
                     )}
                  </div>

@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { certifications, caregiverVerifications, tickets, users, examSubmissions, examQuestions, certificationExams, auditLogs, ticketMessages, nannyProfiles } from "@/db/schema";
+import { Pulse } from "@/lib/notifications/engine";
 import { eq, and, desc, count } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { uploadExamSchema } from "@/lib/validations";
@@ -143,6 +144,9 @@ export async function markExamSubmission(submissionId: string, score: number, no
     .where(eq(examSubmissions.id, submissionId));
 
   if (passed) {
+    const certType = (submission.exam as any).certificationType;
+
+    // Update Certification record
     await db.update(certifications)
       .set({
         status: "completed",
@@ -150,8 +154,26 @@ export async function markExamSubmission(submissionId: string, score: number, no
       })
       .where(and(
         eq(certifications.caregiverId, submission.caregiverId),
-        eq(certifications.type, (submission.exam as any).certificationType)
+        eq(certifications.type, certType)
       ));
+
+    // 🏆 Grant Elite Status / Premium if passed Professional Program
+    if (certType === "standards_program") {
+        await db.update(users)
+            .set({ isPremium: true })
+            .where(eq(users.id, submission.caregiverId));
+
+        // 🔔 Pulse: Elite Status Unlocked
+        try {
+            await Pulse.sendDirect(submission.caregiverId, {
+                title: "Elite Status Unlocked! 🏆",
+                message: "Congratulations! You've passed the exam and unlocked your Elite Professional Badge.",
+                type: "certification",
+                linkUrl: "/dashboard/nanny/certifications",
+                priority: "high"
+            });
+        } catch (e) { console.error("Pulse elite notify failed:", e); }
+    }
   }
 
   // AUDIT LOG
@@ -191,14 +213,21 @@ export async function updateNannyVerificationStatus(nannyId: string, status: "ve
     await db.update(nannyProfiles).set({ isVerified: true }).where(eq(nannyProfiles.id, nannyId));
   }
 
-  // AUDIT LOG
-  await db.insert(auditLogs).values({
-    actorId: clerkUser.uid,
-    action: status === "verified" ? "VERIFY_NANNY" : "REJECT_NANNY",
-    entityType: "caregiver_verification",
-    entityId: nannyId,
-    metadata: { oldStatus, newStatus: status, notes }
-  });
+  // 🔔 Trigger Kindred Pulse
+  try {
+    const isApproved = status === "verified";
+    await Pulse.sendDirect(nannyId, {
+      title: isApproved ? "ID Verification Approved! 🛡️" : "ID Verification Rejected ⚠️",
+      message: isApproved 
+        ? "Congratulations! Your identity has been verified. You now have full access to high-trust features." 
+        : `Management review complete: ${notes || "Documentation was insufficient."}`,
+      type: "verification",
+      linkUrl: "/dashboard/nanny/verification",
+      priority: "high"
+    });
+  } catch (err) {
+    console.error("Pulse notification failed in verification update:", err);
+  }
 
   revalidatePath("/dashboard/moderator/verifications");
   return { success: true };

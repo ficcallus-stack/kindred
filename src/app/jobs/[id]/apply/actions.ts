@@ -3,6 +3,7 @@
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
 import { applications, jobs, users } from "@/db/schema";
+import { Pulse } from "@/lib/notifications/engine";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { rateLimit } from "@/lib/rate-limit";
@@ -17,6 +18,7 @@ export async function submitApplication({ jobId, message }: { jobId: string; mes
   // Verify job exists
   const job = await db.query.jobs.findFirst({
     where: eq(jobs.id, jobId),
+    with: { parent: true }
   });
 
   if (!job) throw new Error("Job not found");
@@ -38,14 +40,24 @@ export async function submitApplication({ jobId, message }: { jobId: string; mes
     status: "pending",
   });
 
-  // Send email notification to the parent
+  // 🔔 Trigger Kindred Pulse
   try {
-    const parent = await db.query.users.findFirst({ where: eq(users.id, job.parentId) });
     const nanny = await db.query.users.findFirst({ where: eq(users.id, clerkUser.uid) });
-    if (parent?.email) {
-      await sendNewApplicationEmail(parent.email, parent.fullName, nanny?.fullName || "A caregiver", job.title);
+    await Pulse.sendDirect(job.parentId, {
+      title: "New Application Received! 📄",
+      message: `${nanny?.fullName || "A caregiver"} just applied for: ${job.title}. Tap to review.`,
+      type: "application",
+      linkUrl: "/dashboard/parent/applicants",
+      priority: "normal"
+    });
+    
+    // Existing Email notification
+    if (job.parent?.email) {
+      await sendNewApplicationEmail(job.parent.email, job.parent.fullName, nanny?.fullName || "A caregiver", job.title);
     }
-  } catch (e) { console.error("Email send failed:", e); }
+  } catch (e) { 
+    console.error("Pulse application notify failed:", e); 
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/dashboard/nanny");

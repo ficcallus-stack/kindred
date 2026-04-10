@@ -2,10 +2,8 @@ import { Metadata } from 'next';
 import { db } from '@/db';
 import { users, nannyProfiles } from '@/db/schema';
 import { eq, ilike, and } from 'drizzle-orm';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import FAQSchema from '@/components/seo/FAQSchema';
 import { MaterialIcon } from '@/components/MaterialIcon';
+import FAQSchema from "@/components/seo/FAQSchema";
 
 export async function generateMetadata({ params }: { params: { niche: string; state: string; city: string } }): Promise<Metadata> {
   const { niche, state, city } = params;
@@ -59,7 +57,6 @@ export default async function HireCityPage({ params }: { params: { niche: string
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen flex flex-col">
-      <Navbar />
       <FAQSchema faqs={faqs} />
 
       <main className="pt-32 pb-24 px-6 flex-1 max-w-7xl mx-auto w-full">
@@ -137,7 +134,6 @@ export default async function HireCityPage({ params }: { params: { niche: string
         </section>
       </main>
 
-      <Footer />
     </div>
   );
 }

@@ -8,15 +8,29 @@ interface LiveStatusTrackerProps {
   channelName: string;
   nannyName: string;
   isActive?: boolean;
+  startTime?: string | Date;
 }
 
-export function LiveStatusTracker({ channelName, nannyName, isActive = false }: LiveStatusTrackerProps) {
+export function LiveStatusTracker({ channelName, nannyName, isActive = false, startTime }: LiveStatusTrackerProps) {
   const [tickerTime, setTickerTime] = useState(new Date().toLocaleTimeString());
+  const [duration, setDuration] = useState("00:00");
 
   useEffect(() => {
-    const timer = setInterval(() => setTickerTime(new Date().toLocaleTimeString()), 1000);
+    const timer = setInterval(() => {
+      const now = new Date();
+      setTickerTime(now.toLocaleTimeString());
+      
+      if (isActive && startTime) {
+        const start = new Date(startTime);
+        const diff = Math.floor((now.getTime() - start.getTime()) / 1000);
+        const hours = Math.floor(diff / 3600);
+        const mins = Math.floor((diff % 3600) / 60);
+        const secs = diff % 60;
+        setDuration(`${hours > 0 ? hours.toString().padStart(2, '0') + ':' : ''}${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+      }
+    }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [isActive, startTime]);
 
   if (!isActive) return (
      <div className="bg-surface-container-low p-6 rounded-[2rem] border border-outline-variant/10 flex items-center justify-between opacity-60 grayscale scale-[0.98] transition-all">
@@ -63,7 +77,7 @@ export function LiveStatusTracker({ channelName, nannyName, isActive = false }: 
              <div className="text-right">
                   <p className="text-[10px] font-black uppercase tracking-widest text-primary/40 mb-1">Session Duration</p>
                   <div className="flex items-center gap-3">
-                       <span className="text-2xl font-black text-primary tracking-tighter">06:02</span>
+                       <span className="text-2xl font-black text-primary tracking-tighter">{duration}</span>
                        <div className="w-24 h-2 bg-slate-100 rounded-full overflow-hidden shrink-0">
                             <div className="h-full bg-emerald-500 w-[75%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
                        </div>

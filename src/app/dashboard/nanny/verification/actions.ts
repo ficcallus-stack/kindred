@@ -2,7 +2,7 @@
 
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { caregiverVerifications, nannyProfiles } from "@/db/schema";
+import { caregiverVerifications, nannyProfiles, users, referenceSubmissions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { uploadToR2 } from "@/lib/r2";
 import { revalidatePath } from "next/cache";
@@ -110,7 +110,9 @@ export async function submitBackgroundAuth(ssnLastFour?: string) {
       backgroundAuthTimestamp: new Date(),
       currentStep: 3,
       updatedAt: new Date(),
-      adminNotes: ssnLastFour ? `SSN Last 4: ${ssnLastFour}` : undefined,
+      // TRUST-01: Set status to pending to reflect real-world vetting requirement
+      status: "pending", 
+      adminNotes: ssnLastFour ? `SSN Last 4: ${ssnLastFour} (Awaiting Provider Sync)` : "Awaiting Background Check Provider Sync",
     })
     .where(eq(caregiverVerifications.id, userId));
 
@@ -157,19 +159,52 @@ export async function saveProfessionalProfile(data: {
 }
 
 export async function submitReferences(referencesJson: string) {
-  const { uid: userId } = await requireUser();
+  const clerkUser = await requireUser();
+  const userId = clerkUser.uid;
+  const refs = JSON.parse(referencesJson);
 
+  // 1. Update the verification status
   await db
     .update(caregiverVerifications)
     .set({
-      references: JSON.parse(referencesJson),
+      references: refs,
       currentStep: 5, // Move to step 5 (Review)
       updatedAt: new Date(),
     })
     .where(eq(caregiverVerifications.id, userId));
 
+  // 2. TRUST-AUTO: Process each reference and send emails
+  // Use dynamic import or direct import if safe (assuming @/lib/email is available)
+  const { sendReferenceRequestEmail } = await import("@/lib/email");
+  const userRecord = await db.query.users.findFirst({ where: eq(users.id, userId) });
+  if (!userRecord) throw new Error("User profile not found.");
+
+  for (const ref of refs) {
+    if (!ref.email || !ref.name) continue;
+
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    // Save to tracking table
+    await db.insert(referenceSubmissions).values({
+      caregiverId: userId,
+      employerEmail: ref.email,
+      employerName: ref.name,
+      token,
+      status: "pending",
+    });
+
+    // Send the email (fire and forget for UX, or await for reliability)
+    sendReferenceRequestEmail(
+      ref.email,
+      ref.name,
+      userRecord.fullName || "A KindredCare Applicant",
+      token
+    ).catch(e => console.error(`Failed to send reference email to ${ref.email}:`, e));
+  }
+
   revalidatePath("/dashboard/nanny/verification");
 }
+
 
 export async function finalizeVerification() {
   const { uid: userId } = await requireUser();

@@ -8,7 +8,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { useToast } from "@/components/Toast";
 import { useAuth } from "@/lib/auth-context";
-import Navbar from "@/components/Navbar";
 
 export default function LoginPage() {
   const { user, loading: authLoading, role } = useAuth();
@@ -103,7 +102,6 @@ export default function LoginPage() {
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen">
-      <Navbar />
 
       <main className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 pt-20">
         {/* Background Elements */}

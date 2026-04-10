@@ -1,6 +1,7 @@
 import Ably from "ably";
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth } from "@/lib/firebase-admin";
+import { getServerUser } from "@/lib/get-server-user";
 
 /**
  * Modern Handshake: Authorization via Bearer Token
@@ -28,13 +29,21 @@ export async function POST(req: Request) {
   const idToken = authHeader.split("Bearer ")[1];
 
   try {
-    // 2. Verify with Firebase Admin
+    // 2. Verify with Firebase Admin (Client-side identity)
     const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const clientId = decodedToken.uid;
+    
+    // 3. Ghost Protocol Check: Prioritize Server-side Session (The Impersonated Identity)
+    // This resolves the clientId mismatch during impersonation.
+    const serverUser = await getServerUser();
+    const clientId = serverUser?.uid || decodedToken.uid;
 
-    if (!clientId) throw new Error("No client ID in token");
+    if (!clientId) throw new Error("No client ID found in session or token");
+    
+    if (serverUser && serverUser.uid !== decodedToken.uid) {
+      console.log(`[ABLY AUTH] Ghost Protocol Active: Impersonating ${serverUser.uid} (Authenticated as ${decodedToken.uid})`);
+    }
 
-    // 3. Generate Token Details using Ably.Rest (Server-to-Ably)
+    // 4. Generate Token Details using Ably.Rest (Server-to-Ably)
     // This is much more robust for VPNs/Firewalls than createTokenRequest
     const client = new Ably.Rest({
       key: process.env.ABLY_API_KEY!,
@@ -58,13 +67,23 @@ export async function POST(req: Request) {
   }
 }
 
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
+  const origin = req.headers.get('origin');
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'https://kindredcareus.com',
+    'https://www.kindredcareus.com'
+  ];
+
+  const headerOrigin = (origin && allowedOrigins.includes(origin)) ? origin : allowedOrigins[1];
+
   return new Response(null, {
     status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': headerOrigin,
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
     },
   });
 }

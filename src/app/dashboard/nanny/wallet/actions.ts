@@ -26,8 +26,8 @@ export async function getStripeConnectOnboarding() {
 export async function getWalletData() {
   const user = await requireUser();
 
-  // 1. Fetch Basic Wallet & Transactions
-  const wallet = await db.query.wallets.findFirst({
+  // 1. Fetch Wallet and User Identity
+  const walletPromise = db.query.wallets.findFirst({
     where: eq(wallets.id, user.uid),
     with: {
       transactions: {
@@ -37,19 +37,42 @@ export async function getWalletData() {
     }
   });
 
-  // 2. Aggregate YTD Earnings
+  const userPromise = db.query.users.findFirst({
+    where: eq(users.id, user.uid),
+    columns: { fullName: true }
+  });
+
+  const [wallet, userData] = await Promise.all([walletPromise, userPromise]);
+
+  // 2. Aggregate YTD Earnings by Type
   const startOfYear = new Date(new Date().getFullYear(), 0, 1);
-  const [ytdResult] = await db
-    .select({ total: sum(walletTransactions.amount) })
+  
+  const [earningsResult] = await db
+    .select({ 
+      total: sum(walletTransactions.amount),
+      retainer: sum(sql`CASE WHEN ${walletTransactions.earningType} = 'retainer' THEN ${walletTransactions.amount} ELSE 0 END`),
+      hourly: sum(sql`CASE WHEN ${walletTransactions.earningType} = 'hourly' THEN ${walletTransactions.amount} ELSE 0 END`),
+      overtime: sum(sql`CASE WHEN ${walletTransactions.earningType} = 'overtime' THEN ${walletTransactions.amount} ELSE 0 END`),
+    })
     .from(walletTransactions)
     .where(and(
       eq(walletTransactions.walletId, user.uid),
       eq(walletTransactions.type, "earning"),
-      eq(walletTransactions.status, "completed"),
+      sql`${walletTransactions.status} IN ('completed', 'cleared')`,
       gte(walletTransactions.createdAt, startOfYear)
     ));
 
-  // 3. Find Most Frequent Client
+  // 3. Get Active Retainers Count
+  const [activeRetainers] = await db
+    .select({ count: count() })
+    .from(bookings)
+    .where(and(
+      eq(bookings.caregiverId, user.uid),
+      eq(bookings.status, "confirmed"),
+      eq(bookings.hiringMode, "retainer")
+    ));
+
+  // 4. Find Most Frequent Client
   const [topClient] = await db
     .select({ 
       fullName: users.fullName,
@@ -65,7 +88,7 @@ export async function getWalletData() {
     .orderBy(desc(count(bookings.id)))
     .limit(1);
 
-  // 4. Generate Monthly Chart Data (Last 6 Months)
+  // 5. Generate Monthly Chart Data (Last 6 Months)
   const sixMonthsAgo = new Date();
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
   sixMonthsAgo.setDate(1);
@@ -73,15 +96,13 @@ export async function getWalletData() {
   const rawMonthly = await db
     .select({
       month: sql<string>`TO_CHAR(${walletTransactions.createdAt}, 'Mon')`,
-      monthNum: sql<number>`EXTRACT(MONTH FROM ${walletTransactions.createdAt})`,
-      year: sql<number>`EXTRACT(YEAR FROM ${walletTransactions.createdAt})`,
       total: sum(walletTransactions.amount)
     })
     .from(walletTransactions)
     .where(and(
       eq(walletTransactions.walletId, user.uid),
       eq(walletTransactions.type, "earning"),
-      eq(walletTransactions.status, "completed"),
+      sql`${walletTransactions.status} IN ('completed', 'cleared')`,
       gte(walletTransactions.createdAt, sixMonthsAgo)
     ))
     .groupBy(
@@ -94,33 +115,29 @@ export async function getWalletData() {
       sql`EXTRACT(MONTH FROM ${walletTransactions.createdAt})`
     );
 
-  // Transform to a stable 6-month array for the chart
-  const months = [];
+  // Transform to a stable 6-month array
+  const chartData = [];
   for (let i = 0; i < 6; i++) {
     const d = new Date();
     d.setMonth(d.getMonth() - (5 - i));
     const mLabel = d.toLocaleString('en-US', { month: 'short' });
     const match = rawMonthly.find(r => r.month === mLabel);
-    months.push({
+    chartData.push({
       m: mLabel,
-      val: match ? Number(match.total) / 100 : 0,
-      h: match ? Math.max(10, Math.min(100, (Number(match.total) / 500000) * 100)) + "%" : "10%",
-      curr: i === 4,
-      proj: i === 5
+      val: match ? Number(match.total) / 100 : 0
     });
   }
 
-  // 5. Fetch Inbound Payments (Bookings)
+  // 6. Fetch Inbound Payments (Bookings) with Hiring Mode
   const inboundPayments = await db.query.bookings.findMany({
-    where: eq(bookings.caregiverId, user.uid),
+    where: and(
+      eq(bookings.caregiverId, user.uid),
+      eq(bookings.status, "completed")
+    ),
     with: {
       parent: {
-        columns: {
-          fullName: true,
-        },
-        with: {
-          parentProfile: true
-        }
+        columns: { fullName: true },
+        with: { parentProfile: { columns: { familyPhoto: true } } }
       }
     },
     orderBy: [desc(bookings.startDate)],
@@ -129,23 +146,31 @@ export async function getWalletData() {
 
   return {
     ...wallet,
+    fullName: userData?.fullName || "Caregiver",
     stats: {
-      ytdEarnings: Number(ytdResult?.total || 0) / 100,
+      ytdTotal: Number(earningsResult?.total || 0) / 100,
+      ytdRetainer: Number(earningsResult?.retainer || 0) / 100,
+      ytdHourly: Number(earningsResult?.hourly || 0) / 100,
+      ytdOvertime: Number(earningsResult?.overtime || 0) / 100,
+      activeRetainers: activeRetainers?.count || 0,
       topClient: topClient?.fullName || "No bookings yet",
-      avgWeekly: (Number(ytdResult?.total || 0) / 100) / Math.max(1, new Date().getUTCMonth() * 4),
-      chart: months
+      chart: chartData
     },
-    inboundPayments: inboundPayments.map(b => ({
-      id: b.id,
-      family: (b.parent as any)?.fullName || "Family",
-      familyPhoto: (b.parent as any)?.parentProfile?.familyPhoto || null,
-      date: b.startDate,
-      hours: b.hoursPerDay,
-      amount: b.totalAmount / 100,
-      status: b.status === "completed" ? "Paid" : "Pending",
-      rate: 30, // Mock rate for UI
-      overtime: b.overtimeAmount / 100,
-      lateness: b.latenessMinutes
-    }))
+    inboundPayments: inboundPayments.map(b => {
+      const { caregiverNet } = (require("@/lib/financial-logic")).getBookingFinancialBreakdown(b.totalAmount);
+      return {
+        id: b.id,
+        family: (b.parent as any)?.fullName || "Family",
+        familyPhoto: (b.parent as any)?.parentProfile?.familyPhoto || null,
+        date: b.startDate,
+        hours: b.hoursPerDay,
+        amount: caregiverNet / 100,
+        totalPaidByParent: b.totalAmount / 100,
+        hiringMode: b.hiringMode,
+        status: b.status === "completed" ? "Available" : "Locked",
+        statusColor: b.status === "completed" ? "emerald" : "primary",
+        overtime: b.overtimeAmount / 100
+      };
+    })
   };
 }

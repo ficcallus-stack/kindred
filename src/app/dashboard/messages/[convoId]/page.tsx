@@ -16,7 +16,6 @@ export default async function ConversationPage({ params }: { params: Promise<{ c
 
   if (!convo) notFound();
 
-  // Get other member info
   const members = await db.select({
     id: users.id,
     fullName: users.fullName,
@@ -25,6 +24,14 @@ export default async function ConversationPage({ params }: { params: Promise<{ c
   .from(conversationMembers)
   .innerJoin(users, eq(conversationMembers.userId, users.id))
   .where(eq(conversationMembers.conversationId, convoId));
+
+  // Mark as read
+  await db.update(conversationMembers)
+    .set({ lastReadAt: new Date() })
+    .where(and(
+      eq(conversationMembers.conversationId, convoId),
+      eq(conversationMembers.userId, serverUser.uid)
+    ));
 
   const otherMember = members.find(m => m.id !== serverUser.uid);
 

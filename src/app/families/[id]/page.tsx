@@ -1,7 +1,6 @@
 "use client";
 
 import { MaterialIcon } from "@/components/MaterialIcon";
-import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 
 const FAMILY = {
@@ -51,7 +50,6 @@ const FAMILY = {
 export default function FamilyPublicProfile() {
   return (
     <div className="bg-surface min-h-screen pb-32">
-      <Navbar />
 
       <main className="pt-24 max-w-7xl mx-auto px-6">
         {/* Hero Section */}

@@ -7,7 +7,7 @@ import { format } from "date-fns";
 export default async function NannyBookingsPage() {
   const allBookings = await getNannyBookings();
 
-  const active = allBookings.filter(b => b.status === "in_progress" || b.status === "confirmed");
+  const active = allBookings.filter(b => b.status === "in_progress" || b.status === "confirmed" || b.status === "paid");
   const past = allBookings.filter(b => b.status === "completed" || b.status === "cancelled");
 
   return (
@@ -53,7 +53,7 @@ export default async function NannyBookingsPage() {
                       "px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest italic shadow-sm",
                       booking.status === "in_progress" ? "bg-green-100/80 text-green-700 border border-green-200" : "bg-primary/5 text-primary border border-primary/10"
                     )}>
-                      {booking.status === "in_progress" ? "In Progress" : "Confirmed"}
+                      {booking.status === "in_progress" ? "In Progress" : (booking.status === "paid" || booking.status === "confirmed" ? "Confirmed" : "Pending")}
                     </span>
                   </div>
                   

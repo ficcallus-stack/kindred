@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { careMilestones } from "@/db/schema";
+import { careMilestones, careActivities, notifications, bookings } from "@/db/schema";
 import { requireUser } from "@/lib/get-server-user";
 import { revalidatePath } from "next/cache";
+import { eq, desc } from "drizzle-orm";
 
 /**
  * Nanny Action: Record a Kindred Moment (Milestone)
@@ -52,4 +53,70 @@ export async function getScrapbookMilestones() {
         createdAt: m.createdAt,
         caregiverName: (m.caregiver as any).fullName
     })) as any;
+}
+
+/**
+ * Log a specific session activity (Meal, Sleep, etc.)
+ */
+export async function logActivityAction(data: {
+    bookingId: string;
+    type: string;
+    content: string;
+    photoUrl?: string;
+    videoUrl?: string;
+}) {
+    const user = await requireUser();
+
+    // 1. Fetch booking to get parentId
+    const booking = await db.query.bookings.findFirst({
+        where: eq(bookings.id, data.bookingId)
+    });
+
+    if (!booking) throw new Error("Booking not found");
+
+    // 2. Insert activity
+    await db.insert(careActivities).values({
+        bookingId: data.bookingId,
+        parentId: booking.parentId,
+        caregiverId: user.uid,
+        type: data.type,
+        content: data.content,
+        photoUrl: data.photoUrl,
+        videoUrl: data.videoUrl,
+    });
+
+    // 3. If media present or critical, send notification to parent
+    if (data.photoUrl || data.videoUrl || data.type === "incident" || data.type === "medication") {
+        const dbUser = await db.query.users.findFirst({
+            where: (u, { eq }) => eq(u.id, user.uid)
+        });
+        const fullName = dbUser?.fullName || "Your Nanny";
+
+        await db.insert(notifications).values({
+            userId: booking.parentId,
+            type: "care_update",
+            title: `Care Update from ${fullName}`,
+            message: data.content || `Nanny added a new ${data.type} log.`,
+            linkUrl: `/dashboard/parent/bookings/${data.bookingId}`,
+        });
+    }
+
+    revalidatePath(`/dashboard/nanny/bookings/${data.bookingId}`);
+    revalidatePath("/dashboard/parent");
+    return { success: true };
+}
+
+/**
+ * Fetch all activities for a specific booking
+ */
+export async function getBookingActivities(bookingId: string, page: number = 0, limit: number = 10) {
+    const user = await requireUser();
+    const offset = page * limit;
+    
+    return db.query.careActivities.findMany({
+        where: eq(careActivities.bookingId, bookingId),
+        orderBy: [desc(careActivities.createdAt)],
+        limit: limit,
+        offset: offset
+    });
 }

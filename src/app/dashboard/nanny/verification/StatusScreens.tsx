@@ -9,128 +9,179 @@ interface StatusScreenProps {
   verification?: any;
 }
 
-// ── Success State ─────────────────────────────────────────────
+// SUCCESS STATE
 export function SuccessState({ user }: StatusScreenProps) {
+  const firstName = user?.fullName?.split(" ")[0] || "Caregiver";
+
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000">
-      {/* Hero Celebration Section */}
-      <section className="relative mb-24 overflow-hidden">
-        <div className="grid md:grid-cols-2 gap-16 items-center">
-          <div className="z-10 order-2 md:order-1">
-            <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-tertiary-fixed text-on-tertiary-fixed rounded-full font-headline font-black text-[10px] uppercase tracking-widest mb-8 shadow-xl shadow-tertiary/10">
-              <span className="material-symbols-outlined text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-              Verified Professional
-            </div>
-            <h1 className="font-headline text-5xl md:text-7xl font-black text-primary mb-8 leading-tight tracking-tighter italic">
-              Congratulations, <br/><span className="text-secondary italic">{user?.fullName?.split(" ")[0]}.</span>
-            </h1>
-            <p className="text-lg text-on-surface-variant max-w-lg mb-10 leading-relaxed font-medium italic opacity-80">
-              Your profile is now 100% verified. You've joined the top tier of caregivers, unlocking priority placement in family searches and <span className="text-primary font-black">5x more job invites.</span>
-            </p>
-            <div className="flex flex-wrap gap-5">
-              <Link href="/dashboard/nanny/open-roles" className="px-10 py-5 bg-gradient-to-br from-primary to-primary-container text-white rounded-[1.5rem] font-headline font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-primary/20 hover:scale-[1.05] active:scale-95 transition-all flex items-center gap-3 italic">
-                Apply for Jobs
-                <MaterialIcon name="arrow_forward" />
-              </Link>
-              <Link href={`/nannies/${user?.id}`} className="px-10 py-5 bg-white border border-outline-variant/30 text-primary rounded-[1.5rem] font-headline font-black uppercase tracking-widest text-[10px] hover:bg-surface-container-low transition-all italic shadow-lg shadow-black/5 active:scale-95">
-                View Public Profile
-              </Link>
-            </div>
+    <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 pb-20">
+      {/* Hero Section */}
+      <section className="relative mb-24 mt-4 flex flex-col md:flex-row items-center gap-16">
+        <div className="flex-1 text-center md:text-left z-10">
+          <div className="inline-flex items-center gap-3 px-5 py-2 bg-tertiary-fixed text-on-tertiary-fixed rounded-full mb-8 font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-tertiary/10 border border-tertiary/20">
+            <MaterialIcon name="verified" className="text-sm" fill />
+            Verified Professional
           </div>
-          <div className="relative order-1 md:order-2">
-            <div className="relative z-10 w-full aspect-square overflow-hidden rounded-[4rem] shadow-2xl rotate-2">
-              <img 
-                alt="Celebration" 
-                className="w-full h-full object-cover" 
-                src="https://images.unsplash.com/photo-1543333995-a78ee9e5419f?auto=format&fit=crop&q=80&w=800" 
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent" />
+          <h1 className="font-headline text-5xl md:text-8xl font-black text-primary mb-8 tracking-tighter leading-[0.9] italic">
+            Congratulations, <br/><span className="text-secondary italic">{firstName}!</span>
+          </h1>
+          <p className="text-on-surface-variant text-lg md:text-xl max-w-xl leading-relaxed mb-12 font-medium italic opacity-70">
+            Your profile is now 100% verified. You've joined the top tier of caregivers, unlocking priority placement in family searches and <span className="text-primary font-black underline decoration-secondary decoration-4">5x more job invites.</span>
+          </p>
+          <div className="flex flex-col sm:flex-row gap-5 justify-center md:justify-start">
+            <Link 
+              href="/dashboard/nanny/open-roles"
+              className="bg-primary text-white px-10 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-primary/20 transition-all hover:scale-[1.03] active:scale-95 flex items-center gap-3"
+            >
+              Apply for Jobs <MaterialIcon name="arrow_forward" />
+            </Link>
+            <Link 
+              href={`/nannies/${user?.id}`}
+              className="bg-white text-primary border border-slate-100 px-10 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all hover:bg-slate-50 active:scale-95 shadow-lg"
+            >
+              View Public Profile
+            </Link>
+          </div>
+        </div>
+        
+        <div className="flex-1 relative">
+          <div className="rounded-[4rem] overflow-hidden shadow-2xl shadow-primary/20 rotate-3 border-8 border-white group">
+            <img 
+              alt="Professional success" 
+              className="w-full h-[500px] object-cover transition-transform duration-1000 group-hover:scale-110" 
+              src="https://lh3.googleusercontent.com/aida-public/AB6AXuDD-hpjb8W4im2eMtDZbz4fb75jfGqqJZhNks6d0ZJLLtPC_V7zvSw93BcHo79tjyYv8AhFnRukEGWq8y-N9BPKkYvXYjDbgX7hIrWio0w44XXcj-G6PQnhTAi08-Z07TvU_IJ4Dv-IOIQmz13jhM2XPtIJtnM5p85ElBPcgX-65BJKapVibIegq94oIBl-kJtHgS_yZ_KyQHznJ-Z5RbT9CMnhj2KhYbj7jCdoJhOhOM4s-95sHDJbuk2C8rq5JZIHKAXstpD-7JA" 
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/40 to-transparent" />
+          </div>
+          <div className="absolute -bottom-8 -left-8 bg-white p-6 rounded-[2rem] shadow-2xl border border-slate-50 hidden lg:flex items-center gap-5 z-20">
+            <div className="bg-secondary-fixed p-4 rounded-2xl shadow-lg">
+              <MaterialIcon name="celebration" className="text-secondary text-2xl" fill />
             </div>
-            <div className="absolute -top-10 -right-10 w-full h-full bg-secondary-fixed opacity-10 rounded-[4rem] -z-10 translate-x-4 translate-y-4 -rotate-3" />
-            <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-tertiary-fixed opacity-30 rounded-full blur-[100px] -z-10" />
+            <div>
+              <p className="font-black text-primary italic tracking-tight">Top 1% Badge</p>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Active on your profile now</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Bento Grid Perks Section */}
-      <section className="space-y-12 pb-24">
-        <h2 className="font-headline text-3xl font-black text-primary tracking-tight italic">Your Elite Benefits</h2>
+      {/* Bento Grid: Elite Benefits */}
+      <section className="mb-32">
+        <div className="mb-16">
+          <h2 className="font-headline text-4xl font-black text-primary italic tracking-tight mb-2">Your Elite Benefits</h2>
+          <p className="text-slate-500 font-medium italic opacity-60">The premium tools designed for your professional growth.</p>
+        </div>
+        
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 bg-white p-12 rounded-[3.5rem] shadow-2xl shadow-primary/5 border border-outline-variant/10 relative overflow-hidden group">
-            <div className="flex flex-col h-full justify-between relative z-10">
-              <div>
-                <MaterialIcon name="trending_up" fill className="text-5xl text-primary mb-6" />
-                <h3 className="font-headline text-3xl font-black text-primary mb-4 italic tracking-tight">Priority Search Ranking</h3>
-                <p className="text-on-surface-variant leading-relaxed max-w-md font-medium italic opacity-70">
-                  Families will see your profile first in their search results. Verified caregivers receive 85% more profile views on average.
-                </p>
-              </div>
-              <div className="mt-12 flex items-center gap-6">
-                <div className="flex -space-x-4">
-                    {[1,2,3].map(i => (
-                        <div key={i} className="w-12 h-12 rounded-full border-4 border-white overflow-hidden shadow-lg">
-                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=family${i}`} alt="Family" className="w-full h-full object-cover" />
-                        </div>
-                    ))}
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 italic">Recently viewed by 12 families</span>
-              </div>
-            </div>
-            <MaterialIcon name="verified" className="absolute top-0 right-0 p-16 text-[15rem] opacity-[0.03] rotate-12 group-hover:rotate-6 transition-transform duration-1000" fill />
-          </div>
-
-          <div className="bg-primary p-12 rounded-[3.5rem] shadow-2xl shadow-primary/20 flex flex-col justify-between text-white group overflow-hidden relative">
+          {/* Priority Search Ranking */}
+          <div className="md:col-span-2 bg-slate-50 rounded-[3.5rem] p-12 relative overflow-hidden flex flex-col justify-between border border-slate-100 group">
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mb-10 backdrop-blur-md">
-                <MaterialIcon name="payments" className="text-4xl" />
+              <div className="w-16 h-16 bg-primary-container text-white flex items-center justify-center rounded-2xl mb-10 shadow-xl shadow-primary/10 transition-transform group-hover:scale-110">
+                <MaterialIcon name="trending_up" className="text-3xl" fill />
               </div>
-              <h3 className="font-headline text-2xl font-black italic tracking-tight mb-4">Higher Rates</h3>
-              <p className="text-blue-100/60 text-sm font-medium italic leading-relaxed">
-                Elite verified caregivers earn an average of $25/hr—significantly above market standards.
+              <h3 className="font-headline text-3xl font-black text-primary mb-6 italic tracking-tight leading-none">Priority Search Ranking</h3>
+              <p className="text-on-surface-variant text-lg max-w-md mb-10 font-medium italic opacity-70 leading-relaxed">
+                Families will see your profile first in their search results. Verified caregivers receive <span className="text-primary font-black underline decoration-secondary">85% more profile views</span> on average.
               </p>
             </div>
-            <div className="mt-12 relative z-10">
-              <div className="text-6xl font-headline font-black italic tracking-tighter mb-1">+42%</div>
-              <div className="text-[9px] text-white/40 uppercase tracking-[0.3em] font-black italic">Income Potential</div>
+            <div className="flex items-center gap-4 bg-white/60 backdrop-blur-md px-6 py-3 rounded-2xl w-fit shadow-sm border border-white">
+              <MaterialIcon name="visibility" className="text-primary text-sm" />
+              <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] italic">Recently viewed by 12 families</span>
             </div>
-            <MaterialIcon name="currency_exchange" className="absolute -bottom-10 -right-10 text-[10rem] opacity-5 group-hover:-rotate-12 transition-transform duration-700" fill />
+            <MaterialIcon name="search" className="absolute -right-16 -bottom-16 text-[18rem] text-primary/5 -rotate-12 transition-transform duration-1000 group-hover:scale-125" />
           </div>
 
-          <div className="bg-secondary-fixed p-12 rounded-[3.5rem] shadow-2xl shadow-secondary/5 border border-outline-variant/10 flex flex-col md:flex-row gap-10 items-center">
-            <div className="flex-1">
-              <h3 className="font-headline text-2xl font-black text-on-secondary-fixed mb-4 italic tracking-tight">5x Invite Boost</h3>
-              <p className="text-on-secondary-fixed-variant text-sm font-medium italic leading-relaxed opacity-80">
+          {/* 5x Invite Boost */}
+          <div className="bg-secondary-container rounded-[3.5rem] p-12 text-on-secondary-container flex flex-col justify-between shadow-2xl shadow-secondary/5 relative overflow-hidden group">
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-white/20 flex items-center justify-center rounded-2xl mb-10 backdrop-blur-md transition-transform group-hover:rotate-12">
+                <MaterialIcon name="bolt" className="text-3xl" fill />
+              </div>
+              <h3 className="font-headline text-3xl font-black mb-6 italic tracking-tight leading-none">5x Invite Boost</h3>
+              <p className="text-on-secondary-container/80 text-sm font-medium italic leading-relaxed">
                 Our elite matching engine now prioritizes your availability for high-end recurring roles in your area.
               </p>
             </div>
-            <div className="w-28 h-28 rounded-[2rem] bg-white shadow-2xl flex items-center justify-center">
-              <MaterialIcon name="bolt" fill className="text-5xl text-secondary" />
+            <div className="mt-12 text-5xl font-headline font-black italic tracking-tighter opacity-10 uppercase transition-opacity group-hover:opacity-20">INVITES x5</div>
+          </div>
+
+          {/* Higher Rates */}
+          <div className="bg-tertiary-fixed rounded-[3.5rem] p-12 flex flex-col justify-between border border-tertiary/10 relative overflow-hidden group">
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-tertiary-container text-tertiary-fixed flex items-center justify-center rounded-2xl mb-10 shadow-xl shadow-tertiary/10 transition-transform group-hover:rotate-45">
+                <MaterialIcon name="payments" className="text-3xl" fill />
+              </div>
+              <h3 className="font-headline text-3xl font-black text-tertiary mb-6 italic tracking-tight leading-none">Higher Rates</h3>
+              <p className="text-on-tertiary-fixed-variant text-sm font-medium italic leading-relaxed opacity-80 mb-10">
+                Elite verified caregivers earn an average of <strong>$25/hr</strong>—significantly above market standards.
+              </p>
+            </div>
+            <div className="inline-flex items-center px-5 py-2.5 bg-white/40 rounded-full w-fit shadow-sm border border-white">
+              <span className="text-[9px] font-black text-on-tertiary-fixed uppercase tracking-widest italic">+42% Income Potential</span>
             </div>
           </div>
 
-          <div className="md:col-span-2 bg-tertiary-container p-12 rounded-[3.5rem] shadow-2xl shadow-tertiary/20 relative overflow-hidden group">
-            <div className="flex items-center gap-10 relative z-10">
-              <div className="flex-1">
-                <h3 className="font-headline text-2xl font-black text-tertiary-fixed mb-4 italic tracking-tight leading-none">Elite Safety Badge</h3>
-                <p className="text-on-tertiary-container font-medium italic leading-relaxed opacity-70">
-                  Your dossier now displays the "Elite Security Verified" seal, providing ultimate peace of mind to parents and increasing trust scores.
-                </p>
+          {/* Elite Safety Badge */}
+          <div className="md:col-span-2 bg-primary-container text-on-primary rounded-[3.5rem] p-12 flex flex-col md:flex-row items-center gap-12 overflow-hidden relative group shadow-2xl shadow-primary/20">
+            <div className="flex-1 relative z-10">
+              <div className="w-16 h-16 bg-primary text-on-primary flex items-center justify-center rounded-2xl mb-10 shadow-xl shadow-black/10">
+                <MaterialIcon name="shield" className="text-3xl" fill />
               </div>
-              <div className="hidden md:block">
-                <div className="w-40 h-40 rounded-full border-4 border-dashed border-tertiary-fixed/20 flex items-center justify-center p-8">
-                  <MaterialIcon name="shield" className="text-7xl text-tertiary-fixed" />
+              <h3 className="font-headline text-3xl font-black mb-6 text-white italic tracking-tight leading-none">Elite Safety Badge</h3>
+              <p className="text-on-primary-container font-medium italic leading-relaxed opacity-70">
+                Your dossier now displays the "Elite Security Verified" seal, providing ultimate peace of mind to parents and distinguishing you as a trusted professional.
+              </p>
+            </div>
+            <div className="flex-1 flex justify-center z-10 relative">
+              <div className="w-56 h-56 rounded-full border-4 border-dashed border-primary/20 flex items-center justify-center p-8 animate-[spin_20s_linear_infinite]">
+                 <MaterialIcon name="verified_user" className="text-white text-[120px] opacity-[0.05] grayscale absolute" fill />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-32 h-32 bg-white rounded-full flex items-center justify-center shadow-2xl transform rotate-12 transition-transform duration-700 group-hover:rotate-0">
+                  <MaterialIcon name="verified" className="text-primary text-6xl" fill />
                 </div>
               </div>
             </div>
-            <MaterialIcon name="security" className="absolute -bottom-10 -right-10 text-[12rem] opacity-[0.02] group-hover:scale-125 transition-transform duration-1000" fill />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,#30476a_0%,transparent_70%)]"></div>
           </div>
         </div>
+      </section>
+
+      {/* Referral Section */}
+      <section className="bg-white rounded-[4rem] p-16 flex flex-col md:flex-row items-center gap-16 shadow-2xl shadow-black/[0.02] border border-slate-50 relative overflow-hidden group">
+        <div className="flex-1 relative z-10">
+          <h2 className="font-headline text-4xl font-black text-primary mb-6 italic tracking-tight leading-none">Invite Your Friends</h2>
+          <p className="text-on-surface-variant text-lg mb-10 leading-relaxed font-medium italic opacity-70">
+            Know another amazing caregiver? Refer them to Kindred and you both <span className="text-primary font-black underline decoration-secondary decoration-4">earn $50</span> when they complete their first booking.
+          </p>
+          <Link 
+            href="/dashboard/nanny/referrals"
+            className="inline-flex items-center gap-4 bg-secondary-fixed text-on-secondary-fixed px-10 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:brightness-95 transition-all active:scale-95 shadow-xl shadow-secondary/10"
+          >
+            Refer a Friend <MaterialIcon name="person_add" />
+          </Link>
+        </div>
+        <div className="flex-1 w-full relative z-10">
+          <div className="grid grid-cols-2 gap-6">
+            <img 
+              alt="Community" 
+              className="w-full h-48 object-cover rounded-[2rem] shadow-xl border-4 border-white grayscale group-hover:grayscale-0 transition-all duration-1000" 
+              src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=800" 
+            />
+            <img 
+              alt="Success" 
+              className="w-full h-48 object-cover rounded-[2rem] shadow-xl border-4 border-white transform translate-y-8 grayscale group-hover:grayscale-0 transition-all duration-1000 delay-300" 
+              src="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&q=80&w=800" 
+            />
+          </div>
+        </div>
+        <MaterialIcon name="loyalty" className="absolute -top-10 -right-10 text-[15rem] text-primary/[0.02] -rotate-12" fill />
       </section>
     </div>
   );
 }
 
-// ── Pending State ─────────────────────────────────────────────
+// PENDING STATE
 export function PendingState({ user }: StatusScreenProps) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000">
@@ -228,7 +279,7 @@ export function PendingState({ user }: StatusScreenProps) {
   );
 }
 
-// ── Rejected State (Action Required) ──────────────────────────
+// REJECTED STATE
 export function RejectedState({ user, verification }: StatusScreenProps) {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-8 duration-1000 py-12">
@@ -259,7 +310,7 @@ export function RejectedState({ user, verification }: StatusScreenProps) {
               <div>
                 <h3 className="font-black text-primary uppercase text-[10px] tracking-widest italic mb-2">Identity Documentation</h3>
                 <p className="text-on-surface-variant text-sm font-medium italic leading-relaxed opacity-70">
-                  {verification?.adminNotes || "We encountered an issue with your identity assets. Typically this is due to motion blur or cropped corners on the ID scan."}
+                  {verification?.adminNotes || "We encountered an issue with your identity assets. Typically this is due to motion blur on the ID scan or the 5-second live video selfie not clearly showing your face."}
                 </p>
               </div>
             </div>
@@ -268,7 +319,7 @@ export function RejectedState({ user, verification }: StatusScreenProps) {
               <div>
                 <h3 className="font-black text-primary uppercase text-[10px] tracking-widest italic mb-2">Next Steps Protocol</h3>
                 <p className="text-on-surface-variant text-sm font-medium italic leading-relaxed opacity-70">
-                  Please capture clear, well-lit photos of your official documentation and resubmit for priority vetting.
+                  Please capture clear, well-lit photos of your official documentation and ensure your video selfie is well-lit without hats or sunglasses, then resubmit for priority vetting.
                 </p>
               </div>
             </div>

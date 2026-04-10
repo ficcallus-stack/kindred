@@ -17,7 +17,22 @@ export async function uploadFile(formData: FormData) {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
 
-  const fileName = `uploads/${user.uid}/${Date.now()}-${file.name}`;
+  // VULN-07 FIX: Whitelist MIME types
+  const ALLOWED_TYPES = [
+    'image/jpeg', 
+    'image/png', 
+    'image/webp', 
+    'video/mp4', 
+    'application/pdf', 
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    throw new Error(`File type ${file.type} is not allowed. Please upload an image, video, or document.`);
+  }
+
+  const fileName = `uploads/${user.uid}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
   const contentType = file.type;
 
   await uploadToR2(buffer, fileName, contentType);

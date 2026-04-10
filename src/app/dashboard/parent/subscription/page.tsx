@@ -33,10 +33,10 @@ export default function SubscriptionPage() {
     fetchData();
   }, []);
 
-  async function handleSubscribe(interval: "month" | "year") {
-    setLoading(interval);
+  async function handleSubscribe(tier: "plus" | "elite") {
+    setLoading(tier === "plus" ? "month" : "year"); // Reuse loading state for simplicity or update it
     try {
-      const { url } = await createSubscriptionSession(interval);
+      const { url } = await createSubscriptionSession(tier);
       if (url) window.location.href = url;
     } catch (error: any) {
       showToast(error.message || "Failed to start checkout session", "error");
@@ -59,77 +59,125 @@ export default function SubscriptionPage() {
             <h1 className="font-headline text-5xl font-extrabold text-primary italic tracking-tighter">
               Billing & <span className="text-secondary">Commitments</span>
             </h1>
-            <p className="text-on-surface-variant font-medium opacity-70">Manage your premium membership and active care retainers.</p>
+            <p className="text-on-surface-variant font-medium opacity-70">Elevate your family's care with our professional subscription tiers.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
             {/* Left Column: Premium Membership */}
-            <div className="lg:col-span-7 space-y-12">
-              <div className="bg-surface-container-low rounded-[3rem] p-10 editorial-shadow border border-outline-variant/10 relative overflow-hidden">
-                <div className="relative z-10 space-y-8">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-primary rounded-xl flex items-center justify-center text-white">
-                        <MaterialIcon name="verified" fill />
+            <div className="lg:col-span-12 space-y-12">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Kindred Plus Card */}
+                <div className={cn(
+                  "bg-white rounded-[3rem] p-10 editorial-shadow border border-outline-variant/10 relative overflow-hidden transition-all",
+                  subscription?.subscriptionTier === "plus" && "ring-2 ring-primary bg-primary/5"
+                )}>
+                  <div className="space-y-8">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+                          <MaterialIcon name="verified_user" fill />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold font-headline text-primary italic">Kindred Plus</h2>
+                          <p className="text-[10px] font-black text-on-surface-variant uppercase tracking-widest opacity-60">Verified Access</p>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="text-2xl font-bold font-headline text-primary italic">Kindred Elite</h2>
-                        <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest opacity-60">Platform Access Fee</p>
-                      </div>
+                      {subscription?.subscriptionTier === "plus" && (
+                        <span className="bg-primary text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Current Plan</span>
+                      )}
                     </div>
-                    {subscription?.isPremium && (
-                      <span className="bg-secondary text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Active</span>
-                    )}
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Monthly Option */}
-                    <button 
-                      onClick={() => handleSubscribe("month")}
-                      disabled={!!loading || (subscription?.isPremium && subscription?.subscriptionStatus === "active")}
-                      className={cn(
-                        "p-8 rounded-[2.5rem] border-2 transition-all text-left flex flex-col justify-between h-48",
-                        subscription?.isPremium 
-                          ? "border-outline-variant opacity-50 grayscale cursor-not-allowed" 
-                          : "border-primary bg-primary text-white hover:scale-[1.02] active:scale-95 shadow-xl shadow-primary/20"
-                      )}
-                    >
-                      <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Flexible Monthly</span>
-                      <div>
-                        <span className="text-4xl font-headline font-black tracking-tighter">$23</span>
-                        <span className="text-sm font-medium opacity-60 ml-1">/mo</span>
+                    <div className="space-y-2">
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-5xl font-headline font-black text-primary tracking-tighter">$29</span>
+                        <span className="text-sm font-medium text-on-surface-variant">/mo</span>
                       </div>
-                    </button>
+                      <p className="text-xs text-on-surface-variant font-medium">Essential professional discovery & messaging.</p>
+                    </div>
 
-                    {/* Annual Option */}
-                    <button 
-                      onClick={() => handleSubscribe("year")}
-                      disabled={!!loading || subscription?.isPremium}
-                      className={cn(
-                        "p-8 rounded-[2.5rem] border-2 border-outline-variant bg-white transition-all text-left flex flex-col justify-between h-48 hover:border-secondary group",
-                        subscription?.isPremium && "opacity-50 cursor-not-allowed"
-                      )}
-                    >
-                      <div className="flex justify-between items-start">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant group-hover:text-secondary">Strategic Annual</span>
-                        {!subscription?.isPremium && <span className="bg-secondary/10 text-secondary text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest">Save $126</span>}
-                      </div>
-                      <div>
-                        <span className="text-4xl font-headline font-black text-primary tracking-tighter group-hover:text-secondary">$150</span>
-                        <span className="text-sm font-medium text-on-surface-variant ml-1">/yr</span>
-                      </div>
-                    </button>
-                  </div>
-
-                  <div className="pt-6 border-t border-outline-variant/10">
-                    <ul className="grid grid-cols-2 gap-4">
-                      {["Unlimited Messaging", "Elite Vetting Reports", "48h Early Access", "Direct Concierge"].map(benefit => (
+                    <ul className="space-y-4 pt-6 border-t border-outline-variant/10">
+                      {["Unlimited Real-time Messaging", "Professional Priority Access", "Zero Service Fees", "Basic Job Posting"].map(benefit => (
                         <li key={benefit} className="flex items-center gap-2 text-xs font-medium text-on-surface-variant">
-                          <MaterialIcon name="check_circle" className="text-secondary text-sm" fill />
+                          <MaterialIcon name="check_circle" className="text-primary/40 text-sm" fill />
                           {benefit}
                         </li>
                       ))}
                     </ul>
+
+                    <button 
+                      onClick={() => handleSubscribe("plus")}
+                      disabled={!!loading || subscription?.subscriptionTier === "plus" || subscription?.subscriptionTier === "elite"}
+                      className={cn(
+                        "w-full py-4 rounded-2xl font-headline font-black text-[12px] uppercase tracking-widest transition-all",
+                        subscription?.subscriptionTier === "plus"
+                          ? "bg-primary/10 text-primary cursor-default"
+                          : subscription?.subscriptionTier === "elite"
+                          ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                          : "bg-primary text-white hover:scale-[1.02] active:scale-95 shadow-xl shadow-primary/20"
+                      )}
+                    >
+                      {subscription?.subscriptionTier === "plus" ? "Current Plan" : subscription?.subscriptionTier === "elite" ? "Elite Inclusive" : "Upgrade to Plus"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Kindred Elite Card */}
+                <div className={cn(
+                  "bg-primary rounded-[3rem] p-10 editorial-shadow border border-white/10 relative overflow-hidden transition-all text-white",
+                  subscription?.subscriptionTier === "elite" && "ring-4 ring-secondary"
+                )}>
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-secondary/20 rounded-full blur-[80px] -mr-32 -mt-32"></div>
+                  
+                  <div className="relative z-10 space-y-8">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-primary">
+                          <MaterialIcon name="diamond" fill />
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-bold font-headline italic">Kindred Elite</h2>
+                          <p className="text-[10px] font-black text-white/50 uppercase tracking-widest">Full Power Membership</p>
+                        </div>
+                      </div>
+                      {subscription?.subscriptionTier === "elite" && (
+                        <span className="bg-secondary text-white px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">Active</span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-baseline gap-1 focus-ring">
+                        <span className="text-5xl font-headline font-black tracking-tighter">$59</span>
+                        <span className="text-sm font-medium text-white/60">/mo</span>
+                      </div>
+                      <p className="text-xs text-white/70 font-medium">For families who demand the best.</p>
+                    </div>
+
+                    <ul className="space-y-4 pt-6 border-t border-white/10">
+                      {[
+                        "Automatic Job Boosting ($19/post value)", 
+                        "Featured Professional Priority", 
+                        "Direct Concierge Support", 
+                        "Unlimited Messaging & Reports"
+                      ].map(benefit => (
+                        <li key={benefit} className="flex items-center gap-2 text-xs font-medium">
+                          <MaterialIcon name="verified" className="text-secondary text-sm" fill />
+                          {benefit}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button 
+                      onClick={() => handleSubscribe("elite")}
+                      disabled={!!loading || subscription?.subscriptionTier === "elite"}
+                      className={cn(
+                        "w-full py-4 rounded-2xl font-headline font-black text-[12px] uppercase tracking-widest transition-all",
+                        subscription?.subscriptionTier === "elite"
+                          ? "bg-white/10 text-white cursor-default"
+                          : "bg-white text-primary hover:bg-secondary hover:text-white hover:scale-[1.02] active:scale-95 shadow-xl shadow-black/20"
+                      )}
+                    >
+                      {subscription?.subscriptionTier === "elite" ? "Current Plan" : "Upgrade to Elite"}
+                    </button>
                   </div>
                 </div>
               </div>

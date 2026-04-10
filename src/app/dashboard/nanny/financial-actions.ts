@@ -40,5 +40,5 @@ export async function getNannyFinancials(month: Date = new Date()) {
     netEarnings: 0,
     actualHoursWorked: 0,
     currency: "USD"
-  });
+  } as any);
 }

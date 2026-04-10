@@ -14,9 +14,10 @@ const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "/dashboard/admin" },
   { id: "caregivers", label: "Caregivers", icon: "groups", href: "/dashboard/admin/caregivers" },
   { id: "bookings", label: "Bookings", icon: "calendar_month", href: "/dashboard/admin/bookings" },
-  { id: "safety", label: "Safety", icon: "verified_user", href: "/dashboard/admin/safety" },
+  { id: "analytics", label: "Analytics", icon: "analytics", href: "/dashboard/admin/analytics" },
   { id: "revenue", label: "Revenue", icon: "payments", href: "/dashboard/admin/revenue" },
   { id: "financial-ops", label: "Financial Ops", icon: "account_balance_wallet", href: "/dashboard/admin/financial-ops" },
+  { id: "liquidity", label: "Liquidity", icon: "magic_button", href: "/dashboard/admin/liquidity" },
   { id: "settings", label: "Settings", icon: "settings", href: "/dashboard/admin/settings" },
 ];
 
@@ -33,7 +34,7 @@ export default function AdminDashboardLayoutClient({ children, user }: LayoutPro
         </div>
 
         <nav className="flex flex-col h-full gap-y-1">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter(item => item.id !== 'liquidity' || user.role === 'admin').map((item) => {
             const isActive = pathname === item.href || (item.id !== 'dashboard' && pathname.startsWith(item.href));
             return (
               <Link

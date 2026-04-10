@@ -75,6 +75,7 @@ export class PaymentService {
     metadata?: Record<string, string>;
     idempotencyKey?: string;
     applicationFeeAmount?: number; // In cents (Platform Commission)
+    transferDataDestination?: string; // Nanny's Stripe Connect ID
   }) {
     const iKey = params.idempotencyKey || crypto.randomBytes(16).toString("hex");
 
@@ -83,9 +84,15 @@ export class PaymentService {
         customer: params.customerId,
         payment_method_types: ["card"],
         mode: "payment",
-        payment_intent_data: params.applicationFeeAmount ? {
+        payment_intent_data: {
+          metadata: params.metadata,
           application_fee_amount: params.applicationFeeAmount,
-        } : undefined,
+          transfer_data: params.transferDataDestination ? {
+            destination: params.transferDataDestination,
+          } : undefined,
+          // Explicitly set capture_method to automatic unless it's a legacy flow that requires manual
+          capture_method: "automatic", 
+        },
         line_items: [{
           price_data: {
             currency: "usd",

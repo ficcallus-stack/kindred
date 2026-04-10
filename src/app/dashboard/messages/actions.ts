@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { users, conversations, conversationMembers, messages, chatUnlocks, applications, jobs, wallets, walletTransactions } from "@/db/schema";
-import { eq, and, or, desc, ne, count, exists, sql, gt } from "drizzle-orm";
+import { eq, and, or, desc, ne, count, exists, sql, gt, inArray } from "drizzle-orm";
 import { getServerUser, requireUser } from "@/lib/get-server-user";
 import Ably from "ably";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
@@ -32,6 +32,19 @@ export async function getUsers() {
 export async function getConversationMessages(conversationId: string) {
   const serverUser = await getServerUser();
   if (!serverUser) throw new Error("Unauthorized");
+
+  // VULN-08 FIX: Verify user is a member of this conversation
+  const isMember = await db.select({ id: conversationMembers.conversationId })
+    .from(conversationMembers)
+    .where(and(
+      eq(conversationMembers.conversationId, conversationId),
+      eq(conversationMembers.userId, serverUser.uid)
+    ))
+    .limit(1);
+
+  if (isMember.length === 0) {
+    throw new Error("Access denied: You are not a member of this conversation.");
+  }
 
   return await db.select({
     id: messages.id,
@@ -63,90 +76,128 @@ export async function sendMessage({
   fileName?: string;
   metadata?: Record<string, any>;
 }) {
-  const serverUser = await getServerUser();
-  if (!serverUser) throw new Error("Unauthorized");
+  const start = Date.now();
+  try {
+    const serverUser = await getServerUser();
+    if (!serverUser) throw new Error("Unauthorized");
 
-  // 1. Get conversation members to check permissions
-  const members = await db.select({
-    userId: conversationMembers.userId,
-    userRole: users.role,
-  })
-  .from(conversationMembers)
-  .innerJoin(users, eq(conversationMembers.userId, users.id))
-  .where(eq(conversationMembers.conversationId, conversationId));
+    console.log(`[SendMessage] Start: user=${serverUser.uid}, convo=${conversationId}`);
 
-  const me = members.find(m => m.userId === serverUser.uid);
-  const other = members.find(m => m.userId !== serverUser.uid);
+    // 1. Get conversation members to check permissions
+    const members = await db.select({
+      userId: conversationMembers.userId,
+      userRole: users.role,
+      isPremium: users.isPremium,
+      isGhost: users.isGhost,
+    })
+    .from(conversationMembers)
+    .innerJoin(users, eq(conversationMembers.userId, users.id))
+    .where(eq(conversationMembers.conversationId, conversationId));
 
-  if (!me) throw new Error("You are not a member of this conversation");
+    if (members.length === 0) {
+      console.warn(`[SendMessage] No members found for convo=${conversationId}`);
+      throw new Error("Conversation not found or access denied");
+    }
 
-  // 2. Permission Check: Nannies can only message if unlocked or they applied
-  if (me.userRole === 'caregiver' && other) {
-    // Check if it's a support chat
-    const [convo] = await db.select({ isSupport: conversations.isSupport })
-      .from(conversations)
-      .where(eq(conversations.id, conversationId))
-      .limit(1);
+    const me = members.find(m => m.userId === serverUser.uid);
+    const other = members.find(m => m.userId !== serverUser.uid);
 
-    if (convo?.isSupport) {
-      // Allowed
-    } else {
-      // Check for Paid Unlock
-      const [unlock] = await db.select()
-        .from(chatUnlocks)
-        .where(and(
-          eq(chatUnlocks.parentId, other.userId),
-          eq(chatUnlocks.caregiverId, me.userId)
-        ))
+    if (!me) {
+      console.error(`[SendMessage] User ${serverUser.uid} not in convo=${conversationId}`);
+      throw new Error("You are not a member of this conversation");
+    }
+
+    // 2. Universal Permission Check
+    // Rules: Elite (isPremium) is always free. Others need Unlock or Application.
+    if (other && !me.isPremium) {
+      const [convo] = await db.select({ isSupport: conversations.isSupport })
+        .from(conversations)
+        .where(eq(conversations.id, conversationId))
         .limit(1);
 
-      if (!unlock) {
-        // Check for Job Application (Implicit Unlock)
-        // Does the caregiver have an application for ANY of the parent's jobs?
-        const [application] = await db.select()
-          .from(applications)
-          .innerJoin(jobs, eq(applications.jobId, jobs.id))
-          .where(and(
-            eq(applications.caregiverId, me.userId),
-            eq(jobs.parentId, other.userId)
+      if (!convo?.isSupport) {
+        // A. Check for Paid Unlock (Role-Agnostic)
+        // We check if either ID is in parentId/caregiverId in the unlock table
+        const [unlock] = await db.select()
+          .from(chatUnlocks)
+          .where(or(
+            and(eq(chatUnlocks.parentId, me.userId), eq(chatUnlocks.caregiverId, other.userId)),
+            and(eq(chatUnlocks.parentId, other.userId), eq(chatUnlocks.caregiverId, me.userId))
           ))
           .limit(1);
 
-        if (!application) {
-          throw new Error("You must be unlocked by the parent to send messages.");
+        if (!unlock) {
+          // B. Check for Application (if one is parent, one is caregiver)
+          const [application] = await db.select()
+            .from(applications)
+            .innerJoin(jobs, eq(applications.jobId, jobs.id))
+            .where(or(
+              and(eq(applications.caregiverId, me.userId), eq(jobs.parentId, other.userId)),
+              and(eq(applications.caregiverId, other.userId), eq(jobs.parentId, me.userId))
+            ))
+            .limit(1);
+
+          if (!application) {
+            // WHISTLEBLOWER: Local Development Bypass
+            if (process.env.NODE_ENV === "development") {
+              console.warn(`[DEVELOPMENT BYPASS] No unlock found for ${me.userId} -> ${other.userId}, but allowing in DEV mode for testing.`);
+            } else {
+              console.warn(`[SendMessage] Locked: ${me.userId} -> ${other.userId} (No Premium/Unlock/App)`);
+              throw new Error("You must unlock this chat to send messages to this professional.");
+            }
+          }
         }
       }
     }
+
+    console.log(`[SendMessage] Authorized: user=${serverUser.uid}, isPremium=${me.isPremium}`);
+
+
+    // 3. Insert message
+    console.log(`[SendMessage] Inserting message: user=${serverUser.uid}`);
+    const [newMessage] = await db.insert(messages).values({
+      conversationId,
+      senderId: serverUser.uid,
+      content,
+      fileUrl,
+      fileType,
+      fileName,
+      metadata
+    }).returning();
+
+    // 4. Update conversation timestamp
+    await db.update(conversations)
+      .set({ updatedAt: new Date() })
+      .where(eq(conversations.id, conversationId));
+
+    // 5. Broadcast via Ably
+    console.log(`[SendMessage] Broadcasting: convo=${conversationId}`);
+    const ably_client = new Ably.Rest({ 
+      key: process.env.ABLY_API_KEY!,
+      clientId: serverUser.uid 
+    });
+    
+    const channel = ably_client.channels.get(`conversation:${conversationId}`);
+    await channel.publish("message", {
+      ...newMessage,
+      createdAt: newMessage.createdAt.getTime()
+    });
+
+    const recipients = members.filter(m => m.userId !== serverUser.uid);
+    for (const recipient of recipients) {
+      const userChannel = ably_client.channels.get(`notifications:${recipient.userId}`);
+      await userChannel.publish("new_message", {
+        conversationId,
+        senderId: serverUser.uid
+      });
+    }
+
+    console.log(`[SendMessage] Success: convo=${conversationId}, elapsed=${Date.now() - start}ms`);
+    return newMessage;
+  } catch (err: any) {
+    console.error(`[SendMessage] CRITICAL ERROR: convo=${conversationId}, error=${err.message}`);
+    throw err;
   }
-
-  // 3. Insert message
-  const [newMessage] = await db.insert(messages).values({
-    conversationId,
-    senderId: serverUser.uid,
-    content,
-    fileUrl,
-    fileType,
-    fileName,
-    metadata
-  }).returning();
-
-  // 4. Update conversation timestamp
-  await db.update(conversations)
-    .set({ updatedAt: new Date() })
-    .where(eq(conversations.id, conversationId));
-
-  // 5. Broadcast via Ably
-  const ably_client = new Ably.Rest({ 
-    key: process.env.ABLY_API_KEY!,
-    clientId: serverUser.uid 
-  });
-  const channel = ably_client.channels.get(`conversation:${conversationId}`);
-  await channel.publish("message", {
-    ...newMessage,
-    createdAt: newMessage.createdAt.getTime()
-  });
-
-  return newMessage;
 }
 
 export async function getOrCreateConversation(otherUserId: string) {
@@ -167,12 +218,14 @@ export async function getOrCreateConversation(otherUserId: string) {
 
   // Optimized: Find a conversation that contains BOTH users and has exactly 2 members
   // We use a subquery/filter approach that is more portable across SQL dialects
+  // Strict 1-on-1 Lookup: Find a conversation where EXACTLY both users are members.
+  // We look for conversation IDs that have both user IDs and a total member count of 2.
   const [existingConvoId] = await db.select({ id: conversationMembers.conversationId })
     .from(conversationMembers)
     .innerJoin(conversations, eq(conversations.id, conversationMembers.conversationId))
     .where(and(
       eq(conversations.isSupport, false),
-      or(eq(conversationMembers.userId, myId), eq(conversationMembers.userId, otherUserId))
+      inArray(conversationMembers.userId, [myId, otherUserId])
     ))
     .groupBy(conversationMembers.conversationId)
     .having(sql`count(${conversationMembers.userId}) = 2`)
@@ -193,6 +246,56 @@ export async function getOrCreateConversation(otherUserId: string) {
   ]);
 
   return newConvo.id;
+}
+
+export async function getConversationMetadata(conversationId: string) {
+  const serverUser = await getServerUser();
+  if (!serverUser) throw new Error("Unauthorized");
+
+  const [convo] = await db.select({
+    id: conversations.id,
+    isSupport: conversations.isSupport,
+    updatedAt: conversations.updatedAt,
+  })
+  .from(conversations)
+  .innerJoin(conversationMembers, eq(conversations.id, conversationMembers.conversationId))
+  .where(and(
+    eq(conversations.id, conversationId),
+    eq(conversationMembers.userId, serverUser.uid)
+  ))
+  .limit(1);
+
+  if (!convo) return null;
+
+  // Fetch other member
+  const otherMember = await db.select({
+    id: users.id,
+    fullName: users.fullName,
+    profileImageUrl: users.profileImageUrl,
+  })
+  .from(conversationMembers)
+  .innerJoin(users, eq(users.id, conversationMembers.userId))
+  .where(and(
+    eq(conversationMembers.conversationId, conversationId),
+    ne(conversationMembers.userId, serverUser.uid)
+  ))
+  .limit(1);
+
+  // Fetch last message
+  const [lastMsg] = await db.select({
+    content: messages.content,
+    createdAt: messages.createdAt,
+  })
+  .from(messages)
+  .where(eq(messages.conversationId, conversationId))
+  .orderBy(desc(messages.createdAt))
+  .limit(1);
+
+  return {
+    ...convo,
+    otherMember: otherMember[0] || null,
+    lastMessage: lastMsg?.content || null,
+  };
 }
 
 export async function updateUserActive() {
@@ -323,10 +426,14 @@ export async function uploadMessageAttachment(formData: FormData) {
 
 export async function checkChatAccess(otherUserId: string) {
   const firebaseUser = await requireUser();
+  const [userRecord] = await db.select({ isPremium: users.isPremium }).from(users).where(eq(users.id, firebaseUser.uid)).limit(1);
   
   if (otherUserId === "kindred-support") {
     return { hasAccess: true };
   }
+
+  // 0. Is the parent Premium (Elite)?
+  if (userRecord?.isPremium) return { hasAccess: true };
 
   // 1. Are they already unlocked?
   const [unlock] = await db.select()
@@ -359,6 +466,8 @@ export async function createChatUnlockSession(caregiverId: string) {
   const [caregiver] = await db.select().from(users).where(eq(users.id, caregiverId)).limit(1);
   if (!caregiver) throw new Error("Caregiver not found");
 
+  const origin = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     line_items: [
@@ -369,14 +478,14 @@ export async function createChatUnlockSession(caregiverId: string) {
             name: `Unlock Conversation with ${caregiver.fullName}`,
             description: "One-time fee to enable private messaging with this caregiver.",
           },
-          unit_amount: 1500, // $15.00
+          unit_amount: 200, // $2.00
         },
         quantity: 1,
       },
     ],
     mode: "payment",
-    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/messages?unlocked=${caregiverId}`,
-    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/messages`,
+    success_url: `${origin}/dashboard/messages?userId=${caregiverId}&unlocked=true&session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${origin}/nannies/${caregiverId}`,
     metadata: {
       type: "chat_unlock",
       parentId: firebaseUser.uid,
@@ -385,4 +494,46 @@ export async function createChatUnlockSession(caregiverId: string) {
   });
 
   return { url: session.url };
+}
+
+export async function syncChatUnlock(sessionId: string) {
+  const serverUser = await getServerUser();
+  if (!serverUser) throw new Error("Unauthorized");
+
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.payment_status !== 'paid') {
+      throw new Error("Payment not completed.");
+    }
+
+    const { type, parentId, caregiverId } = session.metadata || {};
+    if (type !== 'chat_unlock' || !parentId || !caregiverId) {
+      throw new Error("Invalid session metadata.");
+    }
+
+    // Safety: Verify the payer is the current user
+    if (parentId !== serverUser.uid) {
+      throw new Error("Session does not belong to current user.");
+    }
+
+    // 1. Check if already exists to avoid duplication
+    const [existing] = await db.select().from(chatUnlocks)
+      .where(and(eq(chatUnlocks.parentId, parentId), eq(chatUnlocks.caregiverId, caregiverId)))
+      .limit(1);
+
+    if (!existing) {
+      await db.insert(chatUnlocks).values({
+        parentId,
+        caregiverId,
+        method: 'stripe',
+      });
+      console.log(`[Sync] Chat Unlocked Fast-Track: ${parentId} -> ${caregiverId}`);
+    }
+
+    revalidatePath("/dashboard/messages");
+    return { success: true };
+  } catch (err: any) {
+    console.error("[Sync] Failed to fast-track unlock:", err.message);
+    throw err;
+  }
 }

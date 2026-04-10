@@ -3,11 +3,12 @@ import MarkingClient from "./marking-client";
 import { notFound } from "next/navigation";
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default async function ModeratorMarkingPage({ params }: PageProps) {
-  const submission = await getSubmissionDetails(params.id);
+  const { id } = await params;
+  const submission = await getSubmissionDetails(id);
 
   if (!submission) {
     notFound();

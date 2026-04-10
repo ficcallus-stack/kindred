@@ -50,23 +50,31 @@ export default function BrowseFilters({ initialLocation, initialRate }: { initia
         />
       </div>
 
-      {/* Hourly Rate */}
+      {/* Weekly Retainer Budget */}
       <div className="mb-8">
         <div className="flex justify-between items-center mb-4">
-          <label className="text-xs font-bold uppercase tracking-widest text-on-surface-variant">Hourly Rate</label>
-          <span className="text-sm font-bold text-primary">${rate} - $100+</span>
+          <div className="flex flex-col">
+            <label className="text-[10px] font-black uppercase tracking-widest text-secondary">Hiring Model</label>
+            <span className="text-sm font-black text-primary italic">Weekly Retainer</span>
+          </div>
+          <span className="text-sm font-black text-primary tracking-tighter italic">${rate}<span className="text-[10px] not-italic opacity-40">/wk</span></span>
         </div>
         <input 
           type="range" 
-          max="100" 
-          min="15" 
+          max="4000" 
+          min="300" 
+          step="50"
           value={rate}
           onChange={(e) => {
             setRate(e.target.value);
             updateFilters("rate", e.target.value);
           }}
-          className="accent-primary w-full h-1 bg-surface-variant rounded-lg appearance-none cursor-pointer" 
+          className="accent-secondary w-full h-1 bg-surface-variant rounded-lg appearance-none cursor-pointer" 
         />
+        <div className="flex justify-between mt-2">
+           <span className="text-[9px] font-bold text-on-surface-variant opacity-40 uppercase tracking-widest">$300/wk</span>
+           <span className="text-[9px] font-bold text-on-surface-variant opacity-40 uppercase tracking-widest">$4000/wk</span>
+        </div>
       </div>
 
       {/* Experience */}

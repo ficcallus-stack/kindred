@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import Navbar from "@/components/Navbar";
 
 export default function VerifyEmailPage() {
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
@@ -123,7 +122,6 @@ export default function VerifyEmailPage() {
 
   return (
     <main className="min-h-screen bg-surface">
-      <Navbar />
       <div className="flex items-center justify-center pt-32 px-6 pb-20 relative overflow-hidden">
         {/* Atmospheric Background */}
         <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary-fixed opacity-20 blur-[120px]" />

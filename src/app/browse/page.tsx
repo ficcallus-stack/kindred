@@ -1,277 +1,220 @@
 import { db } from "@/db";
 import { users, nannyProfiles, parentProfiles } from "@/db/schema";
-import { eq, and, sql, lte, desc, gte } from "drizzle-orm";
-import BrowseFilters from "@/components/BrowseFilters";
+import { eq, and, or, ilike, lte, sql, desc } from "drizzle-orm";
+import BrowseCommandCenter from "@/components/browse/BrowseCommandCenter";
+import { NannyCuratorCard } from "@/components/browse/NannyCuratorCard";
 import { MaterialIcon } from "@/components/MaterialIcon";
-import Navbar from "@/components/Navbar";
-import { cn } from "@/lib/utils";
-import Link from "next/link";
-import { LocationModal } from "@/components/browse/LocationModal";
+import { trackSearch } from "./actions";
 import { getServerUser } from "@/lib/get-server-user";
 
-export default async function BrowseNannies({ 
-  searchParams 
-}: { 
-  searchParams: Promise<{ location?: string, rate?: string, lat?: string, lng?: string, distance?: string, page?: string, skip?: string, exp?: string }> 
-}) {
-  const user = await getServerUser();
-  const userId = user?.uid;
+export const dynamic = 'force-dynamic';
+
+export default async function BrowseNannies({ searchParams }: { searchParams: Promise<any> }) {
   const params = await searchParams;
-  const isSkipped = params.skip === "true";
+  const user = await getServerUser();
   
+  // 1. Initial Location Resolution (Profile -> URL -> Fallback handled by Client)
   let lat = params.lat ? parseFloat(params.lat) : undefined;
   let lng = params.lng ? parseFloat(params.lng) : undefined;
   let locationLabel = params.location || "";
 
-  // Fallback to logged-in user's stored location if no search lat/lng in URL AND not skipped
-  if (userId && (!lat || !lng) && !isSkipped) {
-    const parent = await db.query.parentProfiles.findFirst({
-      where: eq(parentProfiles.id, userId),
-    });
-    if (parent?.latitude && parent?.longitude) {
-      lat = parseFloat(parent.latitude);
-      lng = parseFloat(parent.longitude);
-      locationLabel = parent.location || locationLabel;
+  // If logged in and no coordinates in URL, pull from Parent Profile
+  if (user && !lat && !lng) {
+    const [profile] = await db.select()
+      .from(parentProfiles)
+      .where(eq(parentProfiles.id, user.uid))
+      .limit(1);
+    
+    if (profile?.latitude && profile?.longitude) {
+      lat = parseFloat(profile.latitude);
+      lng = parseFloat(profile.longitude);
+      locationLabel = profile.location || "";
     }
   }
 
-  const maxRateFilter = params.rate ? parseInt(params.rate) : 100;
-  const searchDistance = params.distance ? parseInt(params.distance) : 50;
-  const page = params.page ? parseInt(params.page) : 1;
+  // 2. Parsing Filters & Pagination
+  const page = parseInt(params.page || "1");
   const limit = 10;
   const offset = (page - 1) * limit;
 
-  // Parse experience filter (e.g. "3-5" -> min 3, "10+" -> min 10)
-  let minExp: number | undefined;
-  if (params.exp) {
-    const expVal = params.exp;
-    if (expVal.endsWith('+')) {
-      minExp = parseInt(expVal);
-    } else if (expVal.includes('-')) {
-      minExp = parseInt(expVal.split('-')[0]);
-    }
-  }
-
-  // We only use distance calculation if coordinates are present AND we didn't skip discovery
-  const useProximity = !!(lat && lng && !isSkipped);
-
-  const distanceSql = useProximity
-    ? sql`
-        (3959 * acos(
-          cos(radians(${lat})) * cos(radians(${nannyProfiles.latitude})) *
-          cos(radians(${nannyProfiles.longitude}) - radians(${lng})) +
-          sin(radians(${lat})) * sin(radians(${nannyProfiles.latitude}))
-        ))
-      `
+  const mode = params.mode || (lat && lng ? "local" : "nationwide");
+  const maxDistance = parseInt(params.distance || "30");
+  const maxRateFilter = parseInt(params.rate || (params.rateType === "weekly" ? "4000" : "100"));
+  const rateType = params.rateType || "hourly"; // "hourly" or "weekly"
+  const globalOnly = params.global === "true";
+  const availableNow = params.available === "true";
+  const alwaysAvailableOnly = params.always === "true";
+  
+  const distanceSql = lat && lng 
+    ? sql`3958.8 * acos(cos(radians(${lat})) * cos(radians(${nannyProfiles.latitude})) * cos(radians(${nannyProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${nannyProfiles.latitude})))`
     : undefined;
 
-  // Fetch nannies with profiles
-  const nannies = await db.select({
+  // 3b. Matching Algorithm Weights (MATCH-01)
+  const matchScore = sql<number>`(
+    (CASE WHEN ${nannyProfiles.isVerified} THEN 500 ELSE 0 END) +
+    (CASE WHEN ${distanceSql} < 30 THEN ((30 - ${distanceSql}) / 30.0) * 200 ELSE 0 END) +
+    (LEAST(${nannyProfiles.experienceYears}, 15) * 20) +
+    (CASE WHEN ${nannyProfiles.updatedAt} > NOW() - INTERVAL '7 days' THEN 100 ELSE 0 END)
+  )`.as('match_score');
+
+  // 4. Database Queries (Strict Visibility Guard)
+  const whereClause = and(
+    eq(users.role, 'caregiver'),
+    eq(nannyProfiles.isVerified, true), // MUST be verified
+    sql`${nannyProfiles.hourlyRate} > 0`, // MUST have a rate
+    sql`${nannyProfiles.experienceYears} > 0`, // MUST have experience
+    
+    // Ghost Liquidity Bypass: Real users must have strict media, Ghosts skip this check
+    or(
+      eq(users.isGhost, true),
+      and(
+        sql`${nannyProfiles.videoUrl} IS NOT NULL`, // MUST have video
+        sql`${users.profileImageUrl} IS NOT NULL`, // MUST have profile pic
+        sql`jsonb_array_length(${nannyProfiles.photos}) >= 2` // MUST have 2+ photos
+      )
+    ),
+    
+    rateType === "hourly" 
+      ? (maxRateFilter < 150 ? lte(nannyProfiles.hourlyRate, maxRateFilter.toString()) : undefined)
+      : (maxRateFilter < 5000 ? lte(nannyProfiles.weeklyRate, maxRateFilter.toString()) : undefined),
+    
+    // Hybrid Geo-Text Match
+    (mode === "local" && locationLabel)
+      ? (distanceSql
+          ? or(lte(distanceSql, maxDistance), ilike(nannyProfiles.location, `%${locationLabel}%`))
+          : ilike(nannyProfiles.location, `%${locationLabel}%`))
+      : undefined,
+      
+    alwaysAvailableOnly ? sql`${nannyProfiles.availability}->>'alwaysAvailable' = 'true'` : undefined,
+  );
+
+  const nanniesQuery = db.select({
     id: users.id,
     name: users.fullName,
-    email: users.email,
     profileImageUrl: users.profileImageUrl,
     location: nannyProfiles.location,
     experienceYears: nannyProfiles.experienceYears,
     hourlyRate: nannyProfiles.hourlyRate,
+    weeklyRate: nannyProfiles.weeklyRate,
     isVerified: nannyProfiles.isVerified,
+    availability: nannyProfiles.availability,
     isOccupied: nannyProfiles.isOccupied,
-    maxTravelDistance: nannyProfiles.maxTravelDistance,
     bio: nannyProfiles.bio,
     distance: distanceSql ? sql<number>`${distanceSql}`.as('distance') : sql`0`.as('distance'),
+    matchScore: matchScore,
   })
   .from(users)
   .innerJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
-  .where(
-    and(
-      eq(users.role, "caregiver"),
-      distanceSql ? lte(distanceSql, searchDistance) : (locationLabel ? sql`LOWER(${nannyProfiles.location}) LIKE LOWER(${'%' + locationLabel + '%'})` : undefined),
-      params.rate ? lte(sql`CAST(${nannyProfiles.hourlyRate} AS NUMERIC)`, maxRateFilter) : undefined,
-      minExp ? gte(nannyProfiles.experienceYears, minExp) : undefined
-    )
+  .where(whereClause)
+  .orderBy(
+    // 1. Primary Sort: Weighted Matching Algorithm
+    desc(matchScore),
+    // 2. Secondary Sort: "Always Available" status
+    desc(sql`(${nannyProfiles.availability}->>'alwaysAvailable')::boolean`),
+    // 3. Fallback to distance
+    mode === "local" && distanceSql ? sql`distance ASC` : desc(nannyProfiles.updatedAt)
   )
-  .orderBy(distanceSql ? sql`${distanceSql} ASC` : desc(nannyProfiles.experienceYears))
   .limit(limit)
   .offset(offset);
 
-  return (
-    <div className="bg-surface min-h-screen">
-      <Navbar />
-      <LocationModal />
+  const countQuery = db.select({ count: sql<number>`count(*)` })
+    .from(users)
+    .innerJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
+    .where(whereClause);
 
-      <main className="pt-24 pb-32 px-6 max-w-7xl mx-auto">
-        {/* Banner Section */}
-        <section className="mb-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="max-w-2xl">
-              <h1 className="font-headline text-4xl md:text-5xl font-extrabold tracking-tight text-primary mb-4 leading-tight">
-                Exceptional Care for <br/><span className="text-secondary">Exceptional Families.</span>
-              </h1>
-              <p className="text-on-surface-variant text-lg max-w-lg leading-relaxed font-medium opacity-60 italic">
-                {(locationLabel && useProximity)
-                  ? `Discover vetted, local caregivers near ${locationLabel}. Expertly matched for safety and connection.`
-                  : "Discover vetted, elite caregivers from around the nation, curated for your family's unique rhythm."
-                }
-              </p>
-            </div>
-            <div className="flex flex-col gap-3">
-              <Link 
-                href="/dashboard/parent/post-job"
-                className="bg-secondary text-white px-8 py-5 rounded-2xl font-black uppercase tracking-[0.1em] text-[11px] flex items-center justify-center shadow-lg shadow-secondary/20 hover:bg-orange-800 transition-all font-label"
-              >
-                <MaterialIcon name="person_search" className="mr-2" />
-                Let nannies find me instead
-              </Link>
-              <p className="text-[10px] text-on-surface-variant text-center px-4 font-black uppercase tracking-widest opacity-40">Post your needs & get applications</p>
-            </div>
+  const [nannies, [{ count: totalCount }]] = await Promise.all([
+    nanniesQuery,
+    countQuery
+  ]);
+
+  const totalPages = Math.ceil(totalCount / limit);
+
+  // 4b. Track Search Telemetry for Admin GeoPulse
+  if (totalCount > 0) {
+    // Fire and forget (optional: await for reliability)
+    trackSearch({
+      userId: user?.uid,
+      queryText: locationLabel || "Nationwide",
+      latitude: lat,
+      longitude: lng,
+      filtersApplied: {
+        mode,
+        distance: maxDistance,
+        rate: maxRateFilter,
+        rateType,
+        globalOnly,
+        availableNow,
+        alwaysAvailableOnly
+      },
+      resultsCount: totalCount
+    }).catch(e => console.error("[ANALYTICS] Sync Fail:", e));
+  }
+
+  // 5. Client Filtering for 'Available Now'
+  const filteredNannies = availableNow 
+    ? nannies.filter(n => {
+        const avail = n.availability as any;
+        return avail?.instantAvailable && avail?.instantUntil && new Date(avail.instantUntil) > new Date();
+      })
+    : nannies;
+
+  return (
+    <div className="bg-[#faf9f9] min-h-screen font-body text-on-surface selection:bg-secondary-container selection:text-on-secondary-container">
+      <main className="pt-32 pb-20 px-8 max-w-screen-2xl mx-auto overflow-hidden">
+        
+        {/* Header Section */}
+        <header className="mb-10 text-center md:text-left flex flex-col md:row md:items-end justify-between gap-6">
+          <div className="max-w-3xl">
+            <h1 className="text-5xl md:text-6xl font-headline font-extrabold text-[#000716] tracking-tight mb-4 leading-none">
+              The <span className="text-[#875124] italic font-medium">Curated</span> Caregivers
+            </h1>
+            <p className="text-lg text-[#44474e] leading-relaxed">
+              Experience a new standard of childcare excellence. Each caregiver represents a unique blend of expertise, safety, and cultural precision.
+            </p>
           </div>
+        </header>
+
+        {/* The Command Center / Filters Pill */}
+        <BrowseCommandCenter 
+          initialLocation={locationLabel} 
+          currentPage={page} 
+          totalPages={totalPages} 
+          totalResults={totalCount}
+        />
+
+        {/* Nanny Grid */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-8 gap-y-16 min-h-[400px]">
+          {filteredNannies.length > 0 ? (
+            filteredNannies.map((nanny) => (
+              <NannyCuratorCard key={nanny.id} nanny={nanny} />
+            ))
+          ) : (
+            <div className="col-span-full py-24 text-center flex flex-col items-center justify-center">
+               <div className="w-16 h-16 rounded-full bg-[#e3e2e2] flex items-center justify-center mb-4">
+                  <MaterialIcon name="search_off" className="text-3xl text-[#44474e]" />
+              </div>
+              <h3 className="text-xl font-headline font-bold text-[#000716] mb-2">No caregivers found</h3>
+              <p className="text-sm text-[#44474e]">Try expanding your search radius or removing some filters.</p>
+            </div>
+          )}
         </section>
 
-        <div className="flex flex-col lg:flex-row gap-10">
-          {/* Sidebar Filters */}
-          <aside className="lg:w-80 shrink-0">
-             <BrowseFilters initialLocation={useProximity ? locationLabel : ""} initialRate={maxRateFilter} />
-          </aside>
-
-          {/* Nanny Grid */}
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-8 px-2">
-              <p className="text-on-surface-variant font-black uppercase tracking-widest text-[10px] opacity-40">
-                Found <span className="text-primary font-bold">{nannies.length} results</span> {useProximity ? `near ${locationLabel || "Your Location"}` : "Nationwide"}
-              </p>
-              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-primary cursor-pointer hover:opacity-80 transition-opacity font-label">
-                Sort by: Recommended <MaterialIcon name="expand_more" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-              {nannies.map((nanny, i) => (
-                <div 
-                  key={nanny.id} 
-                  className="group bg-surface-container-lowest rounded-[3rem] p-8 shadow-[0_8px_48px_rgba(29,53,87,0.06)] hover:shadow-[0_16px_64px_rgba(29,53,87,0.12)] transition-all duration-500 relative overflow-hidden ring-1 ring-primary/5"
-                >
-                  <div className="flex gap-10 mb-8">
-                    {/* Image (Half width of top section) */}
-                    <div className="w-1/2 aspect-square relative flex-shrink-0">
-                      <div className={cn(
-                        "w-full h-full rounded-[48px_16px_48px_16px] overflow-hidden shadow-2xl ring-8 transition-all group-hover:scale-[1.03] group-hover:rotate-1",
-                        nanny.isVerified ? "ring-secondary-fixed/5" : "ring-surface-variant/5",
-                        nanny.isOccupied && "grayscale-[30%] opacity-90"
-                      )}>
-                        <img 
-                          src={nanny.profileImageUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${nanny.name}`} 
-                          alt={nanny.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      {nanny.isVerified && (
-                        <div className="absolute -top-4 -right-4 bg-white rounded-full p-3 shadow-2xl z-20">
-                          <MaterialIcon name="verified" className="text-secondary text-xl" style={{ fontVariationSettings: "'FILL' 1" }} />
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Content Right (Name, Badge) */}
-                    <div className="w-1/2 flex flex-col justify-center gap-4">
-                      <div className={cn(
-                        "inline-flex items-center px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] rounded-full w-fit",
-                        nanny.isOccupied 
-                          ? "bg-error-container text-error" 
-                          : "bg-tertiary-fixed/20 text-on-tertiary-fixed"
-                      )}>
-                        <div className={cn("w-1.5 h-1.5 rounded-full mr-2", nanny.isOccupied ? "bg-error" : "bg-on-tertiary-fixed animate-pulse")} />
-                        {nanny.isOccupied ? "Occupied" : "Available Now"}
-                      </div>
-                      <h3 className="font-headline text-4xl font-black text-primary tracking-tighter italic leading-none group-hover:text-secondary transition-colors">{nanny.name}</h3>
-                      <div className="flex flex-col gap-1">
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Location (Full width below image row) */}
-                  <div className="mb-10 bg-surface-container-low/50 p-6 rounded-[2rem] border border-primary/5">
-                    <p className="text-on-surface-variant text-sm font-bold flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm flex-shrink-0">
-                        <MaterialIcon name="location_on" className="text-secondary text-xl" />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-primary font-black italic text-lg leading-tight">
-                          {(nanny as any).distance > 0 ? `${(nanny as any).distance.toFixed(1)} miles away` : (nanny.location || "Nearby")}
-                        </span>
-                        <span className="text-xs font-medium opacity-60 mt-1 uppercase tracking-widest">{nanny.location || "Verified Service Area"}</span>
-                      </div>
-                    </p>
-                    {(nanny as any).distance > 0 && (nanny.maxTravelDistance || 25) >= (nanny as any).distance && !nanny.isOccupied && (
-                        <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 bg-green-50 text-green-700 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl border border-green-100">
-                           <MaterialIcon name="direct_route" className="text-[14px]" /> Within Reach
-                        </div>
-                    )}
-                  </div>
-
-                  {/* Stats Grid */}
-                  <div className="grid grid-cols-2 gap-6 mb-8">
-                    <div className="p-1">
-                      <p className="text-[10px] uppercase font-black text-on-surface-variant tracking-[0.2em] opacity-30 mb-2">Expertise</p>
-                      <p className="font-headline font-black text-primary italic leading-none text-2xl">{nanny.experienceYears}+ YRS</p>
-                    </div>
-                    <div className="p-1">
-                      <p className="text-[10px] uppercase font-black text-on-surface-variant tracking-[0.2em] opacity-30 mb-2">Hourly Rate</p>
-                      <p className="font-headline font-black text-primary italic leading-none text-2xl">${nanny.hourlyRate}<span className="text-xs font-medium opacity-40 ml-1">/hr</span></p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 mb-10">
-                    <span className="px-4 py-2 bg-secondary-fixed/10 text-secondary text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center border border-secondary/5">
-                      <MaterialIcon name="security" className="text-[14px] mr-2" /> Identity Verified
-                    </span>
-                    {nanny.isVerified && (
-                      <span className="px-4 py-2 bg-tertiary-fixed/10 text-tertiary text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center border border-tertiary/5">
-                        <MaterialIcon name="public" className="text-[14px] mr-2" /> Global Care
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="pt-2">
-                    <Link 
-                      href={`/nannies/${nanny.id}`}
-                      className={cn(
-                        "w-full block py-6 rounded-3xl font-black uppercase tracking-[0.3em] text-[11px] transition-all text-center shadow-2xl",
-                        nanny.isOccupied 
-                         ? "bg-outline-variant text-on-surface-variant cursor-not-allowed opacity-50" 
-                         : "bg-primary text-white shadow-primary/30 hover:shadow-primary/50 hover:-translate-y-1 active:scale-98"
-                      )}
-                    >
-                      {nanny.isOccupied ? "Fully Booked" : "View Comprehensive Profile"}
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {nannies.length === 0 && (
-              <div className="py-48 flex flex-col items-center justify-center text-center opacity-40 italic">
-                <div className="w-24 h-24 rounded-full bg-surface-container-low flex items-center justify-center mb-8">
-                  <MaterialIcon name="location_searching" className="text-4xl text-primary animate-pulse" />
-                </div>
-                <h3 className="text-4xl font-black font-headline text-primary italic tracking-tight mb-4">No results in this reach</h3>
-                <p className="text-xl max-w-md mx-auto leading-relaxed">We couldn't find any caregivers within 50 miles of your current location. Try adjusting your filters.</p>
-              </div>
-            )}
-            
-            {/* Pagination */}
-            {nannies.length === limit && (
-              <div className="mt-20 flex justify-center">
-                 <Link 
-                   href={`/browse?page=${page + 1}${lat ? `&lat=${lat}` : ''}${lng ? `&lng=${lng}` : ''}`}
-                   className="px-16 py-6 bg-white border-2 border-primary text-primary rounded-[2rem] font-black uppercase tracking-[0.3em] text-[12px] hover:bg-primary hover:text-white transition-all shadow-xl shadow-primary/10 active:scale-95"
-                 >
-                   Discover More Local Care
-                 </Link>
-              </div>
-            )}
-          </div>
-        </div>
       </main>
+
+      <footer className="w-full mt-20 bg-[#f4f3f3] border-t border-[#000716]/5">
+        <div className="flex flex-col md:flex-row justify-between items-center px-12 py-16 w-full max-w-screen-2xl mx-auto">
+            <div className="flex flex-col items-center md:items-start mb-8 md:mb-0">
+                <div className="text-lg font-bold text-[#031F41] mb-4">The Digital Curator</div>
+                <p className="text-[#44474e] text-xs uppercase tracking-[0.05rem] text-center md:text-left">© 2026 The Digital Curator. All rights reserved.</p>
+            </div>
+            <div className="flex flex-wrap justify-center gap-8">
+                <a className="text-[#44474e] hover:text-[#031f41] transition-colors font-body text-xs uppercase tracking-[0.05rem]" href="#">Privacy Policy</a>
+                <a className="text-[#44474e] hover:text-[#031f41] transition-colors font-body text-xs uppercase tracking-[0.05rem]" href="#">Terms of Service</a>
+                <a className="text-[#44474e] hover:text-[#031f41] transition-colors font-body text-xs uppercase tracking-[0.05rem]" href="#">Safety Standards</a>
+                <a className="text-[#44474e] hover:text-[#031f41] transition-colors font-body text-xs uppercase tracking-[0.05rem]" href="#">Contact</a>
+            </div>
+        </div>
+      </footer>
     </div>
   );
 }

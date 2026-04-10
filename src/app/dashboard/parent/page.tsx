@@ -21,6 +21,8 @@ import { Scrapbook } from "@/components/dashboard/Scrapbook";
 import { TrialConversionPrompt } from "@/components/dashboard/TrialConversionPrompt";
 import { getCareTeam, getBookingSeries, getFamilyFinancials, getActivityFeed } from "./care-team/actions";
 import { getScrapbookMilestones } from "../nanny/care-actions";
+import { getActiveCareOverview } from "./bookings/actions";
+import { UpcomingCareWidget } from "@/components/dashboard/UpcomingCareWidget";
 
 export default async function FamilyDashboard() {
   const user = await syncUser();
@@ -64,6 +66,10 @@ export default async function FamilyDashboard() {
     orderBy: [desc(bookings.endDate)]
   });
 
+  // 1h. Fetch Active/Pending Care for Overview
+  const activeCareBookings = await getActiveCareOverview();
+  const liveBooking = activeCareBookings.find(b => b.status === "in_progress");
+
   // 2. Fetch Children
   const myChildren = await db.query.children.findMany({
     where: eq(children.parentId, userId),
@@ -72,6 +78,7 @@ export default async function FamilyDashboard() {
   // 3. Fetch Applicants Hub (Latest 2)
   const myApplicants = await db.select({
     id: applications.id,
+    jobId: jobs.id,
     jobTitle: jobs.title,
     nannyName: users.fullName,
     nannyImage: users.profileImageUrl,
@@ -84,7 +91,7 @@ export default async function FamilyDashboard() {
   .innerJoin(jobs, eq(applications.jobId, jobs.id))
   .innerJoin(users, eq(applications.caregiverId, users.id))
   .leftJoin(nannyProfiles, eq(users.id, nannyProfiles.id))
-  .where(eq(jobs.parentId, userId))
+  .where(and(eq(jobs.parentId, userId), eq(applications.status, "pending")))
   .orderBy(desc(applications.createdAt))
   .limit(2);
 
@@ -107,7 +114,8 @@ export default async function FamilyDashboard() {
         <FamilyOverviewHero 
           initialProfile={{
             familyName: familyName,
-            bio: familyBio,
+            bio: parentProfile?.bio || familyBio,
+            philosophy: parentProfile?.philosophy || "",
             location: location,
             familyPhoto: parentProfile?.familyPhoto || ""
           }}
@@ -140,8 +148,13 @@ export default async function FamilyDashboard() {
           {/* 2a. Live Pulse (Final Stage 4) */}
           <LiveStatusTracker 
             channelName={`family-presence:${user.id}`} 
-            nannyName={activeSeries[0]?.caregiverName || "Caregiver"} 
+            nannyName={liveBooking?.caregiver?.fullName || activeSeries[0]?.caregiverName || "Caregiver"} 
+            isActive={!!liveBooking}
+            startTime={liveBooking?.startDate}
           />
+
+          {/* 2a-2. Upcoming & Active Care Widget (New Itemized Visibility) */}
+          <UpcomingCareWidget bookings={activeCareBookings} />
 
           {/* 2b. Series Manager (Overhaul Stage 2) */}
           <SeriesManager series={activeSeries} />
@@ -225,33 +238,37 @@ export default async function FamilyDashboard() {
                   )}
                 </div>
                 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {myApplicants.length > 0 ? (
                     myApplicants.map((app) => (
-                      <div key={app.id} className="flex flex-col md:flex-row items-center justify-between gap-6 p-6 rounded-[2.5rem] bg-surface-container-low hover:bg-white border border-transparent hover:border-outline-variant/10 transition-all group">
+                      <div key={app.id} className="flex flex-col md:flex-row items-center justify-between gap-6 p-6 rounded-full bg-surface-container-low/50 hover:bg-white border border-transparent hover:border-outline-variant/10 transition-all group lg:pr-8">
                         <div className="flex items-center gap-6">
-                          <img 
-                            alt={app.nannyName} 
-                            className="w-16 h-16 rounded-2xl object-cover shadow-lg group-hover:rotate-3 transition-transform"
-                            src={app.nannyImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.nannyName}`} 
-                          />
-                          <div>
-                            <h4 className="font-headline text-2xl font-black text-primary leading-none tracking-tight">{app.nannyName}</h4>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-40 mt-1 whitespace-nowrap">For: {app.jobTitle}</p>
-                          </div>
+                           <div className="relative">
+                              <img 
+                                alt={app.nannyName} 
+                                className="w-16 h-16 rounded-2xl object-cover shadow-lg group-hover:scale-105 transition-transform"
+                                src={app.nannyImage || `https://api.dicebear.com/7.x/avataaars/svg?seed=${app.nannyName}`} 
+                              />
+                           </div>
+                           <div>
+                             <h4 className="font-headline text-2xl font-black text-primary leading-none tracking-tight">{app.nannyName}</h4>
+                             <p className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant opacity-30 mt-1 whitespace-nowrap font-label">
+                               For: {app.jobTitle}
+                             </p>
+                           </div>
                         </div>
-                        <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="flex items-center gap-2 w-full md:w-auto">
                           <Link 
                             href={`/dashboard/messages/user/${app.caregiverId}`}
-                            className="p-4 bg-white text-primary rounded-2xl hover:bg-primary hover:text-white transition-all shadow-sm flex items-center justify-center shrink-0"
+                            className="w-14 h-14 bg-white text-primary rounded-2xl hover:bg-primary-container transition-all shadow-sm flex items-center justify-center shrink-0 border border-outline-variant/10"
                           >
                             <MaterialIcon name="chat" fill />
                           </Link>
                           <Link 
-                            href={`/nannies/${app.caregiverId}`}
-                            className="flex-1 md:flex-none px-8 py-4 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-primary/20 hover:scale-105 transition-all text-center"
+                            href={`/dashboard/parent/jobs/${app.jobId}/applications`}
+                            className="flex-1 md:flex-none px-10 py-5 bg-[#1e293b] text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl shadow-xl hover:scale-[1.02] transition-all text-center font-label"
                           >
-                            View Profile
+                            View Application
                           </Link>
                         </div>
                       </div>

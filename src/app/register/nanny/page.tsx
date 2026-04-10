@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
-import Navbar from "@/components/Navbar";
 
 // Step Components
 import ProfileStep from "@/components/registration/ProfileStep";
@@ -109,7 +108,6 @@ export default function NannyRegistration() {
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen">
-      <Navbar />
 
       <main className="pt-32 pb-20 px-4">
         <div className="max-w-4xl mx-auto">

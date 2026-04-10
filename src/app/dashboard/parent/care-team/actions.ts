@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { auditLogs, careTeam, parentProfiles, users, bookingSeries, bookings } from "@/db/schema";
+import { auditLogs, careTeam, parentProfiles, users, bookingSeries, bookings, careActivities } from "@/db/schema";
 import { generateSeriesInstances } from "@/lib/series-logic";
 import { calculateMonthlyFinancials } from "@/lib/financial-logic";
 import { requireUser } from "@/lib/get-server-user";
@@ -153,6 +153,10 @@ export async function getFamilyFinancials(month: Date = new Date()) {
     activeSeries.map(s => calculateMonthlyFinancials(s.id, month))
   );
 
+  // Fetch ad-hoc snapshot (bookings where seriesId IS NULL)
+  const adhocSnapshot = await calculateMonthlyFinancials(null, month, user.uid);
+  snapshots.push(adhocSnapshot);
+
   // Aggregate totals
   return snapshots.reduce((acc, s) => ({
     retainer: acc.retainer + s.retainer,
@@ -170,7 +174,7 @@ export async function getFamilyFinancials(month: Date = new Date()) {
     netEarnings: 0,
     actualHoursWorked: 0,
     currency: "USD"
-  });
+  } as any);
 }
 
 /**
@@ -250,21 +254,46 @@ export async function cancelBookingSeries(seriesId: string) {
 
 /**
  * Retrieves the activity feed for the logged-in user.
+ * Merges audit logs with live session activities from nannies.
  */
-export async function getActivityFeed() {
+export async function getActivityFeed(page: number = 0, limit: number = 10) {
     const user = await requireUser();
+    const offset = page * limit;
     
+    // 1. Fetch system audit logs
     const logs = await db.query.auditLogs.findMany({
         where: eq(auditLogs.actorId, user.uid),
         orderBy: (auditLogs, { desc }) => [desc(auditLogs.createdAt)],
-        limit: 5
+        limit: limit,
+        offset: offset
     });
 
-    return logs.map(l => ({
-        id: l.id,
-        type: l.entityType === "booking" ? "nanny" : l.entityType === "series" ? "system" : "financial",
-        action: l.action,
-        timestamp: l.createdAt,
-        metadata: l.metadata
-    }));
+    // 2. Fetch live nanny activities for this parent
+    const nannyActs = await db.query.careActivities.findMany({
+        where: eq(careActivities.parentId, user.uid),
+        orderBy: (careActivities, { desc }) => [desc(careActivities.createdAt)],
+        limit: limit,
+        offset: offset
+    });
+
+    // 3. Map and Merge
+    const merged = [
+       ...logs.map(l => ({
+          id: l.id,
+          type: l.entityType === "booking" ? "system" : l.entityType === "series" ? "system" : "financial",
+          action: l.action,
+          timestamp: l.createdAt,
+          metadata: l.metadata
+       })),
+       ...nannyActs.map(a => ({
+          id: a.id,
+          type: "nanny",
+          action: `${a.type.charAt(0).toUpperCase() + a.type.slice(1)} Logged`,
+          timestamp: a.createdAt,
+          metadata: { summary: a.content, photoUrl: a.photoUrl, videoUrl: a.videoUrl }
+       }))
+    ];
+
+    // Sort by timestamp desc and handle slicing
+    return merged.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).slice(0, limit);
 }

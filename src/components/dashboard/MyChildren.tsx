@@ -59,7 +59,8 @@ export default function MyChildren({ initialChildren }: MyChildrenProps) {
         type: formData.type,
         bio: formData.bio,
         photoUrl: formData.photoUrl,
-        specialNeeds: needsArray
+        specialNeeds: needsArray,
+        interests: []
       });
 
       // Optimistic update
@@ -70,7 +71,8 @@ export default function MyChildren({ initialChildren }: MyChildrenProps) {
         type: formData.type,
         bio: formData.bio,
         photoUrl: formData.photoUrl,
-        specialNeeds: JSON.stringify(needsArray)
+        specialNeeds: JSON.stringify(needsArray),
+        interests: JSON.stringify([])
       }]);
       
       setIsModalOpen(false);

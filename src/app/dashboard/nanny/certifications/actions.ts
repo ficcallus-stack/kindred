@@ -11,9 +11,9 @@ import { stripe } from "@/lib/stripe";
 import { PaymentService } from "@/lib/payments/service";
 
 const CERTIFICATION_PRICES: Record<string, { amount: number; name: string }> = {
-  elite_bundle: { amount: 9500, name: "Elite Bundle" },              // $95
   standards_program: { amount: 4500, name: "Global Care Standards Exam" }, // $45
   standards_retake: { amount: 500, name: "Exam Retake" },             // $5
+  elite_bundle: { amount: 15000, name: "The Elite Nanny Bundle" },     // $150
 };
 
 export async function enrollCertification(data: EnrollCertificationInput) {
@@ -217,4 +217,56 @@ export async function submitExamAttempt(submissionId: string, answers: Record<st
 
   revalidatePath("/dashboard/nanny/certifications");
   return { success: true };
+}
+
+/**
+ * Automatically detects and recovers "stuck" payments on mount or redirect.
+ */
+export async function checkPaymentStatus() {
+  const clerkUser = await requireUser();
+
+  const pendingCerts = await db.query.certifications.findMany({
+    where: and(
+        eq(certifications.caregiverId, clerkUser.uid),
+        eq(certifications.status, "pending_payment")
+    )
+  });
+
+  if (pendingCerts.length === 0) return { recovered: 0 };
+
+  let recoveredCount = 0;
+
+  for (const cert of pendingCerts) {
+    if (!cert.stripePaymentId) continue;
+
+    try {
+        const intentId = cert.stripePaymentId.startsWith("pi_") 
+            ? cert.stripePaymentId 
+            : null;
+
+        if (intentId) {
+            const intent = await stripe.paymentIntents.retrieve(intentId);
+            if (intent.status === "succeeded") {
+                const newStatus = cert.type === "registration" ? "completed" : "enrolled";
+                
+                await db.update(certifications)
+                    .set({ 
+                        status: newStatus as any,
+                        enrolledAt: new Date(), 
+                    })
+                    .where(eq(certifications.id, cert.id));
+
+                recoveredCount++;
+            }
+        }
+    } catch (e) {
+        console.error(`[checkPaymentStatus] Failed for cert ${cert.id}:`, e);
+    }
+  }
+
+  if (recoveredCount > 0) {
+    revalidatePath("/dashboard/nanny/certifications");
+  }
+
+  return { recovered: recoveredCount };
 }

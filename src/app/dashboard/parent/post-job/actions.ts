@@ -4,16 +4,15 @@ import crypto from "crypto";
 
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { jobs, parentProfiles } from "@/db/schema";
+import { jobs, parentProfiles, children, users } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
-import { createJobSchema, type CreateJobInput } from "@/lib/validations";
+import { createJobSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 
 import { syncUser } from "@/lib/user-sync";
 import { stripe } from "@/lib/stripe";
 import { sendEscrowReceiptEmail } from "@/lib/email";
-import { users } from "@/db/schema";
 
 export async function checkIsPremium() {
   const serverUser = await requireUser();
@@ -64,11 +63,32 @@ export async function getLatestJobDraft() {
   return draft;
 }
 
+async function syncChildDetails(data: any, childIds: string[], userId: string) {
+    if (!childIds || childIds.length === 0) return;
+
+    for (const id of childIds) {
+        const medical = data[`child_${id}_medical`];
+        const interestsRaw = data[`child_${id}_interests`];
+        
+        if (medical !== undefined || interestsRaw !== undefined) {
+            const updates: any = {};
+            if (medical !== undefined) updates.medicalNotes = medical;
+            if (interestsRaw !== undefined) {
+                updates.interests = Array.isArray(interestsRaw) ? interestsRaw : interestsRaw.split(',').map((s: string) => s.trim()).filter(Boolean);
+            }
+            
+            await db.update(children)
+                .set(updates)
+                .where(and(eq(children.id, id), eq(children.parentId, userId)));
+        }
+    }
+}
+
 export async function upsertJobDraft(data: any) {
   const user = await requireUser();
   
   // Clean the data - only take what's relevant to jobs table
-  const { location, duration, childCount, minRate, maxRate, certs, duties, description, scheduleType, schedule, specificDates, isFeatured, isBoosted } = data;
+  const { location, duration, childCount, minRate, maxRate, certs, duties, requirements, language, description, scheduleType, schedule, specificDates, isFeatured, isBoosted, hiringType, retainerBudget, startDate, selectedChildrenIds, isFastTrack, philosophy } = data;
 
   // Check if active draft exists
   const existingDraft = await getLatestJobDraft();
@@ -76,11 +96,19 @@ export async function upsertJobDraft(data: any) {
   const title = duration ? `${duration} Care in ${location || 'Pending Location'}` : "New Job Draft";
   const budget = `$${minRate || 20}-$${maxRate || 30}/hr`;
 
+  // Sync child details
+  if (selectedChildrenIds && selectedChildrenIds.length > 0) {
+    await syncChildDetails(data, selectedChildrenIds, user.uid);
+  }
+
   if (existingDraft) {
     await db.update(jobs).set({
       location: location || existingDraft.location,
       duration: duration || existingDraft.duration,
+      startDate: startDate ? new Date(startDate) : existingDraft.startDate,
       childCount: childCount || existingDraft.childCount,
+      selectedChildIds: selectedChildrenIds || existingDraft.selectedChildIds,
+      isPriority: isFastTrack !== undefined ? isFastTrack : existingDraft.isPriority,
       minRate: minRate || existingDraft.minRate,
       maxRate: maxRate || existingDraft.maxRate,
       description: description || existingDraft.description,
@@ -89,6 +117,11 @@ export async function upsertJobDraft(data: any) {
       specificDates: specificDates || existingDraft.specificDates,
       isFeatured: isFeatured !== undefined ? isFeatured : existingDraft.isFeatured,
       isBoosted: isBoosted !== undefined ? isBoosted : existingDraft.isBoosted,
+      hiringType: hiringType || existingDraft.hiringType,
+      retainerBudget: retainerBudget || existingDraft.retainerBudget,
+      requirements: requirements || existingDraft.requirements,
+      duties: duties || existingDraft.duties || "",
+      language: language || existingDraft.language,
       title,
       budget,
       updatedAt: new Date(),
@@ -104,13 +137,24 @@ export async function upsertJobDraft(data: any) {
       budget,
       minRate: minRate || 20,
       maxRate: maxRate || 30,
+      location: location || null,
+      duration: duration || null,
+      startDate: startDate ? new Date(startDate) : null,
+      childCount: childCount || 1,
+      selectedChildIds: selectedChildrenIds || [],
+      isPriority: isFastTrack || false,
       status: "open",
       isDraft: true,
       scheduleType: scheduleType || "recurring",
+      hiringType: hiringType || "hourly",
+      retainerBudget: retainerBudget || 1200,
       schedule: schedule || {},
       specificDates: specificDates || [],
       isFeatured: isFeatured || false,
       isBoosted: isBoosted || false,
+      requirements: requirements || {},
+      duties: duties || "",
+      language: language || "English",
     });
     return { id: newId };
   }
@@ -121,7 +165,7 @@ export async function deleteJobDraft() {
   await db.delete(jobs).where(and(eq(jobs.parentId, user.uid), eq(jobs.isDraft, true)));
 }
 
-export async function createJob(data: CreateJobInput & { isFeatured?: boolean; isBoosted?: boolean }) {
+export async function createJob(data: any) {
   const user = await requireUser();
 
   console.log(`[createJob] Starting for user ${user.uid}. Intent: ${data.stripePaymentIntentId}`);
@@ -138,10 +182,33 @@ export async function createJob(data: CreateJobInput & { isFeatured?: boolean; i
     throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
   }
 
-  const { location, duration, childCount, minRate, maxRate, certs, duties, description: userDescription, stripePaymentIntentId, scheduleType, schedule, specificDates } = parsed.data;
+  const { 
+    location, duration, childCount, minRate, maxRate, certs, duties, 
+    description: userDescription, stripePaymentIntentId, scheduleType, 
+    schedule, specificDates, hiringType, retainerBudget, startDate, 
+    selectedChildrenIds, isFastTrack, requirements, language
+  } = parsed.data;
+
+  // Sync child details
+  if (selectedChildrenIds && selectedChildrenIds.length > 0) {
+    await syncChildDetails(data, selectedChildrenIds, user.uid);
+  }
+
+  // Idempotency: Ensure this payment intent hasn't ALREADY been used for a live job
+  if (stripePaymentIntentId) {
+    const [existingJob] = await db.select().from(jobs)
+      .where(and(eq(jobs.stripePaymentIntentId, stripePaymentIntentId), eq(jobs.isDraft, false)))
+      .limit(1);
+    
+    if (existingJob) {
+      console.warn(`[createJob] Blocked duplicate submission for PI: ${stripePaymentIntentId}`);
+      throw new Error("This payment has already been used to post a job. Redirecting to dashboard...");
+    }
+  }
 
   const [dbUser] = await db.select().from(users).where(eq(users.id, user.uid)).limit(1);
   const isPremium = dbUser?.isPremium;
+  const isElite = dbUser?.subscriptionTier === "elite";
 
   // Verify Payment Intent with Stripe ONLY if not Premium
   if (!isPremium) {
@@ -164,12 +231,12 @@ export async function createJob(data: CreateJobInput & { isFeatured?: boolean; i
   }
 
   const title = `${duration} Care in ${location}`;
-  let description = `Care requested for ${childCount} children. Requirements: ${Object.keys(certs).filter(k => certs[k]).join(", ") || "None specified"}. Duties: ${Object.keys(duties).filter(k => duties[k]).join(", ") || "None specified"}. Schedule: ${scheduleType === 'recurring' ? 'Weekly' : 'One-time dates'}.`;
-  
-  if (userDescription) {
-    description += `\n\nAdditional Notes:\n${userDescription}`;
-  }
+  const description = userDescription || "";
   const budget = `$${minRate}-$${maxRate}/hr`;
+
+  // Elite Perk: Automatic/Free Featured and Boosted status
+  const finalFeatured = isElite || data.isFeatured || false;
+  const finalBoosted = isElite || data.isBoosted || false;
 
   // Try to find existing draft to update instead of fresh insert
   const draft = await getLatestJobDraft();
@@ -181,14 +248,25 @@ export async function createJob(data: CreateJobInput & { isFeatured?: boolean; i
       budget,
       minRate,
       maxRate,
+      location,
+      duration,
+      startDate: startDate ? new Date(startDate) : null,
+      childCount,
+      selectedChildIds: selectedChildrenIds,
+      isPriority: isFastTrack,
+      hiringType,
+      retainerBudget,
       status: "open",
       scheduleType,
       schedule,
       specificDates,
       stripePaymentIntentId: isPremium ? null : stripePaymentIntentId,
-      isFeatured: data.isFeatured || false,
-      isBoosted: data.isBoosted || false,
+      isFeatured: finalFeatured,
+      isBoosted: finalBoosted,
       isDraft: false,
+      requirements,
+      duties,
+      language,
       createdAt: new Date(),
     }).where(eq(jobs.id, draft.id));
   } else {
@@ -200,14 +278,25 @@ export async function createJob(data: CreateJobInput & { isFeatured?: boolean; i
       budget,
       minRate,
       maxRate,
+      location,
+      duration,
+      startDate: startDate ? new Date(startDate) : null,
+      childCount,
+      selectedChildIds: selectedChildrenIds,
+      isPriority: isFastTrack,
+      hiringType: hiringType || "hourly",
+      retainerBudget: retainerBudget || 1200,
       status: "open",
       scheduleType,
       schedule,
       specificDates,
       stripePaymentIntentId: isPremium ? null : stripePaymentIntentId,
-      isFeatured: data.isFeatured || false,
-      isBoosted: data.isBoosted || false,
+      isFeatured: finalFeatured,
+      isBoosted: finalBoosted,
       isDraft: false,
+      requirements,
+      duties,
+      language,
     });
   }
 

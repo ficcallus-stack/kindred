@@ -16,6 +16,21 @@ const CERTS = [
   { id: "badge", name: "Global Care Badge", icon: "verified_user", desc: "Kindred-exclusive background verification.", color: "text-secondary" },
 ];
 
+const PREREQUISITES = [
+  { id: "isNonSmoker", name: "Non-Smoker", icon: "smoke_free" },
+  { id: "isSafeDriver", name: "Safe Driver", icon: "directions_car" },
+  { id: "hasOwnTransport", name: "Own Transport", icon: "commute" },
+  { id: "isVaccinated", name: "Vaccinated", icon: "vaccines" },
+  { id: "swimmingProficient", name: "Swimming Proficient", icon: "pool" },
+  { id: "passportReady", name: "Passport Ready", icon: "passport" },
+  { id: "animalFriendly", name: "Animal Friendly", icon: "pets" },
+  { id: "nonDrinker", name: "Non-Drinker", icon: "no_drinks" },
+  { id: "willingToTravel", name: "Willing to Travel", icon: "flight_takeoff" },
+  { id: "multilingual", name: "Multilingual", icon: "translate" },
+  { id: "childhoodEdu", name: "Childhood Ed", icon: "school" },
+  { id: "collegeDegree", name: "College Grad", icon: "workspace_premium" },
+];
+
 const DUTIES = [
   "Light housekeeping",
   "Meal prep",
@@ -38,6 +53,12 @@ export default function Step3({ data, updateData, onNext, onBack }: Step3Props) 
     updateData({ certs });
   };
 
+  const togglePrerequisite = (id: string) => {
+    const requirements = { ...(data.requirements || {}) };
+    requirements[id] = !requirements[id];
+    updateData({ requirements });
+  };
+
   const toggleDuty = (duty: string) => {
     const duties = { ...(data.duties || {}) };
     duties[duty] = !duties[duty];
@@ -49,8 +70,47 @@ export default function Step3({ data, updateData, onNext, onBack }: Step3Props) 
   };
 
   return (
-    <div className="space-y-10 animate-in fade-in slide-in-from-right-4 duration-500">
-      {/* Section 1: Certifications */}
+    <div className="space-y-12 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
+      
+      {/* Section 1: Prerequisites (Pills Design) */}
+      <section>
+        <div className="flex items-center justify-between mb-8">
+           <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center">
+                 <MaterialIcon name="rule" className="text-2xl" />
+              </div>
+              <div>
+                 <h2 className="font-headline text-2xl font-black text-primary italic leading-none">Key Prerequisites</h2>
+                 <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 mt-1">Foundational Standards</p>
+              </div>
+           </div>
+           <span className="text-[10px] font-black text-on-surface-variant/20 italic uppercase tracking-[0.2em]">Select all that apply</span>
+        </div>
+        
+        <div className="flex flex-wrap gap-3">
+          {PREREQUISITES.map((req) => {
+             const isSelected = data.requirements?.[req.id] || false;
+             return (
+              <button
+                key={req.id}
+                type="button"
+                onClick={() => togglePrerequisite(req.id)}
+                className={cn(
+                  "px-5 py-3 rounded-full flex items-center gap-3 transition-all active:scale-95 text-xs font-black uppercase tracking-widest italic border-2",
+                  isSelected
+                    ? "bg-secondary text-white border-secondary shadow-lg shadow-secondary/20"
+                    : "bg-surface-container-lowest text-on-surface-variant/60 border-outline-variant/10 hover:border-secondary/40 hover:text-secondary"
+                )}
+              >
+                <MaterialIcon name={req.icon} className={cn("text-lg", isSelected ? "text-white" : "text-secondary")} fill={isSelected} />
+                {req.name}
+              </button>
+             );
+          })}
+        </div>
+      </section>
+
+      {/* Section 2: Certifications */}
       <section>
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-headline text-xl font-bold text-primary">Mandatory Certifications</h2>
@@ -79,105 +139,79 @@ export default function Step3({ data, updateData, onNext, onBack }: Step3Props) 
         </div>
       </section>
 
-      {/* Section 2: Duties */}
-      <section className="bg-surface-container-low -mx-6 px-6 py-10 md:mx-0 md:rounded-3xl border border-outline-variant/10 relative overflow-hidden">
-        <div className="max-w-2xl relative z-10">
-          <h2 className="font-headline text-xl font-bold text-primary mb-2">Daily Duties & Responsibilities</h2>
-          <p className="text-on-surface-variant mb-8">What will a typical day look like for your Kindred Caregiver?</p>
-          <div className="flex flex-wrap gap-3">
-            {DUTIES.map((duty) => {
-              const isSelected = data.duties?.[duty];
-              return (
-                <button
-                  key={duty}
-                  onClick={() => toggleDuty(duty)}
-                  className={cn(
-                    "px-5 py-3 rounded-full font-medium text-sm flex items-center gap-2 border transition-all active:scale-95 shadow-sm",
-                    isSelected
-                      ? "bg-tertiary-fixed text-on-tertiary-fixed border-transparent"
-                      : "bg-surface-container-lowest text-on-surface-variant border-outline-variant/15 hover:bg-white"
-                  )}
-                  type="button"
-                >
-                  <MaterialIcon name={isSelected ? "check" : "add"} className="text-lg" />
-                  {duty}
-                </button>
-              );
-            })}
+      {/* Section 3: Duties */}
+      <section className="bg-surface-container-low -mx-6 px-6 py-10 md:mx-0 md:rounded-[2.5rem] border border-outline-variant/10 relative overflow-hidden group">
+        <div className="max-w-4xl relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12">
+          <div className="lg:col-span-4">
+             <div className="w-14 h-14 bg-tertiary-fixed text-on-tertiary-fixed rounded-2xl flex items-center justify-center shadow-lg mb-6 group-hover:rotate-6 transition-transform">
+                <MaterialIcon name="checklist_rtl" className="text-2xl" />
+             </div>
+             <h2 className="font-headline text-2xl font-black text-primary italic leading-none mb-4">Daily Duties & Responsibilities</h2>
+             <p className="text-sm text-on-surface-variant leading-relaxed font-medium italic opacity-70">
+                What will a typical day look like? Be as specific as possible about meal prep, school runs, or education.
+             </p>
+          </div>
+          <div className="lg:col-span-8">
+            <textarea
+              className="w-full bg-white border-2 border-outline-variant/10 rounded-2xl px-6 py-6 focus:ring-4 focus:ring-tertiary-fixed/20 focus:border-tertiary-fixed/40 outline-none transition-all font-body text-primary placeholder:text-outline/40 min-h-[160px] shadow-sm italic font-medium"
+              placeholder="e.g. Preparing healthy afternoon snacks, 3:00 PM school pickup, helping with 1st-grade math, and a light tidy of the play area..."
+              value={data.duties || ""}
+              onChange={(e) => updateData({ duties: e.target.value })}
+            ></textarea>
           </div>
         </div>
-        <div className="absolute top-0 right-0 w-32 h-full bg-gradient-to-l from-primary/5 to-transparent pointer-events-none"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-tertiary-fixed/5 rounded-full blur-3xl -z-0 group-hover:scale-110 transition-transform duration-1000"></div>
       </section>
 
-      {/* Section 3: Languages & Requirements */}
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-        <div className="space-y-8">
-          <div>
-            <label className="block font-headline font-bold text-primary mb-2">Language Requirements</label>
-            <p className="text-sm text-on-surface-variant mb-4">Does your family speak multiple languages at home?</p>
-            <div className="relative">
-              <select
-                className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-xl px-4 py-4 appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all font-medium text-primary cursor-pointer hover:bg-surface-container-lowest/80"
-                value={data.language || ""}
-                onChange={(e) => updateData({ language: e.target.value })}
-              >
-                <option value="">English (Primary)</option>
-                <option value="bilingual_es">Bilingual (Spanish preferred)</option>
-                <option value="bilingual_fr">Bilingual (French preferred)</option>
-                <option value="bilingual_zh">Bilingual (Mandarin preferred)</option>
-                <option value="multilingual">Multilingual</option>
-              </select>
-              <MaterialIcon name="unfold_more" className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant" />
+      {/* Section 4: Language & Video Intro */}
+      <section className="max-w-2xl mx-auto w-full">
+          <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] border border-outline-variant/10 shadow-sm space-y-6 group">
+            <div className="flex items-center gap-4">
+               <div className="w-12 h-12 bg-primary/5 text-primary rounded-xl flex items-center justify-center group-hover:rotate-3 transition-transform">
+                  <MaterialIcon name="language" />
+               </div>
+               <div>
+                  <h3 className="font-headline font-black text-primary italic leading-none">Language Requirement</h3>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 mt-1">Spoken at home</p>
+               </div>
             </div>
+            <input
+              className="w-full bg-surface-container-low border-none rounded-xl focus:ring-2 focus:ring-primary/40 py-4 px-5 font-bold text-primary shadow-inner"
+              placeholder="e.g. English & Spanish (Bilingual preferred)"
+              value={data.language || ""}
+              onChange={(e) => updateData({ language: e.target.value })}
+            />
           </div>
+      </section>
 
-          <div className="p-6 bg-secondary-fixed rounded-2xl border border-outline-variant/10 relative overflow-hidden group">
-            <div className="relative z-10 flex items-center justify-between">
-              <div>
-                <h4 className="font-headline font-bold text-on-secondary-fixed mb-1">Request Video Intro</h4>
-                <p className="text-xs text-on-secondary-fixed-variant leading-relaxed">Require applicants to record a 30s hello.</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  className="sr-only peer" 
-                  checked={data.requestVideo || false}
-                  onChange={(e) => updateData({ requestVideo: e.target.checked })}
-                />
-                <div className="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary shadow-sm"></div>
-              </label>
-            </div>
-            <MaterialIcon name="videocam" className="absolute -bottom-2 -right-2 text-6xl text-white/10 group-hover:scale-110 transition-transform duration-500" />
-          </div>
+      <section className="bg-white p-10 rounded-[3rem] border border-outline-variant/10 shadow-xl relative overflow-hidden group">
+        <label className="block font-headline text-3xl font-black text-primary italic mb-6 text-left">Additional Information</label>
+        <div className="mb-6 flex flex-wrap gap-2">
+          {TEMPLATES.map((t) => (
+            <button
+              key={t.name}
+              onClick={() => applyTemplate(t.text)}
+              className="px-5 py-2.5 bg-surface-container-high rounded-full text-[10px] font-black uppercase tracking-widest text-primary border border-outline-variant/15 hover:bg-primary hover:text-white transition-all flex items-center gap-2 active:scale-95 shadow-sm"
+              type="button"
+            >
+              <MaterialIcon name={t.icon} className="text-sm" />
+              {t.name}
+            </button>
+          ))}
         </div>
-
-        <div className="space-y-6">
-          <div>
-            <label className="block font-headline font-bold text-primary mb-2">Additional Notes</label>
-            <div className="mb-4 flex flex-wrap gap-2">
-              {TEMPLATES.map((t) => (
-                <button
-                  key={t.name}
-                  onClick={() => applyTemplate(t.text)}
-                  className="px-3 py-1.5 bg-surface-container-high rounded-full text-[10px] font-bold text-primary border border-outline-variant/15 hover:bg-primary hover:text-white transition-all flex items-center gap-1.5 active:scale-95"
-                  type="button"
-                >
-                  <MaterialIcon name={t.icon} className="text-sm" />
-                  {t.name}
-                </button>
-              ))}
-            </div>
-            <textarea
-              className="w-full bg-surface-container-lowest border border-outline-variant/15 rounded-xl px-4 py-4 focus:ring-2 focus:ring-primary/20 outline-none transition-all font-body text-primary placeholder:text-outline/60 min-h-[200px] shadow-sm"
-              placeholder="Our 4-year old loves dinosaurs and we encourage outdoor play..."
-              value={data.description || ""}
-              onChange={(e) => updateData({ description: e.target.value })}
-            ></textarea>
-            <p className="text-[10px] text-on-surface-variant mt-2 italic text-right">
+        <textarea
+          className="w-full bg-surface-container-low border-none rounded-2xl px-8 py-8 focus:ring-2 focus:ring-primary/40 outline-none transition-all font-body text-primary placeholder:text-outline/40 min-h-[240px] shadow-inner italic font-medium text-lg leading-relaxed"
+          placeholder="Any other details we should know about your household routines or expectations..."
+          value={data.description || ""}
+          onChange={(e) => updateData({ description: e.target.value })}
+        ></textarea>
+        <div className="flex justify-between items-center mt-4">
+           <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 italic">Premium Household Briefing</span>
+           <p className="text-[11px] font-black text-on-surface-variant italic">
               {data.description?.length || 0}/5000 characters
-            </p>
-          </div>
+           </p>
         </div>
+        <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-primary/5 rounded-full blur-3xl -z-10 group-hover:scale-125 transition-transform duration-1000"></div>
       </section>
     </div>
   );

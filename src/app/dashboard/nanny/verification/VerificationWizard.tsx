@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 import { 
   uploadIdentityDocs, 
   submitBackgroundAuth, 
@@ -16,15 +17,50 @@ interface VerificationWizardProps {
   user: any;
 }
 
+const DRAFT_KEY = "kindred_verif_draft";
+
 export default function VerificationWizard({ initialData, user }: VerificationWizardProps) {
   const [currentStep, setCurrentStep] = useState(initialData?.verification?.currentStep || 1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // States that we might persist locally
   const [verifData, setVerifData] = useState(initialData?.verification || {});
   const [profileData, setProfileData] = useState(initialData?.profile || {});
+  const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
+
+  useEffect(() => {
+     if (typeof window !== "undefined") {
+         const draft = localStorage.getItem(DRAFT_KEY);
+         if (draft && !hasLoadedDraft) {
+             try {
+                const parsed = JSON.parse(draft);
+                // We don't restore files, but we can restore text inputs
+                if (parsed.profile) setProfileData((prev: any) => ({ ...prev, ...parsed.profile }));
+                if (parsed.ssn) setVerifData((prev: any) => ({ ...prev, ssnDraft: parsed.ssn }));
+                if (parsed.refs) setVerifData((prev: any) => ({ ...prev, references: parsed.refs }));
+             } catch(e) {}
+             setHasLoadedDraft(true);
+         }
+     }
+  }, [hasLoadedDraft]);
+
+  const saveDraft = (key: string, value: any) => {
+      if (typeof window !== "undefined") {
+          const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || "{}");
+          draft[key] = value;
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      }
+  };
+
+  const clearDraft = () => {
+      if (typeof window !== "undefined") {
+          localStorage.removeItem(DRAFT_KEY);
+      }
+  }
 
   const trustScore = 250 + (currentStep > 1 ? 200 : 0) + (currentStep > 2 ? 300 : 0) + (currentStep > 3 ? 150 : 0);
 
-  const nextStep = () => setCurrentStep((prev: number) => Math.min(prev + 1, 5));
+  const nextStep = () => setCurrentStep((prev: number) => Math.min(prev + 1, 4));
   const prevStep = () => setCurrentStep((prev: number) => Math.max(prev - 1, 1));
 
   return (
@@ -47,18 +83,17 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
           </p>
         </div>
 
-        <nav className="flex flex-col gap-1.5 p-2 bg-surface-container-low/50 rounded-[2.5rem] border border-outline-variant/10">
+        <nav className="flex flex-col gap-1.5 p-2 bg-surface-container-low/50 rounded-[2.5rem] border border-outline-variant/10 relative overflow-hidden">
           {[
             { id: 1, label: "Legal Identity", icon: "badge" },
             { id: 2, label: "Background Auth", icon: "verified_user" },
-            { id: 3, label: "Professional Profile", icon: "account_circle" },
-            { id: 4, label: "Digital References", icon: "group" },
-            { id: 5, label: "Final Review", icon: "fact_check" },
+            { id: 3, label: "Digital References", icon: "group" },
+            { id: 4, label: "Final Review", icon: "fact_check" },
           ].map((step) => (
             <div 
               key={step.id}
               className={cn(
-                "p-4 flex items-center gap-4 rounded-[1.5rem] transition-all cursor-pointer",
+                "p-4 flex items-center gap-4 rounded-[1.5rem] transition-all cursor-pointer relative z-10",
                 currentStep === step.id 
                     ? "bg-white text-primary shadow-xl shadow-primary/5 font-black scale-[1.02]" 
                     : "text-on-surface-variant/40 hover:text-primary hover:bg-white/50"
@@ -71,6 +106,13 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
             </div>
           ))}
         </nav>
+
+        <Link href="/dashboard/messages?tab=support" className="mt-4 flex items-center gap-3 p-4 rounded-[1.5rem] border border-outline-variant/10 text-primary hover:bg-surface-container-low transition-colors text-[10px] font-black uppercase tracking-widest italic group">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <MaterialIcon name="help" className="text-sm" />
+            </div>
+            Need Concierge Help?
+        </Link>
       </aside>
 
       {/* Main Content */}
@@ -98,22 +140,11 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
                 }}
                 onBack={prevStep}
                 isSubmitting={isSubmitting}
+                verifData={verifData}
+                saveDraft={saveDraft}
             />
         )}
         {currentStep === 3 && (
-            <ProfileStep 
-                initialProfile={profileData}
-                onNext={async (data: any) => {
-                    setIsSubmitting(true);
-                    await saveProfessionalProfile(data);
-                    setIsSubmitting(false);
-                    nextStep();
-                }}
-                onBack={prevStep}
-                isSubmitting={isSubmitting}
-            />
-        )}
-        {currentStep === 4 && (
             <ReferencesStep 
                 initialRefs={verifData.references || []}
                 onNext={async (refs: any[]) => {
@@ -124,15 +155,17 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
                 }}
                 onBack={prevStep}
                 isSubmitting={isSubmitting}
+                saveDraft={saveDraft}
             />
         )}
-        {currentStep === 5 && (
+        {currentStep === 4 && (
             <ReviewStep 
-                data={{ ...verifData, ...profileData }}
+                data={verifData}
                 onBack={prevStep}
                 onSubmit={async () => {
                    setIsSubmitting(true);
                    await finalizeVerification();
+                   clearDraft();
                    setIsSubmitting(false);
                    window.location.reload();
                 }}
@@ -144,12 +177,235 @@ export default function VerificationWizard({ initialData, user }: VerificationWi
   );
 }
 
+// ── Shared Video Recorder ──────────────────────────────────────
+
+function VideoSelfieRecorder({ onCapture }: { onCapture: (file: File) => void }) {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [stream, setStream] = useState<MediaStream | null>(null);
+    const [recording, setRecording] = useState(false);
+    const [timeLeft, setTimeLeft] = useState(5);
+    const [videoSrc, setVideoSrc] = useState<string | null>(null);
+    const [camError, setCamError] = useState<string | null>(null);
+    const [isRequesting, setIsRequesting] = useState(false);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const chunksRef = useRef<Blob[]>([]);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const isFallbackRef = useRef(false);
+
+    const handleFallbackUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        isFallbackRef.current = true;
+        setCamError(null);
+        setVideoSrc(URL.createObjectURL(file));
+        onCapture(file);
+    };
+
+    const startCamera = async () => {
+        setIsRequesting(true);
+        setCamError(null);
+        try {
+            const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+            setStream(s);
+            if (videoRef.current) {
+                videoRef.current.srcObject = s;
+            }
+        } catch (e: any) {
+            console.error("Camera access denied or failed", e);
+            if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+                 setCamError("permission_denied");
+            } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+                 setCamError("in_use");
+            } else {
+                 setCamError("not_found");
+            }
+        } finally {
+            setIsRequesting(false);
+        }
+    };
+
+    const stopCamera = () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            setStream(null);
+        }
+    };
+
+    const startRecording = () => {
+        if (!stream) return;
+        chunksRef.current = [];
+        const mimeType = MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : 'video/mp4';
+        const mr = new MediaRecorder(stream, { mimeType });
+        mediaRecorderRef.current = mr;
+
+        mr.ondataavailable = (e) => {
+            if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        mr.onstop = () => {
+            const blob = new Blob(chunksRef.current, { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            setVideoSrc(url);
+            const file = new File([blob], `selfie.${mimeType === 'video/webm' ? 'webm' : 'mp4'}`, { type: mimeType });
+            onCapture(file);
+            stopCamera();
+        };
+
+        mr.start();
+        setRecording(true);
+        setTimeLeft(5);
+
+        let t = 4;
+        const intv = setInterval(() => {
+            setTimeLeft(t);
+            if (t <= 0) {
+                clearInterval(intv);
+                mr.stop();
+                setRecording(false);
+            }
+            t--;
+        }, 1000);
+    };
+
+    const reset = () => {
+        setVideoSrc(null);
+        setRecording(false);
+        setTimeLeft(5);
+        startCamera();
+    };
+
+    useEffect(() => {
+        return () => stopCamera();
+    }, []);
+
+    if (videoSrc) {
+        return (
+            <div className="relative w-full aspect-[3/4] md:aspect-video bg-black rounded-[2.5rem] overflow-hidden group">
+                <video 
+                    src={videoSrc} 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-full h-full object-cover" 
+                    onLoadedMetadata={(e) => {
+                        if (isFallbackRef.current) {
+                            const duration = e.currentTarget.duration;
+                            if (duration && (duration < 4 || duration > 15)) {
+                                setVideoSrc(null);
+                                setCamError("invalid_duration");
+                                isFallbackRef.current = false;
+                            }
+                        }
+                    }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-8 text-center">
+                    <button type="button" onClick={reset} className="bg-white text-primary px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 active:scale-95 transition-all w-fit mx-auto shadow-xl">
+                        Retake Video
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    if (camError) {
+        return (
+             <div className="w-full aspect-[3/4] md:aspect-video bg-error-container/20 rounded-[2.5rem] flex flex-col items-center justify-center border-2 border-error/30 p-8 text-center">
+                  <MaterialIcon name="videocam_off" className="text-error text-5xl mb-4" />
+                  <h4 className="font-headline font-black text-error mb-2 italic">Camera Access Required</h4>
+                  <p className="text-xs text-on-surface-variant max-w-xs leading-relaxed font-medium mb-6">
+                      {camError === "permission_denied" 
+                          ? "Please click the lock icon in your browser's address bar to allow camera permissions for KindredCare (you may need to ensure your camera isn't actively being used by another window or settings popup)." 
+                          : camError === "in_use"
+                          ? "Your camera is currently in use by another app or browser tab. Please close other camera views and try again."
+                          : camError === "invalid_duration"
+                          ? "The uploaded video must be between 5 and 10 seconds long. Please try a different file."
+                          : "We couldn't detect a working camera on your device. Please ensure it's connected and not used by another app."}
+                  </p>
+                  <div className="flex flex-col gap-3">
+                      <button type="button" onClick={startCamera} className="bg-white border border-outline-variant/20 text-primary px-8 py-4 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:bg-surface-container-low active:scale-95 transition-all shadow-sm">
+                          Try Again
+                      </button>
+                      <button type="button" onClick={() => fileInputRef.current?.click()} className="text-primary font-black uppercase tracking-widest text-[10px] hover:underline italic">
+                          Upload Video Instead
+                      </button>
+                      <input type="file" accept="video/*" ref={fileInputRef} className="hidden" onChange={handleFallbackUpload} />
+                  </div>
+             </div>
+        );
+    }
+
+    if (!stream) {
+        return (
+             <div className="w-full aspect-[3/4] md:aspect-video bg-surface-container-low rounded-[2.5rem] flex flex-col items-center justify-center border-2 border-dashed border-outline-variant/30 group hover:border-primary transition-all">
+                  {isRequesting ? (
+                      <div className="flex flex-col items-center">
+                          <span className="relative flex h-12 w-12 mb-4">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-40"></span>
+                              <span className="relative inline-flex rounded-full h-12 w-12 bg-primary/20 flex items-center justify-center">
+                                  <MaterialIcon name="settings_voice" className="text-primary text-xl animate-pulse" />
+                              </span>
+                          </span>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-primary italic">Requesting Access...</p>
+                      </div>
+                  ) : (
+                      <>
+                          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-xl shadow-black/5 mb-6 group-hover:scale-110 transition-transform">
+                              <MaterialIcon name="videocam" className="text-secondary text-2xl" />
+                          </div>
+                          <button type="button" onClick={startCamera} className="bg-primary text-white px-10 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-primary/20">
+                              Enable Camera
+                          </button>
+                      </>
+                  )}
+             </div>
+        );
+    }
+
+    return (
+        <div className="relative w-full aspect-[3/4] md:aspect-video bg-black rounded-[2.5rem] overflow-hidden">
+            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover -scale-x-100" />
+            
+            {/* Guide Reticle */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="w-48 h-64 border-2 border-dashed border-white/40 rounded-[40%] animate-pulse" />
+            </div>
+
+            <div className="absolute top-6 left-0 right-0 text-center pointer-events-none">
+                <p className="inline-block bg-black/40 backdrop-blur-md text-white px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest">
+                    {recording ? (
+                         <span className="text-error flex items-center gap-2">
+                             <span className="w-2 h-2 rounded-full bg-error animate-ping" />
+                             Recording ({timeLeft}s)
+                         </span>
+                    ) : (
+                        "Position face in oval"
+                    )}
+                </p>
+            </div>
+
+            {!recording && (
+                <div className="absolute bottom-8 left-0 right-0 flex justify-center">
+                    <button type="button" onClick={startRecording} className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md border-[6px] border-white flex items-center justify-center hover:scale-110 active:scale-95 transition-transform group">
+                        <div className="w-12 h-12 bg-error rounded-full group-hover:scale-90 transition-transform" />
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
 // ── Step Components ───────────────────────────────────────────
 
 function IdentityStep({ user, onNext, isSubmitting }: any) {
     const [front, setFront] = useState<File | null>(null);
     const [back, setBack] = useState<File | null>(null);
     const [selfie, setSelfie] = useState<File | null>(null);
+    
+    // Create object URLs securely
+    const frontUrl = useMemo(() => front ? URL.createObjectURL(front) : null, [front]);
+    const backUrl = useMemo(() => back ? URL.createObjectURL(back) : null, [back]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -163,7 +419,7 @@ function IdentityStep({ user, onNext, isSubmitting }: any) {
     return (
         <form method="POST" onSubmit={handleSubmit} className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-16 pb-20">
             <header className="relative">
-                <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 1 of 5</span>
+                <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 1 of 4</span>
                 <h1 className="text-5xl md:text-6xl font-headline font-black text-primary mb-6 leading-tight tracking-tighter italic">Identity Verification</h1>
                 <p className="text-on-surface-variant text-lg max-w-2xl leading-relaxed font-medium italic opacity-80">
                     To ensure the safety of our community, please provide your legal identification details. Your data is encrypted and handled with boutique-level care.
@@ -171,16 +427,40 @@ function IdentityStep({ user, onNext, isSubmitting }: any) {
                 <div className="absolute -top-12 -right-12 w-48 h-48 bg-secondary-fixed/5 blur-[100px] rounded-full -z-10" />
             </header>
 
+            <section className="bg-primary/5 rounded-[3rem] p-8 md:p-12 border border-primary/10 flex flex-col md:flex-row gap-10 items-center overflow-hidden relative group">
+               <div className="flex-1 space-y-4 relative z-10">
+                   <div className="inline-flex items-center gap-2 bg-white text-primary px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm italic">
+                       <MaterialIcon name="verified_user" className="text-sm" />
+                       AES-256 Encryption
+                   </div>
+                   <h3 className="text-3xl font-headline font-black text-primary italic tracking-tight">Kindred Secure Vault</h3>
+                   <p className="text-on-surface-variant font-medium leading-relaxed italic opacity-80 max-w-sm">
+                       Your documents are encrypted end-to-end. We only use this information to verify your identity with government databases and do not share it with families.
+                   </p>
+               </div>
+               <div className="w-48 h-48 md:w-64 md:h-64 relative z-10 shrink-0">
+                    {/* Placeholder for secure_document_illustration, ensuring it maps correctly to the generated aesthetic */}
+                    <img src="https://images.unsplash.com/photo-1614064641936-3b9e4ec4b341?auto=format&fit=crop&q=80&w=800" alt="Secure Encryption" className="w-full h-full object-cover rounded-[2rem] shadow-2xl rotate-3 group-hover:rotate-0 transition-all duration-700 mixture-blend-multiply" />
+               </div>
+               <MaterialIcon name="lock" className="absolute -bottom-10 -left-10 text-[15rem] opacity-[0.03] group-hover:-rotate-12 transition-transform duration-1000" fill />
+            </section>
+
             <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="p-10 bg-white rounded-[2.5rem] shadow-2xl shadow-primary/5 border border-outline-variant/10">
+                <div className="p-10 bg-white rounded-[2.5rem] shadow-xl shadow-primary/5 border border-outline-variant/10 relative group">
                     <label className="block">
-                        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary mb-4 italic">Full Legal Name <span className="text-error">*</span></span>
+                        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary mb-4 italic">
+                            Full Legal Name <span className="text-error">*</span>
+                            <MaterialIcon name="info" className="text-sm opacity-40 ml-auto group-hover:opacity-100 transition-opacity cursor-help" />
+                        </span>
                         <input name="fullName" required defaultValue={user?.fullName} className="w-full bg-surface-container-low/50 border-none rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary/20 transition-all font-bold text-primary italic" />
                     </label>
                 </div>
-                <div className="p-10 bg-white rounded-[2.5rem] shadow-2xl shadow-primary/5 border border-outline-variant/10">
+                <div className="p-10 bg-white rounded-[2.5rem] shadow-xl shadow-primary/5 border border-outline-variant/10 relative group">
                     <label className="block">
-                        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary mb-4 italic">Date of Birth <span className="text-error">*</span></span>
+                        <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-primary mb-4 italic">
+                            Date of Birth <span className="text-error">*</span>
+                            <MaterialIcon name="info" className="text-sm opacity-40 ml-auto group-hover:opacity-100 transition-opacity cursor-help" />
+                        </span>
                         <input name="dob" type="date" required className="w-full bg-surface-container-low/50 border-none rounded-2xl px-6 py-4 focus:ring-2 focus:ring-primary/20 transition-all font-bold text-primary" />
                     </label>
                 </div>
@@ -194,72 +474,117 @@ function IdentityStep({ user, onNext, isSubmitting }: any) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     <label className={cn(
                         "relative group h-72 bg-surface-container-low rounded-[2.5rem] border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all overflow-hidden",
-                        front ? "border-primary bg-primary/5" : "hover:bg-white hover:shadow-2xl"
+                        front ? "border-primary bg-primary/5" : "hover:bg-white hover:shadow-2xl hover:border-primary/50"
                     )}>
-                        <input type="file" className="hidden" onChange={(e) => setFront(e.target.files?.[0] || null)} />
-                        <MaterialIcon name={front ? "check_circle" : "file_upload"} className={cn("text-5xl mb-4", front ? "text-primary" : "text-primary/20")} />
-                        <span className="font-bold text-primary uppercase tracking-widest text-[10px] italic">{front ? front.name : "Upload ID Front"}</span>
+                        <input type="file" accept="image/*" disabled={isSubmitting} className="hidden" onChange={(e) => setFront(e.target.files?.[0] || null)} />
+                        {frontUrl && <img src={frontUrl} className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-multiply transition-all group-hover:scale-105 group-hover:opacity-40" alt="Front ID Preview" />}
+                        {isSubmitting ? (
+                             <div className="bg-white/80 backdrop-blur-md p-4 rounded-full shadow-lg mb-4 z-10 relative">
+                                 <MaterialIcon name="refresh" className="text-4xl text-primary animate-spin" />
+                             </div>
+                        ) : (
+                             <MaterialIcon name={front ? "check_circle" : "file_upload"} className={cn("text-5xl mb-4 transition-transform group-hover:-translate-y-2 z-10 relative", front ? "text-primary" : "text-primary/20")} />
+                        )}
+                        <span className="font-bold text-primary uppercase tracking-widest text-[10px] italic z-10 relative px-4 py-2 bg-white/70 backdrop-blur-md rounded-full shadow-sm">
+                             {isSubmitting ? "Uploading Front..." : front ? front.name : "Upload ID Front"}
+                        </span>
                     </label>
                     <label className={cn(
                         "relative group h-72 bg-surface-container-low rounded-[2.5rem] border-2 border-dashed border-outline-variant/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all overflow-hidden",
-                        back ? "border-primary bg-primary/5" : "hover:bg-white hover:shadow-2xl"
+                        back ? "border-primary bg-primary/5" : "hover:bg-white hover:shadow-2xl hover:border-primary/50"
                     )}>
-                        <input type="file" className="hidden" onChange={(e) => setBack(e.target.files?.[0] || null)} />
-                        <MaterialIcon name={back ? "check_circle" : "file_upload"} className={cn("text-5xl mb-4", back ? "text-primary" : "text-primary/20")} />
-                        <span className="font-bold text-primary uppercase tracking-widest text-[10px] italic">{back ? back.name : "Upload ID Back"}</span>
+                        <input type="file" accept="image/*" disabled={isSubmitting} className="hidden" onChange={(e) => setBack(e.target.files?.[0] || null)} />
+                        {backUrl && <img src={backUrl} className="absolute inset-0 w-full h-full object-cover opacity-20 mix-blend-multiply transition-all group-hover:scale-105 group-hover:opacity-40" alt="Back ID Preview" />}
+                        {isSubmitting ? (
+                             <div className="bg-white/80 backdrop-blur-md p-4 rounded-full shadow-lg mb-4 z-10 relative">
+                                 <MaterialIcon name="refresh" className="text-4xl text-primary animate-spin" />
+                             </div>
+                        ) : (
+                             <MaterialIcon name={back ? "check_circle" : "file_upload"} className={cn("text-5xl mb-4 transition-transform group-hover:-translate-y-2 z-10 relative", back ? "text-primary" : "text-primary/20")} />
+                        )}
+                        <span className="font-bold text-primary uppercase tracking-widest text-[10px] italic z-10 relative px-4 py-2 bg-white/70 backdrop-blur-md rounded-full shadow-sm">
+                             {isSubmitting ? "Uploading Back..." : back ? back.name : "Upload ID Back"}
+                        </span>
                     </label>
                 </div>
             </section>
 
-            <section className="flex flex-col md:flex-row gap-16 items-center p-12 bg-primary/5 rounded-[3rem] border border-primary/10">
-                <div className="flex-1 space-y-6">
-                    <h3 className="text-3xl font-headline font-black text-primary italic tracking-tight flex items-center gap-4">
-                        Live Selfie Verification
+            <section className="space-y-8 pt-8 border-t border-outline-variant/10">
+                <div>
+                     <h3 className="text-3xl font-headline font-black text-primary italic tracking-tight flex items-center gap-4 mb-2">
+                        Live Video Selfie
                         <span className="text-error text-sm">*</span>
                     </h3>
-                    <p className="text-on-surface-variant font-medium leading-relaxed italic opacity-80">
-                        Capture a quick live image to ensure you match your ID documents. Ensure you are in a well-lit area without hats or sunglasses.
+                    <p className="text-on-surface-variant font-medium leading-relaxed italic opacity-80 max-w-2xl">
+                        To prevent identity fraud, please record a short 5-10 second video. Ensure your face is centered, well-lit, and completely visible. Hats and sunglasses must be removed.
                     </p>
-                    <label className="inline-flex items-center gap-4 bg-primary text-white px-10 py-5 rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] shadow-2xl shadow-primary/20 cursor-pointer hover:scale-[1.02] active:scale-95 transition-all">
-                        <input type="file" accept="image/*" capture="user" className="hidden" onChange={(e) => setSelfie(e.target.files?.[0] || null)} />
-                        <MaterialIcon name="photo_camera" />
-                        {selfie ? "Recapture Selfie" : "Start Camera Capture"}
-                    </label>
-                    {selfie && <p className="text-[10px] font-black uppercase tracking-widest text-green-600 italic">✓ Selfie Captured: {selfie.name}</p>}
                 </div>
-                <div className="w-64 h-64 bg-white rounded-[2.5rem] shadow-inner flex items-center justify-center border border-outline-variant/10 overflow-hidden relative">
-                    {selfie ? (
-                        <img src={URL.createObjectURL(selfie)} className="w-full h-full object-cover" alt="Selfie preview" />
-                    ) : (
-                        <MaterialIcon name="face" className="text-6xl text-primary/10" />
-                    )}
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-10 bg-white p-8 md:p-12 rounded-[3.5rem] shadow-2xl shadow-primary/5 border border-outline-variant/10">
+                     <div className="md:col-span-7 flex items-center justify-center">
+                         <div className="w-full max-w-sm">
+                            <VideoSelfieRecorder onCapture={setSelfie} />
+                         </div>
+                     </div>
+                     <div className="md:col-span-5 space-y-8 flex flex-col justify-center">
+                         <div className="space-y-6">
+                            {[
+                                { t: "Unobstructed Face", i: "face" },
+                                { t: "Good Lighting", i: "light_mode" },
+                                { t: "5-10 Second Limit", i: "timer" }
+                            ].map((rule, idx) => (
+                                <div key={idx} className="flex items-center gap-4">
+                                     <div className="w-10 h-10 rounded-[1rem] bg-secondary-container text-on-secondary-container flex items-center justify-center">
+                                         <MaterialIcon name={rule.i} className="text-sm" />
+                                     </div>
+                                     <span className="font-black text-primary uppercase text-[10px] tracking-[0.2em] italic">{rule.t}</span>
+                                </div>
+                            ))}
+                         </div>
+                         {selfie && (
+                             <div className="bg-green-50 p-6 rounded-[2rem] border border-green-100 flex items-center gap-4">
+                                 <MaterialIcon name="check_circle" className="text-green-600 text-2xl" />
+                                 <div>
+                                     <div className="text-[10px] font-black uppercase tracking-widest text-green-800 italic">Video Captured Successfully</div>
+                                     <div className="text-xs font-medium text-green-700 italic opacity-80">Ready for upload</div>
+                                 </div>
+                             </div>
+                         )}
+                     </div>
                 </div>
             </section>
 
-            <div className="pt-12 border-t border-outline-variant/10 flex justify-between items-center">
+            <div className="pt-12 flex justify-between items-center px-4">
                 <p className="text-[10px] text-on-surface-variant/40 font-black uppercase tracking-widest max-w-xs italic leading-relaxed">
                     By continuing, you agree to our Identity Terms. Data is encrypted via Kindred's secure vault.
                 </p>
                 <button 
                     type="submit"
                     disabled={!front || !back || !selfie || isSubmitting}
-                    className="bg-primary text-white px-16 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+                    className="bg-primary text-white px-16 py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-primary/20 hover:scale-[1.05] active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 group flex items-center gap-4"
                 >
                     {isSubmitting ? "Encrypting Docs..." : "Save & Continue"}
+                    {!isSubmitting && <MaterialIcon name="arrow_forward" className="group-hover:translate-x-1 transition-transform" />}
                 </button>
             </div>
         </form>
     );
 }
 
-function BackgroundStep({ user, onNext, onBack, isSubmitting }: any) {
-    const [ssn, setSsn] = useState("");
+function BackgroundStep({ user, onNext, onBack, isSubmitting, verifData, saveDraft }: any) {
+    const [ssn, setSsn] = useState(verifData?.ssnDraft || "");
     const [signed, setSigned] = useState(false);
+
+    const handleSsnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setSsn(val);
+        saveDraft("ssn", val);
+    };
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-16 pb-20">
              <header className="relative">
-                <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 2 of 5</span>
+                <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 2 of 4</span>
                 <h1 className="text-4xl md:text-6xl font-headline font-black text-primary mb-6 leading-tight tracking-tighter italic">Background Authorization</h1>
                 <p className="text-on-surface-variant text-lg max-w-2xl leading-relaxed font-medium italic opacity-80">
                     To maintain our community's safety standards, we require a comprehensive background screening.
@@ -362,110 +687,6 @@ function BackgroundStep({ user, onNext, onBack, isSubmitting }: any) {
     );
 }
 
-function ProfileStep({ initialProfile, onNext, onBack, isSubmitting }: any) {
-    const [bio, setBio] = useState(initialProfile?.bio || "");
-    const [years, setYears] = useState(initialProfile?.experienceYears || "");
-    const [edu, setEdu] = useState(initialProfile?.education || "");
-    const [specs, setSpecs] = useState<string[]>(initialProfile?.specializations || []);
-
-    const toggleSpec = (s: string) => {
-        setSpecs(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
-    };
-
-    return (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-16 pb-20">
-             <header>
-                <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 3 of 5</span>
-                <h1 className="text-4xl md:text-5xl font-headline font-black text-primary mb-4 leading-tight tracking-tighter italic">Professional Profile</h1>
-                <p className="text-on-surface-variant text-lg max-w-2xl leading-relaxed font-medium italic opacity-80">Help families get to know you by showcasing your professional pedigree.</p>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                <div className="lg:col-span-8 space-y-12">
-                    <div className="bg-white p-12 rounded-[3.5rem] shadow-2xl shadow-primary/5 border border-outline-variant/10 space-y-10">
-                        <div className="space-y-4">
-                            <label className="block text-[10px] font-black uppercase tracking-widest text-primary italic">Professional Bio</label>
-                            <textarea 
-                                value={bio}
-                                onChange={(e) => setBio(e.target.value)}
-                                className="w-full bg-surface-container-low/50 border-none rounded-3xl p-8 focus:ring-4 focus:ring-primary/5 transition-all text-primary font-medium italic min-h-[200px]" 
-                                placeholder="Describe your philosophy..." 
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-4">
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-primary italic">Years of Experience</label>
-                                <input 
-                                    type="number"
-                                    value={years}
-                                    onChange={(e) => setYears(e.target.value)}
-                                    className="w-full bg-surface-container-low/50 border-none rounded-2xl px-6 py-5 font-black text-primary italic" 
-                                    placeholder="5+" 
-                                />
-                            </div>
-                            <div className="space-y-4">
-                                <label className="block text-[10px] font-black uppercase tracking-widest text-primary italic">Educational Background</label>
-                                <input 
-                                    value={edu}
-                                    onChange={(e) => setEdu(e.target.value)}
-                                    className="w-full bg-surface-container-low/50 border-none rounded-2xl px-6 py-5 font-black text-primary italic" 
-                                    placeholder="e.g. Early Childhood Certificate" 
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-8">
-                        <h3 className="text-2xl font-headline font-black text-primary italic tracking-tight">Specializations</h3>
-                        <div className="bg-surface-container-low rounded-[3rem] p-10 flex flex-wrap gap-4 border border-outline-variant/10">
-                            {["Infant Care", "Special Needs", "Tutoring", "Meal Prep", "Bilingual", "Sleep Training", "Potty Training"].map(s => (
-                                <button 
-                                    key={s}
-                                    type="button"
-                                    onClick={() => toggleSpec(s)}
-                                    className={cn(
-                                        "px-8 py-4 rounded-full text-[10px] font-black uppercase tracking-widest transition-all",
-                                        specs.includes(s) ? "bg-primary text-white shadow-xl" : "bg-white text-on-surface-variant/60 hover:text-primary"
-                                    )}
-                                >
-                                    {s}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="lg:col-span-4 space-y-10">
-                     <div className="bg-primary-container p-12 rounded-[3.5rem] text-white relative overflow-hidden shadow-2xl">
-                         <div className="relative z-10 flex justify-between items-start mb-10">
-                            <h3 className="font-headline text-xl font-black italic tracking-tight leading-none">Trust Score</h3>
-                            <MaterialIcon name="auto_awesome" className="text-secondary text-2xl" />
-                         </div>
-                         <div className="text-5xl font-black italic tracking-tighter mb-8">500 <span className="text-on-primary-container text-xl opacity-40">/ 1000</span></div>
-                         <div className="w-full bg-white/10 h-3 rounded-full overflow-hidden mb-10">
-                            <div className="bg-gradient-to-r from-secondary-container to-secondary h-full w-1/2 rounded-full transition-all duration-1000" />
-                         </div>
-                         <ul className="space-y-4">
-                            <li className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest"><MaterialIcon name="check_circle" className="text-secondary" /> ID Verified</li>
-                            <li className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest opacity-40"><MaterialIcon name="pending" /> Certifications</li>
-                         </ul>
-                     </div>
-
-                    <button 
-                        onClick={() => onNext({ bio, experienceYears: parseInt(years), education: edu, specializations: specs, certifications: [] })}
-                        disabled={!bio || !years || !edu || isSubmitting}
-                        className="w-full bg-primary text-white py-6 rounded-[2rem] font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-                    >
-                        {isSubmitting ? "Saving Profile..." : "Save and Continue"}
-                    </button>
-                    <button onClick={onBack} className="w-full bg-white text-primary py-5 rounded-[1.5rem] border border-outline-variant/10 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all italic">Back to Identity</button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 function ReferencesStep({ initialRefs, onNext, onBack, isSubmitting }: any) {
     const [refs, setRefs] = useState(initialRefs?.length >= 2 ? initialRefs : [
         { name: "", relation: "Former Employer", email: "", phone: "", tenure: "", children: "" },
@@ -486,7 +707,7 @@ function ReferencesStep({ initialRefs, onNext, onBack, isSubmitting }: any) {
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-16 pb-20">
              <header className="flex flex-col md:flex-row md:items-end justify-between gap-10">
                 <div className="max-w-2xl">
-                    <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 4 of 5</span>
+                    <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 3 of 4</span>
                     <h1 className="text-4xl md:text-5xl font-headline font-black text-primary mb-4 leading-tight tracking-tighter italic">Digital References</h1>
                     <p className="text-on-surface-variant text-lg font-medium italic opacity-80">Validation through professional direct peer-to-peer verification.</p>
                 </div>
@@ -573,7 +794,7 @@ function ReviewStep({ data, onSubmit, onBack, isSubmitting }: any) {
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-1000 space-y-16 pb-20">
              <header className="text-center">
-                <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 5 of 5</span>
+                <span className="text-secondary font-black text-[10px] uppercase tracking-[0.2em] mb-3 block italic opacity-60">Step 4 of 4</span>
                 <h1 className="text-5xl md:text-7xl font-headline font-black text-primary mb-6 leading-tight tracking-tighter italic">Review & Submit</h1>
                 <p className="text-on-surface-variant text-lg max-w-2xl mx-auto leading-relaxed font-medium italic opacity-80">Please review your dossier. Once submitted, your application will enter our vetting queue.</p>
             </header>

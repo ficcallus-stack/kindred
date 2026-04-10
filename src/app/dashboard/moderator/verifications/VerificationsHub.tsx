@@ -17,6 +17,7 @@ export default function VerificationsHub({ queueItems }: VerificationsHubProps) 
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [notes, setNotes] = useState("");
   const { showToast } = useToast();
 
   const selectedCandidate = useMemo(() => 
@@ -36,10 +37,17 @@ export default function VerificationsHub({ queueItems }: VerificationsHubProps) 
 
   const handleAction = async (status: "verified" | "rejected") => {
     if (!selectedCandidate || processing) return;
+    
+    if (status === "rejected" && !notes.trim()) {
+      showToast("Please provide a reason for rejection in the notes.", "error");
+      return;
+    }
+
     setProcessing(true);
     try {
-      await updateNannyVerificationStatus(selectedCandidate.id, status);
+      await updateNannyVerificationStatus(selectedCandidate.id, status, notes);
       showToast(status === "verified" ? "Caregiver verified successfully!" : "Application rejected.", status === "verified" ? "success" : "error");
+      setNotes(""); // Reset notes on success
     } catch (error) {
       showToast("Verification action failed", "error");
     } finally {
@@ -130,21 +138,19 @@ export default function VerificationsHub({ queueItems }: VerificationsHubProps) 
                       Submitted {formatDistanceToNow(item.createdAt)} ago
                     </p>
                     
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest">
-                        <span className={isSelected ? "text-secondary" : "text-slate-400"}>Queue Progress</span>
-                        <span className="text-primary">{Math.round(progress)}%</span>
-                      </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-50">
-                        <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: `${progress}%` }}
-                          className={cn(
-                            "h-full transition-all duration-1000",
-                            item.isPremium ? "bg-secondary" : "bg-primary"
-                          )}
-                        />
-                      </div>
+                    <div className="flex justify-between items-center mt-3">
+                      <span className={cn(
+                        "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
+                        item.status === "verified" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                        item.status === "rejected" ? "bg-rose-50 text-rose-600 border-rose-100" :
+                        "bg-amber-50 text-amber-600 border-amber-100"
+                      )}>
+                        {item.status}
+                      </span>
+                      <MaterialIcon name="chevron_right" className={cn(
+                        "text-lg transition-transform",
+                        isSelected ? "text-secondary transform translate-x-1" : "text-slate-300"
+                      )} />
                     </div>
                   </div>
                 </div>
@@ -217,12 +223,19 @@ export default function VerificationsHub({ queueItems }: VerificationsHubProps) 
                 </div>
               </div>
 
-              <div className="text-right flex flex-col items-end gap-1">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Platform Trust Integrity</p>
-                <div className="text-5xl font-black font-headline text-secondary italic tracking-tighter leading-none">840</div>
-                <div className="flex items-center gap-2 mt-2">
-                   <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)] animate-pulse"></div>
-                   <p className="text-xs font-black text-on-tertiary-fixed-variant uppercase tracking-widest">TIER: PREMIUM GOLD</p>
+              <div className="text-right flex flex-col items-end gap-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Safety Audit Command</p>
+                <a 
+                  href={`/nanny/${selectedCandidate.id}`} 
+                  target="_blank"
+                  className="px-6 py-2 bg-white border border-slate-200 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 active:scale-95 transition-all shadow-sm flex items-center gap-2"
+                >
+                  <MaterialIcon name="visibility" className="text-sm" />
+                  View Public Profile
+                </a>
+                <div className="flex items-center gap-2 mt-1">
+                   <div className={cn("w-2 h-2 rounded-full", selectedCandidate.status === 'pending' ? "bg-amber-500 animate-pulse" : "bg-emerald-500")}></div>
+                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">STATUS: {selectedCandidate.status?.toUpperCase()}</p>
                 </div>
               </div>
             </div>
@@ -241,21 +254,17 @@ export default function VerificationsHub({ queueItems }: VerificationsHubProps) 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Government Issued ID</p>
-                    <div className="aspect-[16/10] bg-slate-900 rounded-[2rem] overflow-hidden border-4 border-white shadow-2xl group flex items-center justify-center relative">
+                    <div className="aspect-[16/10] bg-slate-900 rounded-[2rem] overflow-hidden border-4 border-white shadow-2xl group flex items-center justify-center relative bg-slate-200">
                       {selectedCandidate.idFrontUrl ? (
-                        <>
-                          <img src={selectedCandidate.idFrontUrl} alt="ID Front" className="w-full h-full object-cover blur-sm opacity-60 transition-all group-hover:blur-none group-hover:opacity-100" />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40 group-hover:opacity-0 transition-opacity">
-                             <div className="flex flex-col items-center gap-2">
-                                <MaterialIcon name="visibility" className="text-white text-3xl" />
-                                <span className="text-[10px] font-black text-white uppercase tracking-widest">Secure View (Hover)</span>
-                             </div>
-                          </div>
-                        </>
+                         <img 
+                          src={selectedCandidate.idFrontUrl} 
+                          alt="ID Front" 
+                          className="w-full h-full object-cover" 
+                        />
                       ) : (
                         <div className="flex flex-col items-center gap-4 opacity-20">
-                           <MaterialIcon name="id_card" className="text-6xl text-white" />
-                           <p className="text-xs font-black text-white uppercase tracking-widest">No Document Provided</p>
+                           <MaterialIcon name="id_card" className="text-6xl text-slate-400" />
+                           <p className="text-xs font-black text-slate-500 uppercase tracking-widest">No Document Provided</p>
                         </div>
                       )}
                     </div>
@@ -272,17 +281,10 @@ export default function VerificationsHub({ queueItems }: VerificationsHubProps) 
                                 alt="Selfie" 
                                 className="w-24 h-24 rounded-3xl object-cover border-4 border-white shadow-lg" 
                                />
-                               <div className="absolute -top-2 -right-2 w-8 h-8 bg-tertiary text-on-tertiary-fixed rounded-full flex items-center justify-center shadow-lg animate-bounce">
-                                  <MaterialIcon name="face" className="text-sm" />
-                               </div>
                             </div>
                             <div className="space-y-2 flex-1">
-                               <p className="text-sm font-black text-blue-950 uppercase italic tracking-tight">98% Match Probability</p>
-                               <p className="text-[10px] text-slate-500 font-medium leading-relaxed uppercase tracking-wider">Face recognition algorithm confirms biometric alignment with government document.</p>
-                               <div className="inline-flex items-center gap-2 px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[9px] font-black uppercase tracking-widest mt-2 border border-tertiary-fixed-dim">
-                                  <MaterialIcon name="security" className="text-[12px]" />
-                                  AWS Recognition Pass
-                               </div>
+                               <p className="text-sm font-black text-blue-950 uppercase italic tracking-tight underline decoration-secondary decoration-2 underline-offset-4">Visual Comparison Required</p>
+                               <p className="text-[10px] text-slate-500 font-medium leading-relaxed uppercase tracking-wider">Moderator must manually confirm biometric alignment between selfie and government document.</p>
                             </div>
                           </>
                         ) : (
@@ -453,37 +455,70 @@ export default function VerificationsHub({ queueItems }: VerificationsHubProps) 
               </section>
             </div>
 
-            {/* Sticky Actions Bar */}
-            <div className="p-10 bg-slate-50/80 backdrop-blur-md border-t border-slate-100 flex items-center justify-between z-30">
-               <div className="flex gap-4">
-                  <button 
-                    onClick={() => handleAction("rejected")}
-                    disabled={processing}
-                    className="px-8 py-4 bg-error text-white rounded-[1.5rem] font-black uppercase italic tracking-widest text-xs flex items-center gap-3 shadow-xl shadow-error/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
-                  >
-                     <MaterialIcon name="flag" className="text-lg" />
-                     Flag / Reject Item
-                  </button>
-                  <button 
-                    disabled={processing}
-                    className="px-8 py-4 bg-white text-primary border-2 border-primary/10 rounded-[1.5rem] font-black uppercase italic tracking-widest text-xs hover:bg-slate-100 transition-all active:scale-95"
-                  >
-                     Request Detail
-                  </button>
+            {/* Sticky Actions Bar (Professional Audit Decision Hub) */}
+            <div className="p-10 bg-slate-50/80 backdrop-blur-md border-t border-slate-100 flex flex-col gap-8 z-30">
+               {/* Quick Decisions & Notes */}
+               <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                     <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <MaterialIcon name="rate_review" className="text-sm" />
+                        Moderator Audit Feedback
+                     </label>
+                     <div className="flex gap-2">
+                        {["Blurry ID", "Selfie Mismatch", "Incomplete profile", "Expired ID"].map(template => (
+                           <button
+                             key={template}
+                             onClick={() => setNotes(prev => prev ? `${prev}. ${template}` : template)}
+                             className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[8px] font-black uppercase tracking-widest text-slate-400 hover:text-primary hover:border-primary transition-all"
+                           >
+                              +{template}
+                           </button>
+                        ))}
+                     </div>
+                  </div>
+                  <textarea 
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="Enter audit notes or rejection reasons here. This will be sent to the candidate via Pulse Sync."
+                    className="w-full bg-white border-2 border-slate-100 rounded-3xl p-6 text-sm font-medium focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all outline-none min-h-[100px]"
+                  />
                </div>
-               <button 
-                 onClick={() => handleAction("verified")}
-                 disabled={processing || selectedCandidate.status === "verified"}
-                 className={cn(
-                   "px-14 py-5 rounded-[1.8rem] font-black uppercase italic tracking-widest text-sm flex items-center gap-3 shadow-2xl transition-all active:scale-95 disabled:opacity-50",
-                   selectedCandidate.status === "verified" 
-                    ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none" 
-                    : "bg-gradient-to-br from-primary to-primary-container text-white shadow-primary/20 hover:scale-[1.03]"
-                 )}
-               >
-                  <MaterialIcon name="verified" className="text-xl" fill />
-                  {selectedCandidate.status === "verified" ? "Verified & Published" : "Approve & Verify Profile"}
-               </button>
+
+               <div className="flex items-center justify-between">
+                 <div className="flex gap-4">
+                    <button 
+                      onClick={() => handleAction("rejected")}
+                      disabled={processing}
+                      className="px-8 py-4 bg-rose-600 text-white rounded-[1.5rem] font-black uppercase italic tracking-widest text-xs flex items-center gap-3 shadow-xl shadow-rose-900/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                    >
+                       <MaterialIcon name="flag" className="text-lg" />
+                       Send Rejection / Flag
+                    </button>
+                    <button 
+                      disabled={processing}
+                      onClick={() => {
+                        window.open(`mailto:${selectedCandidate.email}?subject=Question about your Kindred application`, '_blank');
+                      }}
+                      className="px-8 py-4 bg-white text-primary border-2 border-primary/10 rounded-[1.5rem] font-black uppercase italic tracking-widest text-xs hover:bg-slate-100 transition-all active:scale-95 flex items-center gap-2"
+                    >
+                       <MaterialIcon name="mail" className="text-sm" />
+                       Direct Query
+                    </button>
+                 </div>
+                 <button 
+                   onClick={() => handleAction("verified")}
+                   disabled={processing || selectedCandidate.status === "verified"}
+                   className={cn(
+                     "px-14 py-5 rounded-[1.8rem] font-black uppercase italic tracking-widest text-sm flex items-center gap-3 shadow-2xl transition-all active:scale-95 disabled:opacity-50",
+                     selectedCandidate.status === "verified" 
+                      ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none" 
+                      : "bg-gradient-to-br from-primary to-primary-900 text-white shadow-primary/20 hover:scale-[1.03]"
+                   )}
+                 >
+                    <MaterialIcon name="verified" className="text-xl" fill />
+                    {selectedCandidate.status === "verified" ? "Verified & Published" : "Approve & Verify Profile"}
+                 </button>
+               </div>
             </div>
           </motion.div>
         ) : (

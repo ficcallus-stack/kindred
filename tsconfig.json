@@ -38,6 +38,8 @@
   "exclude": [
     "node_modules",
     "kindred-hub",
-    ".backup"
+    ".backup",
+    "scratch",
+    "scripts"
   ]
 }

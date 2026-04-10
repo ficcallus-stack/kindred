@@ -1,6 +1,4 @@
 import { Metadata } from "next";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { MaterialIcon } from "@/components/MaterialIcon";
 
 export const metadata: Metadata = {
@@ -14,7 +12,6 @@ export const metadata: Metadata = {
 export default function CookiePolicyPage() {
   return (
     <div className="bg-surface text-on-surface font-body min-h-screen flex flex-col">
-      <Navbar />
 
       <main className="pt-32 pb-24 px-6 flex-1">
         {/* Hero Header */}
@@ -149,7 +146,6 @@ export default function CookiePolicyPage() {
         </div>
       </main>
 
-      <Footer />
     </div>
   );
 }

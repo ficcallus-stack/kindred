@@ -1,9 +1,10 @@
-import { redirect } from "next/navigation";
 import { syncUser } from "@/lib/user-sync";
 import { db } from "@/db";
 import { nannyProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import ProfileForm from "./ProfileForm";
+import { ProfileWizard } from "./ProfileWizard";
+import { safeParseJson } from "@/lib/utils";
+import { redirect } from "next/navigation";
 
 export default async function NannyProfilePage() {
   const user = await syncUser();
@@ -28,17 +29,22 @@ export default async function NannyProfilePage() {
     location: profileDetails?.location || "",
     latitude: profileDetails?.latitude ? Number(profileDetails.latitude) : undefined,
     longitude: profileDetails?.longitude ? Number(profileDetails.longitude) : undefined,
-    hourlyRate: profileDetails?.hourlyRate || "0",
+    hourlyRate: profileDetails?.hourlyRate || "35",
+    weeklyRate: profileDetails?.weeklyRate || "1200",
     experienceYears: profileDetails?.experienceYears || 0,
     bio: profileDetails?.bio || "",
-    photos: (profileDetails?.photos as string[]) || [],
+    photos: safeParseJson<string[]>(profileDetails?.photos, []),
     education: profileDetails?.education || "",
-    coreSkills: (profileDetails?.coreSkills as string[]) || [],
-    specializations: (profileDetails?.specializations as string[]) || [],
+    coreSkills: safeParseJson<string[]>(profileDetails?.coreSkills, []),
+    specializations: safeParseJson<string[]>(profileDetails?.specializations, []),
     videoUrl: profileDetails?.videoUrl || "",
-    availability: profileDetails?.availability || {},
-    logistics: (profileDetails?.logistics as string[]) || [],
+    availability: safeParseJson<Record<string, any>>(profileDetails?.availability, {}),
+    logistics: safeParseJson<string[]>(profileDetails?.logistics, []),
+    lastNameUpdateAt: profileDetails?.lastNameUpdateAt,
+    hasCar: profileDetails?.hasCar ?? false,
+    carDescription: profileDetails?.carDescription || "",
+    detailedExperience: profileDetails?.detailedExperience || "",
   };
 
-  return <ProfileForm initialData={initialData} />;
+  return <ProfileWizard initialData={initialData} />;
 }

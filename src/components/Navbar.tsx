@@ -1,20 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { NotificationBell } from "./notifications/NotificationBell";
+import { useAbly } from "ably/react";
+import { 
+  MessageSquare, 
+  Search, 
+  PlusCircle, 
+  LayoutDashboard, 
+  Briefcase, 
+  ShieldCheck, 
+  Settings, 
+  LogOut, 
+  User as UserIcon,
+  HelpCircle,
+  ShieldAlert,
+  CreditCard,
+  UserPlus
+} from "lucide-react";
+
+import { usePathname } from "next/navigation";
 
 export default function Navbar() {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { user, loading: isLoading, role, signOut } = useAuth();
   const isSignedIn = !!user && !user.isAnonymous;
   const isLoaded = !isLoading;
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const NavLink = ({ href, label, icon, secondaryIcon }: { href: string; label: string; icon: string; secondaryIcon?: string }) => (
-    <Link href={href} className="hover:text-primary transition-all duration-300 py-2 flex items-center gap-1.5 px-3 rounded-xl hover:bg-primary/5 group">
-      <MaterialIcon name={icon} className={cn("text-lg", secondaryIcon && "group-hover:text-secondary")} />
+  // Hide Navbar on specific pages (Auth flows)
+  const isAuthPage = [
+    "/login", 
+    "/signup", 
+    "/forgot-password", 
+    "/verify-email",
+    "/register/nanny",
+    "/register/parent"
+  ].includes(pathname);
+
+  const fetchUnreadCount = useCallback(() => {
+    if (isSignedIn) {
+      fetch("/api/messages/unread")
+        .then(res => res.json())
+        .then(data => setUnreadCount(data.unreadCount || 0))
+        .catch(() => {});
+    }
+  }, [isSignedIn]);
+
+  // Initial Fetch
+  useEffect(() => {
+    fetchUnreadCount();
+  }, [fetchUnreadCount]);
+
+  if (isAuthPage) return null;
+
+  const NavLink = ({ href, label, icon: Icon, secondaryIcon }: { href: string; label: string; icon: any; secondaryIcon?: boolean }) => (
+    <Link href={href} className="hover:text-primary transition-all duration-300 py-2.5 flex items-center gap-2.5 px-4 rounded-2xl hover:bg-primary/5 group">
+      <Icon size={18} className={cn("opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all", secondaryIcon && "text-secondary opacity-100")} />
       <span className="font-headline font-bold text-[13px] tracking-tight">{label}</span>
     </Link>
   );
@@ -40,38 +87,38 @@ export default function Navbar() {
                 {/* ROLE: PARENT */}
                 {role === "parent" && (
                   <>
-                    <NavLink href="/dashboard/parent" label="Dashboard" icon="grid_view" />
-                    <NavLink href="/browse" label="Browse Nannies" icon="groups" />
-                    <NavLink href="/dashboard/parent/post-job" label="Post Job" icon="post_add" />
-                    <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
+                    <NavLink href="/dashboard/parent" label="Dashboard" icon={LayoutDashboard} />
+                    <NavLink href="/browse" label="Browse Nannies" icon={Search} />
+                    <NavLink href="/dashboard/parent/post-job" label="Post Job" icon={PlusCircle} />
+                    <NavLink href="/dashboard/messages" label="Messages" icon={MessageSquare} />
                   </>
                 )}
 
                 {/* ROLE: NANNY */}
                 {role === "caregiver" && (
                   <>
-                    <NavLink href="/dashboard/nanny" label="Dashboard" icon="grid_view" />
-                    <NavLink href="/jobs" label="Find Jobs" icon="work" />
-                    <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
+                    <NavLink href="/dashboard/nanny" label="Dashboard" icon={LayoutDashboard} />
+                    <NavLink href="/jobs" label="Find Jobs" icon={Briefcase} />
+                    <NavLink href="/dashboard/messages" label="Messages" icon={MessageSquare} />
                   </>
                 )}
 
                 {/* ROLE: MODERATOR */}
                 {role === "moderator" && (
                   <>
-                    <NavLink href="/dashboard/moderator" label="Dashboard" icon="grid_view" />
-                    <NavLink href="/dashboard/moderator/verifications" label="Verifications" icon="verified" />
-                    <NavLink href="/dashboard/moderator/support" label="Support" icon="support_agent" />
-                    <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
+                    <NavLink href="/dashboard/moderator" label="Dashboard" icon={LayoutDashboard} />
+                    <NavLink href="/dashboard/moderator/verifications" label="Verifications" icon={ShieldCheck} />
+                    <NavLink href="/dashboard/moderator/support" label="Support" icon={MessageSquare} />
+                    <NavLink href="/dashboard/messages" label="Messages" icon={MessageSquare} />
                   </>
                 )}
 
                 {/* ROLE: ADMIN */}
                 {role === "admin" && (
                   <>
-                    <NavLink href="/dashboard/admin" label="Admin" icon="admin_panel_settings" />
-                    <NavLink href="/dashboard/moderator" label="Moderation" icon="shield_person" />
-                    <NavLink href="/dashboard/messages" label="Messages" icon="chat_bubble" />
+                    <NavLink href="/dashboard/admin" label="Admin" icon={ShieldCheck} />
+                    <NavLink href="/dashboard/moderator" label="Moderation" icon={ShieldAlert} />
+                    <NavLink href="/dashboard/messages" label="Messages" icon={MessageSquare} />
                   </>
                 )}
               </>
@@ -80,12 +127,12 @@ export default function Navbar() {
             {/* GUEST ONLY */}
             {isLoaded && !isSignedIn && (
               <>
-                <NavLink href="/browse" label="Find Nannies" icon="groups" />
-                <NavLink href="/register/nanny" label="Become a Nanny" icon="card_membership" />
-                <NavLink href="/referrals" label="Refer & Earn" icon="volunteer_activism" />
-                <NavLink href="/#how-it-works" label="How it Works" icon="help_outline" />
-                <NavLink href="/safety" label="Safety" icon="verified_user" />
-                <NavLink href="/pricing" label="Pricing" icon="payments" />
+                <NavLink href="/browse" label="Find Nannies" icon={Search} />
+                <NavLink href="/register/nanny" label="Become a Nanny" icon={Briefcase} />
+                <NavLink href="/referrals" label="Refer & Earn" icon={UserPlus} />
+                <NavLink href="/#how-it-works" label="How it Works" icon={HelpCircle} />
+                <NavLink href="/safety" label="Safety" icon={ShieldCheck} />
+                <NavLink href="/pricing" label="Pricing" icon={CreditCard} />
               </>
             )}
           </div>
@@ -105,14 +152,21 @@ export default function Navbar() {
             
             {isLoaded && isSignedIn && (
               <>
-                {/* Support Button */}
+                {/* Pulse Notifications */}
+                <NotificationBell />
+
+                {/* Messages Button with Badge */}
                 <Link
                   href="/dashboard/messages"
-                  className="w-11 h-11 rounded-full bg-primary/5 text-primary flex items-center justify-center hover:bg-primary/10 transition-all shadow-sm border border-primary/10 relative"
-                  title="Live Support"
+                  className="w-11 h-11 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center hover:bg-primary/5 hover:text-primary transition-all border border-slate-200/50 relative group"
+                  title="Messages"
                 >
-                  <MaterialIcon name="support_agent" className="text-xl" />
-                  <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-green-500 border-2 border-white pointer-events-none"></span>
+                  <MessageSquare size={20} className="group-hover:scale-110 transition-transform" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-gradient-to-br from-secondary to-secondary-fixed text-white text-[9px] font-black rounded-full flex items-center justify-center px-1.5 border-2 border-white shadow-xl animate-in zoom-in duration-500">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                    </span>
+                  )}
                 </Link>
 
                 <div className="relative group">
@@ -121,7 +175,7 @@ export default function Navbar() {
                     className="flex items-center gap-4 bg-slate-50 p-1.5 pr-3 rounded-2xl border border-slate-200/50 hover:bg-slate-100 transition-all cursor-pointer"
                   >
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <MaterialIcon name="person" className="text-lg text-primary" />
+                      <UserIcon size={18} className="text-primary" />
                     </div>
                     <div className="hidden sm:block">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
@@ -140,14 +194,14 @@ export default function Navbar() {
                         href={`/dashboard/${role === 'admin' ? 'admin' : role === 'moderator' ? 'moderator' : role === 'caregiver' ? 'nanny' : 'parent'}/settings`}
                         className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-primary rounded-xl transition-all"
                       >
-                        <MaterialIcon name="settings" className="text-[18px]" />
+                        <Settings size={16} />
                         Account Settings
                       </Link>
                       <button
                         onClick={signOut}
                         className="w-full flex items-center gap-2 px-4 py-2 text-sm font-bold text-red-500 hover:bg-red-50 rounded-xl transition-all"
                       >
-                        <MaterialIcon name="logout" className="text-[18px]" />
+                        <LogOut size={16} />
                         Sign Out
                       </button>
                     </div>
@@ -247,8 +301,28 @@ export default function Navbar() {
           </div>
         </div>
       )}
+
+      {/* Real-time Pulse Sync (Conditional - Prevents crash for guests) */}
+      {isSignedIn && isLoaded && (
+        <NavbarPulseSync uid={user.uid} onMessage={fetchUnreadCount} />
+      )}
     </>
   );
+}
+
+function NavbarPulseSync({ uid, onMessage }: { uid: string; onMessage: () => void }) {
+  const ably = useAbly();
+  
+  useEffect(() => {
+    if (!ably || !uid) return;
+    const userChannel = ably.channels.get(`notifications:${uid}`);
+    userChannel.subscribe("new_message", onMessage);
+    return () => {
+        userChannel.unsubscribe("new_message");
+    };
+  }, [ably, uid, onMessage]);
+
+  return null;
 }
 
 function MobileNavLink({ href, label, icon, onClick }: { href: string; label: string; icon: string; onClick: () => void }) {

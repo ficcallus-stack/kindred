@@ -5,10 +5,15 @@ export const createJobSchema = z.object({
   location: z.string().min(1, "Location is required").max(200),
   duration: z.string().min(1, "Duration is required").max(100),
   childCount: z.coerce.number().int().min(1).max(20),
+  selectedChildrenIds: z.array(z.string()).default([]),
+  startDate: z.string().optional(), // ISO string from date picker
+  isFastTrack: z.boolean().default(false),
   minRate: z.coerce.number().min(1).max(500),
   maxRate: z.coerce.number().min(1).max(500),
   certs: z.record(z.string(), z.boolean()).default({}),
-  duties: z.record(z.string(), z.boolean()).default({}),
+  duties: z.string().max(5000).optional(),
+  requirements: z.record(z.string(), z.boolean()).default({}),
+  language: z.string().min(1, "Language is required").max(100).default("English"),
   description: z.string().max(5000).optional(),
   scheduleType: z.enum(["recurring", "one_time"]).default("recurring"),
   schedule: z.record(z.string(), z.boolean()).optional(),
@@ -16,7 +21,10 @@ export const createJobSchema = z.object({
   stripePaymentIntentId: z.string().min(1, "Payment verification is required"),
   isFeatured: z.boolean().default(false),
   isBoosted: z.boolean().default(false),
-}).refine((data) => data.maxRate >= data.minRate, {
+  hiringType: z.enum(["hourly", "retainer"]).default("hourly"),
+  retainerBudget: z.coerce.number().min(0).optional(),
+  philosophy: z.string().max(5000).optional(),
+}).passthrough().refine((data) => data.maxRate >= data.minRate, {
   message: "Max rate must be greater than or equal to min rate",
   path: ["maxRate"],
 });
@@ -25,10 +33,16 @@ export type CreateJobInput = z.infer<typeof createJobSchema>;
 
 // ── Nanny Profile Update ───────────────────────────────────
 export const updateNannyProfileSchema = z.object({
-  fullName: z.string().min(1, "Name is required").max(200),
+  fullName: z.string()
+    .min(1, "Name is required")
+    .max(200)
+    .refine(val => val.trim().split(/\s+/).length >= 2, {
+      message: "Please providing at least two names (First and Last)."
+    }),
   bio: z.string().max(2000).optional(),
   hourlyRate: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid rate format").optional(),
-  experienceYears: z.coerce.number().int().min(0).max(50).optional(),
+  weeklyRate: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid rate format").optional(),
+  experienceYears: z.coerce.number().int().min(0).max(100, "Experience cannot exceed 100 years.").optional(),
   location: z.string().max(200).optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
@@ -39,6 +53,12 @@ export const updateNannyProfileSchema = z.object({
   profileImageUrl: z.string().url("Invalid Profile Photo URL format").or(z.literal("")).optional(),
   availability: z.record(z.string(), z.any()).optional(),
   logistics: z.array(z.string()).optional(),
+  photos: z.array(z.string().url()).max(5).optional(),
+  // Overhaul fields
+  hasCar: z.boolean().optional(),
+  carDescription: z.string().max(500).optional(),
+  detailedExperience: z.string().max(5000).optional(),
+  maxTravelDistance: z.coerce.number().int().min(0).max(100, "Travel radius cannot exceed 100 miles.").optional(),
 });
 
 export type UpdateNannyProfileInput = z.infer<typeof updateNannyProfileSchema>;
@@ -59,6 +79,8 @@ export const createChildSchema = z.object({
   bio: z.string().max(1000).optional(),
   photoUrl: z.string().url("Must be valid URL").optional().or(z.literal("")),
   specialNeeds: z.array(z.string().max(100)).max(10).default([]),
+  interests: z.array(z.string().max(100)).max(20).default([]),
+  medicalNotes: z.string().max(2000).optional(),
 });
 
 export type CreateChildInput = z.infer<typeof createChildSchema>;
@@ -75,7 +97,9 @@ export const createBookingSchema = z.object({
   endDate: z.string().min(1, "End date is required"),
   hoursPerDay: z.coerce.number().min(1).max(24),
   totalAmount: z.coerce.number().min(0),
+  hiringMode: z.enum(["hourly", "retainer"]).default("hourly"),
   notes: z.string().max(2000).optional(),
+  isTrial: z.boolean().default(false),
 });
 
 export type CreateBookingInput = z.infer<typeof createBookingSchema>;

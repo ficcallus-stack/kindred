@@ -1,6 +1,4 @@
 import { Metadata } from "next";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
 import { MaterialIcon } from "@/components/MaterialIcon";
 
 export const metadata: Metadata = {
@@ -14,7 +12,6 @@ export const metadata: Metadata = {
 export default function TermsOfServicePage() {
   return (
     <div className="bg-surface font-body text-on-surface selection:bg-secondary-fixed min-h-screen flex flex-col">
-      <Navbar />
 
       <main className="pt-32 pb-24 px-6 flex-1">
         <div className="max-w-4xl mx-auto">

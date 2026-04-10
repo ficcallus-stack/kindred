@@ -2,9 +2,11 @@
 
 import { requireUser } from "@/lib/get-server-user";
 import { db } from "@/db";
-import { users, nannyProfiles, bookings, payments, walletTransactions, auditLogs } from "@/db/schema";
+import { users, nannyProfiles, bookings, payments, walletTransactions, wallets, auditLogs } from "@/db/schema";
 import { eq, desc, like, or, count, sql, and, gte } from "drizzle-orm";
 import { adminAuth } from "@/lib/firebase-admin";
+import { approveWithdrawal, rejectWithdrawal } from "@/lib/actions/stripe-payouts";
+import { processRetainerBilling } from "@/lib/actions/retainer-billing";
 
 type UserRole = "parent" | "caregiver" | "admin" | "moderator";
 
@@ -146,7 +148,7 @@ export async function getPayoutLedger() {
 export async function approvePayoutRequest(transactionId: string) {
   const caller = await requireAdmin();
 
-  // 1. Fetch the transaction
+  // 1. Fetch the transaction to validate it exists and is pending
   const tx = await db.query.walletTransactions.findFirst({
     where: eq(walletTransactions.id, transactionId),
   });
@@ -155,11 +157,8 @@ export async function approvePayoutRequest(transactionId: string) {
     throw new Error("Invalid or already processed transaction.");
   }
 
-  // 2. Perform the actual Stripe transfer (this would call the stripe-payouts.ts logic)
-  // For now, we'll mark as completed in DB
-  await db.update(walletTransactions)
-    .set({ status: "completed" })
-    .where(eq(walletTransactions.id, transactionId));
+  // 2. Delegate to the real Stripe payout function (Transfer + Instant Payout)
+  await approveWithdrawal(transactionId);
 
   // 3. Log the audit event
   await db.insert(auditLogs).values({
@@ -176,16 +175,25 @@ export async function approvePayoutRequest(transactionId: string) {
 export async function flagPayoutRequest(transactionId: string, reason: string) {
   const caller = await requireAdmin();
 
-  await db.update(walletTransactions)
-    .set({ status: "failed", description: `Flagged: ${reason}` })
-    .where(eq(walletTransactions.id, transactionId));
+  // Fetch the transaction to validate
+  const tx = await db.query.walletTransactions.findFirst({
+    where: eq(walletTransactions.id, transactionId),
+  });
 
+  if (!tx || tx.type !== "withdrawal" || tx.status !== "pending") {
+    throw new Error("Invalid or already processed transaction.");
+  }
+
+  // Delegate to the real rejection function (atomically returns balance + marks failed)
+  await rejectWithdrawal(transactionId, reason);
+
+  // Log the audit event
   await db.insert(auditLogs).values({
     actorId: caller.uid,
     action: "payout_flagged",
     entityType: "transaction",
     entityId: transactionId,
-    metadata: { reason },
+    metadata: { reason, amount: tx.amount, walletId: tx.walletId },
   });
 
   return { success: true };
@@ -288,4 +296,21 @@ export async function updateUserRole(userId: string, newRole: UserRole) {
   }
 
   return updated;
+}
+
+export async function triggerRetainerSettlement() {
+  await requireAdmin();
+  const results = await processRetainerBilling();
+  
+  // Log the trigger event
+  const caller = await requireUser();
+  await db.insert(auditLogs).values({
+    actorId: caller.uid,
+    action: "manual_retainer_settlement_triggered",
+    entityType: "system",
+    entityId: "billing_engine",
+    metadata: { processedCount: results.length, summary: results.map(r => r.status) },
+  });
+
+  return results;
 }

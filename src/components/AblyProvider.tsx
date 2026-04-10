@@ -1,18 +1,20 @@
 "use client";
 
 import { AblyProvider as ReactAblyProvider } from "ably/react";
-import * as Ably from "ably";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { createAblyClient } from "@/lib/ably";
 
 export default function AblyClientProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+
   const client = useMemo(() => {
     if (typeof window === "undefined") return null;
-    return new Ably.Realtime({
-      authUrl: "/api/ably/auth",
-    });
-  }, []);
+    if (!user?.uid) return null;
+    return createAblyClient(user.uid);
+  }, [user?.uid]);
 
   if (!client) return <>{children}</>;
 
-  return <ReactAblyProvider client={client as any}>{children}</ReactAblyProvider>;
+  return <ReactAblyProvider client={client}>{children}</ReactAblyProvider>;
 }

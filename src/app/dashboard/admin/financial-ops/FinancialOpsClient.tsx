@@ -3,20 +3,23 @@
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/Toast";
-import { approvePayoutRequest, flagPayoutRequest } from "../actions";
+import { approvePayoutRequest, flagPayoutRequest, triggerRetainerSettlement } from "../actions";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import FinancialAnalyticsSubtab from "./FinancialAnalyticsSubtab";
 
 interface FinancialOpsClientProps {
   pending: any[];
   ledger: any[];
   summary: any;
+  analyticsData: any;
 }
 
-export default function FinancialOpsClient({ pending, ledger, summary }: FinancialOpsClientProps) {
+export default function FinancialOpsClient({ pending, ledger, summary, analyticsData }: FinancialOpsClientProps) {
   const { showToast } = useToast();
   const router = useRouter();
   const [processing, setProcessing] = useState<string | null>(null);
+  const [isSettling, setIsSettling] = useState(false);
 
   const handleApprove = async (txId: string) => {
     if (!confirm("Confirm immediate fund release to caregiver?")) return;
@@ -47,8 +50,52 @@ export default function FinancialOpsClient({ pending, ledger, summary }: Financi
     }
   };
 
+  const handleManualSettlement = async () => {
+    if (!confirm("Are you sure? This will trigger automated off-session charges for ALL active job series due for billing today.")) return;
+    
+    setIsSettling(true);
+    try {
+      const results = await triggerRetainerSettlement();
+      const successCount = results.filter((r: any) => r.status === "success").length;
+      showToast(`Settlement cycle complete. ${successCount} successful captures performed.`, "success");
+      router.refresh();
+    } catch (e: any) {
+      showToast(e.message || "Failed to trigger settlement cycle", "error");
+    } finally {
+      setIsSettling(false);
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState<'vault' | 'analytics'>('vault');
+
   return (
     <div className="space-y-12">
+      {/* Subtab Navigation */}
+      <div className="flex bg-slate-100/50 p-1.5 rounded-2xl w-fit">
+        <button 
+          onClick={() => setActiveTab('vault')}
+          className={cn("px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest italic transition-all", activeTab === 'vault' ? "bg-white text-primary shadow-sm" : "text-slate-400 hover:text-primary")}
+        >
+          <div className="flex items-center gap-2">
+            <MaterialIcon name="account_balance_wallet" className="text-sm" />
+            Vault Ops
+          </div>
+        </button>
+        <button 
+          onClick={() => setActiveTab('analytics')}
+          className={cn("px-8 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest italic transition-all", activeTab === 'analytics' ? "bg-white text-primary shadow-sm" : "text-slate-400 hover:text-primary")}
+        >
+          <div className="flex items-center gap-2">
+            <MaterialIcon name="monitoring" className="text-sm" />
+            Business Pulse
+          </div>
+        </button>
+      </div>
+
+      {activeTab === 'analytics' ? (
+        <FinancialAnalyticsSubtab initialData={analyticsData} />
+      ) : (
+        <>
       {/* Bento Grid Command Rows */}
       <div className="grid grid-cols-12 gap-8">
         {/* Main Escrow Card */}
@@ -80,11 +127,19 @@ export default function FinancialOpsClient({ pending, ledger, summary }: Financi
             </div>
           </div>
           
-          <div className="mt-14 flex gap-4 relative z-10">
-            <button className="flex-1 bg-white text-primary py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-lg">Download Audit Report</button>
-            <button className="w-14 bg-white/10 rounded-2xl hover:bg-white/20 border border-white/5 transition-all flex items-center justify-center">
-              <MaterialIcon name="more_horiz" />
+          <div className="mt-14 flex flex-col sm:flex-row gap-4 relative z-10 font-sans">
+            <button 
+              disabled={isSettling}
+              onClick={handleManualSettlement}
+              className={cn(
+                "flex-1 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2",
+                isSettling ? "bg-white/20 text-white animate-pulse" : "bg-white text-primary hover:scale-[1.02] active:scale-95"
+              )}
+            >
+              <MaterialIcon name={isSettling ? "sync" : "rocket_launch"} className={cn("text-lg", isSettling && "animate-spin")} />
+              {isSettling ? "Processing Global Payouts..." : "Execute Retainer Settlement"}
             </button>
+            <button className="flex-1 bg-white/10 text-white border border-white/20 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/20 transition-all">Download Audit Report</button>
           </div>
         </div>
 
@@ -328,6 +383,8 @@ export default function FinancialOpsClient({ pending, ledger, summary }: Financi
           <MaterialIcon name="tune" className="text-3xl" />
         </button>
       </div>
+      </>
+      )}
     </div>
   );
 }

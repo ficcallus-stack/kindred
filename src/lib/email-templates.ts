@@ -351,3 +351,94 @@ export function escrowReceiptText(name: string, details: { amount: number; hours
   return `Hi ${name},\n\nYour secure deposit of $${details.amount.toFixed(2)} has been authorized for Kindred Escrow.\n\nCare Hours: ${details.hours}h @ $${details.rate}/hr ($${(details.hours * details.rate).toFixed(2)})\nService Fee: $${details.fee.toFixed(2)}\n\nTransaction ID: ${details.transactionId.toUpperCase()}\n\nFunds are held securely and only released after you approve completed work.\n\nView details: ${BRAND.url}/dashboard/parent`;
 }
 
+export function nannyBookingAlertTemplate(
+  nannyName: string,
+  details: {
+    bookingId: string;
+    parentPhone: string;
+    locationName: string;
+    locationDescription: string;
+    childCount: number;
+    amount: number; // Net earnings in cents
+    hiringMode: "hourly" | "retainer";
+    startDate: Date;
+  }
+) {
+  const isRetainer = details.hiringMode === "retainer";
+  return layout(`
+    <td>
+      <div style="width:64px;height:64px;background-color:#e8f5e9;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <span style="font-size:28px;">📅</span>
+      </div>
+      <h1 style="margin:0 0 12px;font-size:28px;font-weight:800;color:${BRAND.color};">New Booking Paid!</h1>
+      <p style="margin:0 0 24px;font-size:16px;color:${BRAND.textSecondary};line-height:1.7;">
+        Hi ${nannyName}, a family has confirmed and paid for a new booking with you. You can now reach out directly to coordinate arrival.
+      </p>
+
+      <div style="background-color:#f9f9f9;border-radius:16px;padding:32px;margin-bottom:32px;border:1px solid #eeeeee;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="padding-bottom:16px;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Parent Coordination</td>
+            <td align="right" style="padding-bottom:16px;font-size:15px;font-weight:800;color:${BRAND.color};">${details.parentPhone}</td>
+          </tr>
+          <tr>
+            <td style="padding-bottom:16px;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Start Date</td>
+            <td align="right" style="padding-bottom:16px;font-size:15px;font-weight:800;color:${BRAND.color};">${details.startDate.toLocaleDateString()}</td>
+          </tr>
+          <tr>
+            <td style="padding-bottom:16px;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Care Environment</td>
+            <td align="right" style="padding-bottom:16px;font-size:15px;font-weight:800;color:${BRAND.color};">${details.locationName}</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="padding:16px;background-color:#ffffff;border-radius:12px;font-size:13px;color:${BRAND.textSecondary};line-height:1.5;font-style:italic;border:1px solid #f0f0f0;">
+              <strong>Note:</strong> ${details.locationDescription}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding-top:24px;font-size:12px;color:#999;text-transform:uppercase;letter-spacing:1px;font-weight:700;">Net Earnings</td>
+            <td align="right" style="padding-top:24px;font-size:24px;font-weight:800;color:#2e7d32;">$${(details.amount / 100).toFixed(2)}</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background-color:#fffdf5;border-radius:12px;padding:20px;border-left:4px solid ${BRAND.accent};margin-bottom:32px;">
+        <p style="margin:0;font-size:13px;color:${BRAND.textSecondary};line-height:1.5;">
+          <strong>Payout Timing:</strong> Earnings are updated in your wallet upon session completion. For weekly retainers, funds are available for withdrawal every Friday after parent approval.
+        </p>
+      </div>
+
+      ${btn("View Booking Details", `${BRAND.url}/dashboard/nanny`)}
+    </td>
+  `);
+}
+
+export function nannyBookingAlertText(nannyName: string, details: any) {
+  return `Hi ${nannyName}, a new booking has been confirmed!\n\nParent Phone: ${details.parentPhone}\nStart Date: ${details.startDate.toLocaleDateString()}\nEarnings: $${(details.amount / 100).toFixed(2)}\n\nView details: ${BRAND.url}/dashboard/nanny\n\n— KindredCare US`;
+}
+export function referenceRequestTemplate(nannyName: string, employerName: string, verifyUrl: string) {
+  return layout(`
+    <td>
+      <div style="width:64px;height:64px;background-color:#fef3e8;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;margin-bottom:24px;">
+        <span style="font-size:28px;">🌟</span>
+      </div>
+      <h1 style="margin:0 0 16px;font-size:26px;font-weight:800;color:${BRAND.color};line-height:1.2;">Reference Request for ${nannyName}</h1>
+      <p style="margin:0 0 20px;font-size:16px;color:${BRAND.textPrimary};line-height:1.6;">
+        Hello ${employerName},
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;color:${BRAND.textSecondary};line-height:1.6;">
+        ${nannyName} is applying to join **KindredCare US**, our elite marketplace for high-fidelity childcare. They have listed you as a former employer who can vouch for their professionalism and care.
+      </p>
+      <p style="margin:0 0 32px;font-size:15px;color:${BRAND.textSecondary};line-height:1.6;">
+        Could you spare 60 seconds to provide a quick verification? Your feedback is crucial for maintaining the safety and quality of our community.
+      </p>
+      ${btn("Provide Reference", verifyUrl)}
+      <p style="margin:32px 0 0;font-size:13px;color:#999;line-height:1.6;font-style:italic;">
+        KindredCare US uses advanced trust-scoring to verify every caregiver. Your response is confidential and handled with the highest security standards.
+      </p>
+    </td>
+  `);
+}
+
+export function referenceRequestText(nannyName: string, employerName: string, verifyUrl: string) {
+    return `Hello ${employerName},\n\n${nannyName} is applying to join KindredCare US and has listed you as a reference.\n\nPlease provide your feedback here: ${verifyUrl}\n\nThank you for helping us maintain a safe community.\n\nKindredCare US`;
+}

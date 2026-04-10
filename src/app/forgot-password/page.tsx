@@ -5,7 +5,6 @@ import Link from "next/link";
 import { initiatePasswordReset } from "@/lib/actions/auth";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { useToast } from "@/components/Toast";
-import Navbar from "@/components/Navbar";
 
 export default function ForgotPasswordPage() {
   const { showToast } = useToast();
@@ -34,7 +33,6 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen">
-      <Navbar />
       <div className="flex items-center justify-center pt-28 px-4">
         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none opacity-20">
           <div className="absolute top-[10%] left-[10%] w-[400px] h-[400px] bg-primary/10 rounded-full blur-3xl"></div>

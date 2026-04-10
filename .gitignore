@@ -28,7 +28,27 @@ yarn-error.log*
 
 # diagnostics
 tmp/
+scratch/
+.backup/
 push-schema-http.ts
 test-db.ts
 db-push-full.txt
 db-push-error.txt
+build_output.txt
+tsc_errors.txt
+tsc_output.txt
+*.tsbuildinfo
+
+# diagnostic scripts
+check-db-schema.js
+list-local-users.js
+list-neon-tables.js
+test-db-connection.js
+test-db.js
+test-neon-connection.js
+test-neon.js
+verify-db-fix.js
+patch-db.js
+migrate.js
+fix-zips.ts
+verify-credits.ts

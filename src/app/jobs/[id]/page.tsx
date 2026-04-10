@@ -1,5 +1,4 @@
 import { MaterialIcon } from "@/components/MaterialIcon";
-import Navbar from "@/components/Navbar";
 import { db } from "@/db";
 import { jobs, users, nannyProfiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -26,7 +25,6 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
   if (!isAuthorized) {
     return (
       <div className="bg-surface min-h-screen flex flex-col">
-        <Navbar />
         <main className="flex-1 flex flex-col items-center justify-center p-6 text-center pt-32">
           <div className="bg-error-container text-on-error-container p-6 rounded-full mb-8 shadow-xl">
              <MaterialIcon name="security" className="text-6xl" fill />
@@ -75,7 +73,6 @@ export default async function JobDetail({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="bg-surface min-h-screen pb-32">
-      <Navbar />
 
       <main className="pt-24 max-w-7xl mx-auto px-6">
         {/* Hero Section */}

@@ -38,36 +38,39 @@ export default async function MessagesLayout({ children }: { children: React.Rea
   .orderBy(desc(conversations.updatedAt));
 
   // 2. Get contact IDs from Bookings, Unlocks, and Applications
+  // 2. Universal Contact Discovery: Check all ID columns regardless of role
   const allContactIds = new Set<string>();
   
-  if (currentUser.role === 'parent') {
-    const parentBookings = await db.select({ id: bookings.caregiverId }).from(bookings).where(eq(bookings.parentId, currentUser.id));
-    const parentUnlocks = await db.select({ id: chatUnlocks.caregiverId }).from(chatUnlocks).where(eq(chatUnlocks.parentId, currentUser.id));
-    const parentApplications = await db.select({ id: applications.caregiverId })
-      .from(applications)
-      .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(eq(jobs.parentId, currentUser.id));
+  // A. From Bookings (Check both parent and caregiver roles)
+  const bookingsAsParent = await db.select({ id: bookings.caregiverId }).from(bookings).where(eq(bookings.parentId, currentUser.id));
+  const bookingsAsCaregiver = await db.select({ id: bookings.parentId }).from(bookings).where(eq(bookings.caregiverId, currentUser.id));
+  
+  // B. From Unlocks (Check both payer and recipient)
+  const unlocksAsPayer = await db.select({ id: chatUnlocks.caregiverId }).from(chatUnlocks).where(eq(chatUnlocks.parentId, currentUser.id));
+  const unlocksAsRecipient = await db.select({ id: chatUnlocks.parentId }).from(chatUnlocks).where(eq(chatUnlocks.caregiverId, currentUser.id));
+  
+  // C. From Applications (Check both applicants and job posters)
+  const appsAsPoster = await db.select({ id: applications.caregiverId })
+    .from(applications)
+    .innerJoin(jobs, eq(applications.jobId, jobs.id))
+    .where(eq(jobs.parentId, currentUser.id));
+  
+  const appsAsApplicant = await db.select({ id: jobs.parentId })
+    .from(applications)
+    .innerJoin(jobs, eq(applications.jobId, jobs.id))
+    .where(eq(applications.caregiverId, currentUser.id));
 
-    parentBookings.forEach(b => allContactIds.add(b.id));
-    parentUnlocks.forEach(u => allContactIds.add(u.id));
-    parentApplications.forEach(a => allContactIds.add(a.id));
-  } else {
-    const caregiverBookings = await db.select({ id: bookings.parentId }).from(bookings).where(eq(bookings.caregiverId, currentUser.id));
-    const caregiverUnlocks = await db.select({ id: chatUnlocks.parentId }).from(chatUnlocks).where(eq(chatUnlocks.caregiverId, currentUser.id));
-    const caregiverApplications = await db.select({ id: jobs.parentId })
-      .from(applications)
-      .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(eq(applications.caregiverId, currentUser.id));
+  [...bookingsAsParent, ...bookingsAsCaregiver, ...unlocksAsPayer, ...unlocksAsRecipient, ...appsAsPoster, ...appsAsApplicant]
+    .forEach(item => { if (item.id) allContactIds.add(item.id); });
 
-    caregiverBookings.forEach(b => allContactIds.add(b.id));
-    caregiverUnlocks.forEach(u => allContactIds.add(u.id));
-    caregiverApplications.forEach(a => allContactIds.add(a.id));
-  }
+  console.log(`[Messages Layout] Found ${allContactIds.size} potential contacts for ${currentUser.fullName} (${currentUser.role})`);
 
-  // 3. Get existing conversation partner IDs and deduplicate real conversations
+  // 3. Get existing conversation partner IDs and enrich data
   const activePartnerIds = new Set<string>();
   const uniqueEnrichedConvos: any[] = [];
   
+  console.log(`[Messages Layout] DB returned ${existingConvos.length} existing conversations.`);
+
   for (const convo of existingConvos) {
     const members = await db.select({
       id: users.id,
@@ -78,16 +81,27 @@ export default async function MessagesLayout({ children }: { children: React.Rea
     .innerJoin(users, eq(conversationMembers.userId, users.id))
     .where(eq(conversationMembers.conversationId, convo.id));
     
+    // Find who we're talking to
     const otherMember = members.find(m => m.id !== currentUser.id);
+    
     if (otherMember) {
-      if (!activePartnerIds.has(otherMember.id)) {
-        activePartnerIds.add(otherMember.id);
-        uniqueEnrichedConvos.push({ ...convo, otherMember });
+      // DEDUPING: If we already have a more recent conversation with this person, skip the older duplicate.
+      if (activePartnerIds.has(otherMember.id)) {
+        console.warn(`[Messages Layout] Found duplicate conversation ${convo.id} for partner ${otherMember.fullName}. Filtering.`);
+        continue;
       }
+      
+      activePartnerIds.add(otherMember.id);
+      uniqueEnrichedConvos.push({ ...convo, otherMember });
+    } else if (members.length === 1 && members[0].id === currentUser.id) {
+       // Only me - usually happens in legacy or deleted account scenarios
+       console.warn(`[Messages Layout] Convo ${convo.id} has no other member. Skipping.`);
     }
   }
 
-  // 4. Identify "Available" contacts (no conversation yet)
+  console.log(`[Messages Layout] Enriched ${uniqueEnrichedConvos.length} unique active conversations.`);
+
+  // 4. Identify "Available" contacts (no conversation history yet)
   const remainingContactIds = Array.from(allContactIds).filter(id => !activePartnerIds.has(id));
   
   let availableContacts: any[] = [];
@@ -103,9 +117,9 @@ export default async function MessagesLayout({ children }: { children: React.Rea
 
   // Map available contacts to "pseudo-conversations"
   const pseudoConvos = availableContacts.map(user => ({
-    id: `new-${user.id}`, // Temporary ID prefix
+    id: `new-${user.id}`, 
     isSupport: false,
-    updatedAt: new Date(0), // Sort to bottom
+    updatedAt: new Date(0), 
     otherMember: user,
     isPseudo: true
   }));
@@ -113,6 +127,8 @@ export default async function MessagesLayout({ children }: { children: React.Rea
   const allConvos = [...uniqueEnrichedConvos, ...pseudoConvos].sort((a, b) => 
     new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
   );
+
+  console.log(`[Messages Layout] Total sidebar items: ${allConvos.length}`);
 
   const supportConvos = await db.select({
     id: conversations.id,

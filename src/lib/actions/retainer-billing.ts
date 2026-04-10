@@ -4,13 +4,13 @@ import { db } from "@/db";
 import { bookingSeries, payments, users, auditLogs } from "@/db/schema";
 import { stripe } from "@/lib/stripe";
 import { eq, and, lte, isNotNull } from "drizzle-orm";
-import { addMonths } from "date-fns";
+import { addMonths, addWeeks, addDays } from "date-fns";
 
 /**
- * Main entry point for automated monthly retainer billing. 
- * This should be triggered by a CRON job (e.g., via Vercel Cron or GitHub Actions).
+ * Main entry point for automated retainer billing. 
+ * This should be triggered by a CRON job or manual Admin action.
  */
-export async function processMonthlyRetainers() {
+export async function processRetainerBilling() {
   const now = new Date();
 
   // Find all active series whose billing date has arrived
@@ -79,10 +79,23 @@ export async function processMonthlyRetainers() {
         description: `Monthly Retainer for ${series.nickname || 'Recurring Care'}`
       });
 
-      // 4. Update the next billing date to one month from now
+      // 4. Update the next billing date based on cycle
+      let nextDate = series.nextBillingDate || now;
+      const cycle = series.billingCycle || "weekly";
+
+      if (cycle === "weekly") {
+        nextDate = addWeeks(nextDate, 1);
+      } else if (cycle === "bi_weekly") {
+        nextDate = addWeeks(nextDate, 2);
+      } else if (cycle === "monthly") {
+        nextDate = addMonths(nextDate, 1);
+      } else {
+        nextDate = addWeeks(nextDate, 1); // Default to weekly
+      }
+
       await db.update(bookingSeries)
         .set({
-          nextBillingDate: addMonths(series.nextBillingDate || now, 1),
+          nextBillingDate: nextDate,
           updatedAt: now
         })
         .where(eq(bookingSeries.id, series.id));

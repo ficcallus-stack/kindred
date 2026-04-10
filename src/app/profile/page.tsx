@@ -1,4 +1,3 @@
-import Navbar from "@/components/Navbar";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 
@@ -20,7 +19,6 @@ export default function Profile() {
 
   return (
     <div className="bg-surface font-body text-on-surface">
-      <Navbar />
 
       <main className="pt-20">
         <section className="relative bg-surface-container-low py-16 px-8 overflow-hidden">

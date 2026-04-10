@@ -178,3 +178,45 @@ export async function sendEscrowReceiptEmail(
     from: { email: `escrow@${domain()}`, name: "KindredCare US" },
   });
 }
+export function sendNannyBookingAlert(
+  email: string,
+  name: string,
+  details: {
+    bookingId: string;
+    parentPhone: string;
+    locationName: string;
+    locationDescription: string;
+    childCount: number;
+    amount: number;
+    hiringMode: "hourly" | "retainer";
+    startDate: Date;
+  }
+) {
+  const { nannyBookingAlertTemplate, nannyBookingAlertText } = require("./email-templates");
+  return sendEmail({
+    to: [{ email, name }],
+    subject: "Action Required: New Paid Booking Coordination!",
+    htmlBody: nannyBookingAlertTemplate(name, details),
+    textBody: nannyBookingAlertText(name, details),
+    from: { email: `bookings@${domain()}`, name: "KindredCare US" },
+  });
+}
+
+export async function sendReferenceRequestEmail(
+  employerEmail: string,
+  employerName: string,
+  nannyName: string,
+  token: string
+) {
+  const { referenceRequestTemplate, referenceRequestText } = await import("./email-templates");
+  const verifyUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://www.kindredcareus.com"}/references/${token}`;
+  
+  return sendEmail({
+    to: [{ email: employerEmail, name: employerName }],
+    subject: `Reference Request: ${nannyName} (via KindredCare US)`,
+    htmlBody: referenceRequestTemplate(nannyName, employerName, verifyUrl),
+    textBody: referenceRequestText(nannyName, employerName, verifyUrl),
+    from: { email: `trust@${domain()}`, name: "KindredCare US" },
+  });
+}
+

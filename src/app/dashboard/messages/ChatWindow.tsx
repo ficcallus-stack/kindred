@@ -605,7 +605,7 @@ export default function ChatWindow({ convo, currentUser }: ChatWindowProps) {
       )}
 
       {/* ─── Chat Header ──────────────────────────────────── */}
-      <header className="px-6 py-3.5 flex items-center justify-between bg-white/70 backdrop-blur-xl border-b border-slate-100 z-10 shrink-0 shadow-sm">
+      <header className="px-6 py-4 md:py-5 flex items-center justify-between bg-white/80 backdrop-blur-2xl border-b border-slate-100 z-20 shrink-0 shadow-sm">
         <div className="flex items-center gap-3.5">
           <button 
             onClick={() => router.push("/dashboard/messages")}
@@ -694,10 +694,34 @@ export default function ChatWindow({ convo, currentUser }: ChatWindowProps) {
         style={{ scrollbarWidth: "thin", scrollbarColor: "#d4d4d8 transparent" }}
       >
         {isLoading ? (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center space-y-3 animate-pulse">
-              <Loader2 size={28} className="animate-spin text-slate-400 mx-auto" />
-              <p className="text-xs text-slate-400 font-medium">Loading messages...</p>
+          <div className="h-full flex flex-col p-6 space-y-8 animate-in fade-in duration-500">
+            {/* Top Skeleton Badge */}
+            <div className="flex justify-center">
+               <div className="w-48 h-6 bg-slate-200/60 rounded-full animate-pulse" />
+            </div>
+            
+            {/* Skeleton Bubbles */}
+            <div className="space-y-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className={cn("flex gap-3", i % 2 === 0 ? "flex-row-reverse" : "flex-row")}>
+                  <div className="w-8 h-8 rounded-full bg-slate-200 animate-pulse shrink-0" />
+                  <div className="space-y-2">
+                    <div className={cn("h-10 rounded-2xl bg-slate-200 animate-pulse", i === 1 ? "w-64" : i === 2 ? "w-48" : "w-72")} />
+                    <div className="h-3 w-12 bg-slate-100 rounded animate-pulse" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex-1 flex items-end justify-center pb-12">
+               <div className="flex flex-col items-center gap-3">
+                  <div className="flex gap-1.5">
+                     <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                     <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                     <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce" />
+                  </div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">Synchronizing Local Node</p>
+               </div>
             </div>
           </div>
         ) : messages.length === 0 ? (

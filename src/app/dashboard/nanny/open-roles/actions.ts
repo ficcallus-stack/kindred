@@ -116,11 +116,20 @@ export async function getJobDetail(jobId: string) {
   if (!job) return null;
 
   // Flatten the response for easier UI usage
+  const allChildren = (job.parent as any).children || [];
+  const selectedIds = job.selectedChildIds || [];
+  
+  // Only show children that were specifically selected for this job,
+  // or show all children if no specific selection was persisted.
+  const jobChildren = selectedIds.length > 0 
+    ? allChildren.filter((c: any) => selectedIds.includes(c.id))
+    : allChildren;
+
   return {
     ...job,
     parentInfo: job.parent,
     profile: (job.parent as any).parentProfile,
-    children: (job.parent as any).children,
+    children: jobChildren,
   };
 }
 

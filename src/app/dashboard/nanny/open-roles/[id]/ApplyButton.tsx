@@ -16,6 +16,8 @@ interface ApplyButtonProps {
     hasApplied?: boolean;
     applicationId?: string;
     familyName?: string;
+    size?: "sm" | "md" | "lg";
+    fullWidth?: boolean;
 }
 
 export default function ApplyButton({ 
@@ -24,7 +26,9 @@ export default function ApplyButton({
     isPremium = false,
     hasApplied: initialHasApplied, 
     applicationId,
-    familyName = "the Family" 
+    familyName = "the Family",
+    size = "md",
+    fullWidth = false
 }: ApplyButtonProps) {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isCancelConfirmOpen, setIsCancelConfirmOpen] = useState(false);
@@ -146,7 +150,11 @@ export default function ApplyButton({
             <button 
                 onClick={() => canApply ? setIsMenuOpen(true) : showToast("Verification Required", "error")}
                 className={cn(
-                    "w-full py-5 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-3",
+                    "rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-3",
+                    fullWidth ? "w-full" : "w-max px-12",
+                    size === "sm" && "py-3 text-[10px]",
+                    size === "md" && "py-5 text-[11px]",
+                    size === "lg" && "py-6 text-sm",
                     canApply 
                         ? "bg-gradient-to-br from-primary to-primary-container text-white shadow-primary/20 hover:opacity-95" 
                         : "bg-surface-container-high text-on-surface-variant/40 cursor-not-allowed border border-outline-variant/10 shadow-none"

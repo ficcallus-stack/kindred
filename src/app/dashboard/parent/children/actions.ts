@@ -17,28 +17,43 @@ export async function getChildren() {
 }
 
 export async function addChild(data: CreateChildInput) {
+  return addChildrenBatch([data]);
+}
+
+export async function addChildrenBatch(data: CreateChildInput[]) {
   const clerkUser = await requireUser();
 
   const { success } = await rateLimit(`addChild:${clerkUser.uid}`);
   if (!success) throw new Error("Too many requests");
 
-  const parsed = createChildSchema.safeParse(data);
-  if (!parsed.success) {
-    throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
-  }
+  if (data.length === 0) throw new Error("No child data provided");
 
-  const [newChild] = await db.insert(children).values({
-    parentId: clerkUser.uid,
-    name: parsed.data.name,
-    age: parsed.data.age,
-    type: parsed.data.type,
-    bio: parsed.data.bio,
-    photoUrl: parsed.data.photoUrl,
-    specialNeeds: parsed.data.specialNeeds,
-  }).returning();
+  const newChildren = await db.transaction(async (tx) => {
+    const results = [];
+    for (const childData of data) {
+      const parsed = createChildSchema.safeParse(childData);
+      if (!parsed.success) {
+        throw new Error(`Validation failed for ${childData.name || 'a child'}: ${parsed.error.issues.map((e) => e.message).join(", ")}`);
+      }
+
+      const [newChild] = await tx.insert(children).values({
+        parentId: clerkUser.uid,
+        name: parsed.data.name,
+        age: parsed.data.age,
+        type: parsed.data.type,
+        bio: parsed.data.bio,
+        photoUrl: parsed.data.photoUrl,
+        specialNeeds: parsed.data.specialNeeds,
+        interests: parsed.data.interests,
+        medicalNotes: parsed.data.medicalNotes,
+      }).returning();
+      results.push(newChild);
+    }
+    return results;
+  });
 
   revalidatePath("/dashboard/parent");
-  return { success: true, childId: newChild.id };
+  return { success: true, count: newChildren.length };
 }
 
 export async function removeChild(childId: string) {

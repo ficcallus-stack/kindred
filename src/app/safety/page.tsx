@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
-import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import SafetyOverview from "@/components/safety/Overview";
 import SafetyResources from "@/components/safety/Resources";
@@ -25,7 +24,6 @@ export default function SafetyPage() {
 
   return (
     <div className="bg-surface min-h-screen text-on-surface selection:bg-secondary-fixed">
-      <Navbar />
 
       <div className="flex max-w-7xl mx-auto pt-20 min-h-screen relative">
         {/* SideNavBar - Desktop */}

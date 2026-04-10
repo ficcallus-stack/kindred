@@ -1,14 +1,15 @@
-import Navbar from "@/components/Navbar";
+"use client";
+
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Link from "next/link";
 import HeroSearch from "@/components/HeroSearch";
 import { cn } from "@/lib/utils";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 export default function Home() {
   return (
     <div className="bg-surface font-body text-on-surface antialiased">
-      <Navbar />
-
       <main className="pt-24 overflow-x-hidden">
         {/* Hero Section: Editorial Style */}
         <section className="relative px-6 py-16 md:py-24 max-w-7xl mx-auto min-h-[80vh] flex items-center">
@@ -147,7 +148,7 @@ export default function Home() {
                   </li>
                 ))}
               </ul>
-              <Link href="/exams" className="inline-flex items-center justify-center bg-primary text-white px-10 py-5 rounded-2xl font-headline font-black text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-transform active:scale-95">
+              <Link href="/dashboard/nanny/certifications" className="inline-flex items-center justify-center bg-primary text-white px-10 py-5 rounded-2xl font-headline font-black text-lg shadow-xl shadow-primary/20 hover:scale-105 transition-transform active:scale-95">
                 Take the Exam
               </Link>
             </div>

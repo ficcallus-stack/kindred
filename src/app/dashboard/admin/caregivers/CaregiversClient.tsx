@@ -47,12 +47,14 @@ export default function CaregiversClient({ initialData, search: initialSearch, r
     }
   };
 
-  const updateFilters = (newParams: Record<string, string>) => {
+  const updateFilters = (newParams: Record<string, string> = {}) => {
     const url = new URL(window.location.href);
-    Object.entries(newParams).forEach(([key, val]) => {
-      if (val) url.searchParams.set(key, val);
-      else url.searchParams.delete(key);
-    });
+    if (newParams) {
+      Object.entries(newParams).forEach(([key, val]) => {
+        if (val) url.searchParams.set(key, val);
+        else url.searchParams.delete(key);
+      });
+    }
     router.push(url.pathname + url.search);
   };
 

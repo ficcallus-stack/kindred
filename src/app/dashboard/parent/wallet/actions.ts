@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/db";
-import { wallets, walletTransactions, users as usersTable } from "@/db/schema";
+import { wallets, walletTransactions, users as usersTable, bookings } from "@/db/schema";
 import { eq, desc, and, gte, sum, sql } from "drizzle-orm";
 import { requireUser } from "@/lib/get-server-user";
 import { 
@@ -50,15 +50,33 @@ export async function getWalletData() {
   });
 
   // 3. Fetch Booking Escrows paid by this parent
-  const { bookings } = await import("@/db/schema");
+  const { platformCreditTransactions } = await import("@/db/schema");
   const pastBookings = await db.query.bookings.findMany({
     where: eq(bookings.parentId, user.uid),
     orderBy: [desc(bookings.createdAt)],
-    limit: 10,
+    limit: 20,
+    with: {
+      caregiver: true
+    }
+  });
+
+  // 3.1 Fetch Platform Credit Transactions
+  const creditTxns = await db.query.platformCreditTransactions.findMany({
+    where: eq(platformCreditTransactions.userId, user.uid),
+    orderBy: [desc(platformCreditTransactions.createdAt)],
+    limit: 30,
   });
 
   // 4. Transform & Unify Ledger
-  type LedgerItem = { id: string, type: 'earning' | 'payout' | 'escrow' | 'subscription', amount: number, status: string, description: string, createdAt: Date };
+  type LedgerItem = { 
+    id: string, 
+    type: 'earning' | 'payout' | 'escrow' | 'subscription', 
+    amount: number, 
+    status: string, 
+    description: string, 
+    createdAt: Date,
+    meta?: any
+  };
   const unifiedLedger: LedgerItem[] = [];
 
   // Add Wallet Transactions (Referral payouts)
@@ -75,6 +93,24 @@ export async function getWalletData() {
     });
   }
 
+  // Add Credit Transactions
+  creditTxns.forEach(ct => {
+    unifiedLedger.push({
+      id: ct.id,
+      type: 'earning', // Treat as earning as it adds value (or we could use 'credit')
+      amount: ct.amount * 100, // credits are 1:1 with cents in display logic if we want, or handle separately. 
+                               // User said "15 credits per $1", so amount is integer credits.
+                               // Let's store amount in "credits" but mark type so UI can handle.
+      status: 'confirmed',
+      description: ct.description || 'Platform Credits Received',
+      createdAt: ct.createdAt,
+      meta: {
+        isCredits: true,
+        creditAmount: ct.amount
+      }
+    });
+  });
+
   // Add Bookings as Escrow Items
   pastBookings.forEach(b => {
     unifiedLedger.push({
@@ -83,7 +119,12 @@ export async function getWalletData() {
       amount: b.totalAmount, // Cent amounts
       status: b.status,
       description: `Nanny Booking (#${b.id.slice(0, 6)})`,
-      createdAt: b.createdAt
+      createdAt: b.createdAt,
+      meta: {
+        caregiverName: (b.caregiver as any)?.fullName || 'Assistant',
+        startDate: b.startDate,
+        endDate: b.endDate
+      }
     });
   });
 
@@ -101,6 +142,6 @@ export async function getWalletData() {
       totalSpent: Number(totalEscrow?.total || 0) / 100,
       chart: [] // Cleaned up for new UI
     },
-    transactions: unifiedLedger.slice(0, 20)
+    transactions: unifiedLedger.slice(0, 100)
   };
 }

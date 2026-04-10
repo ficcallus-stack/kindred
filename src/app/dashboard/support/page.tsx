@@ -3,7 +3,6 @@ import { syncUser } from "@/lib/user-sync";
 import { getSupportConversations } from "@/lib/actions/support";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
 
 export default async function SupportHubPage() {
   const user = await syncUser();
@@ -13,7 +12,6 @@ export default async function SupportHubPage() {
 
   return (
     <div className="bg-surface min-h-screen pb-20">
-      <Navbar />
       
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6 relative overflow-hidden">

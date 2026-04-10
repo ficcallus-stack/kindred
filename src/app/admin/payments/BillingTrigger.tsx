@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
-import { processMonthlyRetainers } from "@/lib/actions/retainer-billing";
+import { processRetainerBilling } from "@/lib/actions/retainer-billing";
 import { useToast } from "@/components/Toast";
 
 interface BillingTriggerProps {
@@ -25,7 +25,7 @@ export default function BillingTrigger({ dueCount }: BillingTriggerProps) {
 
     setIsProcessing(true);
     try {
-      const results = await processMonthlyRetainers();
+      const results = await processRetainerBilling();
       const successCount = results.filter((r: any) => r.status === "success").length;
       const failCount = results.filter((r: any) => r.status === "failed").length;
 

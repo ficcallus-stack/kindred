@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/Toast";
 
 interface DashboardOverviewClientProps {
   summary: {
@@ -16,6 +18,41 @@ interface DashboardOverviewClientProps {
 }
 
 export default function DashboardOverviewClient({ summary, activity }: DashboardOverviewClientProps) {
+  const { showToast } = useToast();
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+
+  const handleBroadcastSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const data = {
+        title: formData.get("title"),
+        message: formData.get("message"),
+        targetRole: formData.get("targetRole"),
+        priority: formData.get("priority") === "high" ? "high" : "normal"
+    };
+
+    setIsBroadcasting(true);
+    try {
+        const res = await fetch("/api/notifications/broadcast", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+            showToast("Broadcast Pulsed Successfully!", "success");
+            setIsBroadcastModalOpen(false);
+        } else {
+            showToast("Failed to dispatch broadcast.", "error");
+        }
+    } catch (err) {
+        showToast("Internal error during broadcast.", "error");
+    } finally {
+        setIsBroadcasting(false);
+    }
+  };
+
   return (
     <div className="space-y-12">
       {/* Bento Grid Stats */}
@@ -69,6 +106,110 @@ export default function DashboardOverviewClient({ summary, activity }: Dashboard
           <MaterialIcon name="priority_high" className="absolute -right-2 -top-2 text-6xl text-white/5 font-thin" />
         </div>
       </div>
+      
+      {/* Admin Toolbox */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div 
+          onClick={() => setIsBroadcastModalOpen(true)}
+          className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all group"
+        >
+          <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+            <MaterialIcon name="campaign" className="text-3xl" />
+          </div>
+          <div>
+             <h4 className="text-lg font-black text-primary italic leading-tight">System Broadcast</h4>
+             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Dispatch Pulse Alert to all users</p>
+          </div>
+          <MaterialIcon name="chevron_right" className="ml-auto text-slate-300" />
+        </div>
+
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 cursor-not-allowed opacity-50">
+          <div className="w-16 h-16 rounded-3xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+            <MaterialIcon name="analytics" className="text-3xl" />
+          </div>
+          <div>
+             <h4 className="text-lg font-black text-primary italic leading-tight">Deep Analytics</h4>
+             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Advanced cohort tracking</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 cursor-not-allowed opacity-50">
+          <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
+            <MaterialIcon name="security" className="text-3xl" />
+          </div>
+          <div>
+             <h4 className="text-lg font-black text-primary italic leading-tight">Security Audit</h4>
+             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Platform-wide access logs</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Broadcast Modal */}
+      {isBroadcastModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl relative animate-in slide-in-from-bottom-8 duration-500">
+              <button 
+                onClick={() => setIsBroadcastModalOpen(false)}
+                className="absolute top-6 right-6 text-slate-400 hover:text-slate-600"
+              >
+                <MaterialIcon name="close" />
+              </button>
+
+              <div className="mb-8">
+                 <h2 className="text-2xl font-headline font-black text-primary italic tracking-tight">Dispatch Broadcast 📢</h2>
+                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-2">Send real-time Pulse to the community</p>
+              </div>
+
+              <form onSubmit={handleBroadcastSubmit} className="space-y-6">
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Target Audience</label>
+                    <select 
+                      name="targetRole"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-2 ring-primary/10 transition-all outline-none"
+                    >
+                      <option value="all">Everyone (Parents & Nannies)</option>
+                      <option value="parent">Parents Only</option>
+                      <option value="caregiver">Nannies Only</option>
+                    </select>
+                 </div>
+
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Alert Title</label>
+                    <input 
+                      name="title"
+                      required
+                      placeholder="e.g., Scheduled Maintenance"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-2 ring-primary/10 transition-all outline-none"
+                    />
+                 </div>
+
+                 <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Message Content</label>
+                    <textarea 
+                      name="message"
+                      required
+                      rows={3}
+                      placeholder="Details of the announcement..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold text-primary focus:ring-2 ring-primary/10 transition-all outline-none resize-none"
+                    />
+                 </div>
+
+                 <div className="flex items-center gap-2">
+                    <input type="checkbox" name="priority" id="priority" value="high" className="w-4 h-4 rounded text-primary" />
+                    <label htmlFor="priority" className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic cursor-pointer">Mark as High Priority (Send Email)</label>
+                 </div>
+
+                 <button 
+                   type="submit"
+                   disabled={isBroadcasting}
+                   className="w-full py-4 bg-primary text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50"
+                 >
+                   {isBroadcasting ? "Syncing Pulse..." : "Dispatch Now"} <MaterialIcon name="bolt" className="ml-2" />
+                 </button>
+              </form>
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Market Graph Area */}

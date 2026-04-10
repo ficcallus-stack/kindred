@@ -1,7 +1,7 @@
 import { MaterialIcon } from "@/components/MaterialIcon";
 import Link from "next/link";
 import { getJobDetail } from "../actions";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { db } from "@/db";
 import { users, nannyProfiles, applications } from "@/db/schema";
@@ -47,234 +47,360 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   });
 
   const isVerified = profile?.isVerified || false;
-  const isPremium = userRecord?.isPremium || userRecord?.subscriptionStatus === "active";
   const hasApplied = !!existingApp;
-  const applicationId = existingApp?.id;
-
-  const isRecurring = job.scheduleType === "recurring";
+  
+  const isRetainer = job.hiringType === "retainer";
   
   // Schedule Parser Logic
   const scheduleData = job.schedule || {};
-  const activeTimesByDay = DAYS.map(day => {
-    const activeTimeIds = TIMES.filter(t => scheduleData[`${day}-${t.id}`]).map(t => t.range);
-    return { day, times: activeTimeIds };
-  }).filter(d => d.times.length > 0);
+  const totalSlots = Object.values(scheduleData).filter(Boolean).length;
+  const totalWeeklyHours = totalSlots * 2; 
 
-  // Stats Logic
-  const totalHours = Object.values(scheduleData).filter(Boolean).length * 2;
-  const subtotal = (job.minRate || 25) * totalHours;
-  const fee = 5.0;
-  const totalWeekly = subtotal; // For recurring we show weekly pay
+  // Asset Fallbacks
+  const familyPhoto = job.profile?.familyPhoto || "https://images.unsplash.com/photo-1510520434124-5bc7e642b61d?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80";
+  const mapFallback = "/illustrations/map_fallback.png";
+
+  // Data-driven Prerequisites
+  const requirementsData = job.requirements || {};
+  const certsData = job.certs || {};
+  const activeRequirements = [
+    ...(certsData.cpr ? [{ icon: "medical_services", label: "CPR Certified" }] : []),
+    ...(certsData.first_aid ? [{ icon: "emergency", label: "First Aid Certified" }] : []),
+    ...(certsData.badge ? [{ icon: "verified_user", label: "Global Care Badge" }] : []),
+    ...(requirementsData.isNonSmoker ? [{ icon: "no_smoking", label: "Non-smoker" }] : []),
+    ...(requirementsData.isSafeDriver ? [{ icon: "directions_car", label: "Safe Driver" }] : []),
+    ...(requirementsData.hasOwnTransport ? [{ icon: "home_appliance_proximity", label: "Own Transport" }] : []),
+  ];
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-2 text-on-surface-variant text-sm font-label">
-        <Link href="/dashboard/nanny/open-roles" className="hover:text-primary transition-colors flex items-center gap-1">
-          <MaterialIcon name="arrow_back" className="text-sm" />
-          Open Roles
-        </Link>
-        <span className="material-symbols-outlined text-sm">chevron_right</span>
-        <span className="font-semibold text-primary">Job Details</span>
-      </nav>
+    <div className="bg-surface font-body text-on-surface antialiased">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .squircle-lg {
+            clip-path: polygon(20% 0%, 80% 0%, 100% 20%, 100% 80%, 80% 100%, 20% 100%, 0% 80%, 0% 20%);
+            border-radius: 2rem;
+        }
+        .squircle-top-left-bottom-right {
+           border-radius: 1.5rem 0.75rem 0.75rem 1.5rem;
+        }
+      `}} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-        {/* Left Column: Content */}
-        <div className="lg:col-span-8 space-y-12">
-          {/* Hero Header Section */}
-          <section className="relative">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-              <div>
-                <span className={cn(
-                  "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4",
-                  isRecurring ? "bg-tertiary-fixed text-on-tertiary-fixed-variant" : "bg-secondary-fixed text-on-secondary-container"
-                )}>
-                  <span className="material-symbols-outlined text-xs" style={{ fontVariationSettings: "'FILL' 1" }}>{isRecurring ? "sync" : "event"}</span>
-                  {isRecurring ? "Recurring Job" : "One-Time Booking"}
-                </span>
-                <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-primary mb-2">The {job.profile?.familyName || "Elite Family"} Family</h1>
-                <div className="flex items-center gap-2 text-on-surface-variant font-medium">
-                  <span className="material-symbols-outlined text-lg">location_on</span>
-                  {job.profile?.location || "Manhattan, NY"}
-                </div>
-              </div>
-              {/* Funds Badge */}
-              <div className="bg-green-50/80 backdrop-blur-sm px-4 py-2 rounded-xl flex items-center gap-2 self-start md:self-auto shadow-sm border border-green-100">
-                <span className="material-symbols-outlined text-green-600 text-lg" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
-                <span className="text-[10px] font-black text-green-700 tracking-tight uppercase">Funds Secured in Escrow</span>
-              </div>
-            </div>
-          </section>
-
-          {/* Main Stats Bento Grid */}
-          <section className="grid grid-cols-1 md:grid-cols-3 gap-1 bg-surface-container-low rounded-[2rem] overflow-hidden p-1 shadow-sm border border-outline-variant/10">
-            <div className="bg-surface-container-lowest p-8 flex flex-col gap-1 rounded-2xl">
-              <span className="text-on-surface-variant text-xs font-bold uppercase tracking-widest opacity-50">{isRecurring ? "Frequency" : "Date"}</span>
-              <span className="text-primary font-bold text-lg">
-                {isRecurring ? activeTimesByDay.map(d => d.day).join(", ") : new Date(job.specificDates?.[0]).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-              </span>
-              <span className="text-on-surface-variant text-sm font-medium">{isRecurring ? "Weekly Schedule" : "One-day Booking"}</span>
-            </div>
-            <div className="bg-surface-container-lowest p-8 flex flex-col gap-1 rounded-2xl">
-              <span className="text-on-surface-variant text-xs font-bold uppercase tracking-widest opacity-50">Duration</span>
-              <span className="text-primary font-bold text-lg">{totalHours} Hours</span>
-              <span className="text-on-surface-variant text-sm font-medium">{isRecurring ? "Total per week" : "Single session"}</span>
-            </div>
-            <div className="bg-surface-container-lowest p-8 flex flex-col gap-1 rounded-2xl">
-              <span className="text-on-surface-variant text-xs font-bold uppercase tracking-widest opacity-50">{isRecurring ? "Weekly Pay" : "Total Pay"}</span>
-              <span className="text-primary font-black text-3xl italic tracking-tighter">${totalWeekly.toFixed(2)}</span>
-              <span className="text-on-surface-variant text-xs font-bold uppercase tracking-widest opacity-30 mt-1">${job.minRate} / hour</span>
-            </div>
-          </section>
-
-          {/* Detailed Schedule (FOR RECURRING JOBS) */}
-          {isRecurring && (
-            <section className="space-y-6 bg-primary/5 p-8 rounded-3xl border border-primary/5 relative overflow-hidden group">
-               <div className="relative z-10">
-                  <h3 className="text-xl font-headline font-bold text-primary flex items-center gap-2 mb-6">
-                    <MaterialIcon name="schedule" className="text-secondary" />
-                    Exact Hours Each Day
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {activeTimesByDay.map(d => (
-                       <div key={d.day} className="bg-white p-4 rounded-xl shadow-sm border border-outline-variant/10">
-                          <span className="text-[10px] font-black tracking-widest uppercase text-on-surface-variant/40 block mb-2">{d.day}</span>
-                          <div className="flex flex-wrap gap-2">
-                             {d.times.map(t => (
-                               <span key={t} className="px-3 py-1 bg-surface-container-low text-primary text-xs font-bold rounded-lg border border-outline-variant/10">
-                                  {t}
-                               </span>
-                             ))}
-                          </div>
-                       </div>
-                    ))}
-                  </div>
-               </div>
-               <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-3xl -mr-16 -mt-16"></div>
-            </section>
-          )}
-
-          {/* Editorial Section */}
-          <section className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div className="relative group">
-              <div className="rounded-[2.5rem] h-[320px] w-full overflow-hidden bg-surface-variant shadow-xl border-4 border-white">
-                <img 
-                   src={job.profile?.familyPhoto || "https://images.unsplash.com/photo-1544333346-64e35199586c?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80"} 
-                   alt="Family" 
-                   className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
-                />
-              </div>
-              {/* Offset Chip for Map */}
-              <div className="absolute -bottom-6 -right-6 bg-white p-4 rounded-2xl shadow-2xl border border-outline-variant/15 flex items-center gap-4 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                  <MaterialIcon name="location_on" fill />
-                </div>
-                <div className="pr-2">
-                  <div className="text-xs font-black text-primary uppercase tracking-wider leading-none mb-1">Location</div>
-                  <div className="text-[11px] font-bold text-on-surface-variant opacity-60 italic">{job.profile?.location || "Upper East Side"}</div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="space-y-8">
-              <h2 className="text-3xl font-black italic tracking-tighter text-primary leading-none">Who you'll <br /> be with</h2>
-              <div className="space-y-6">
-                {job.children?.map((child: any) => (
-                   <div key={child.id} className="flex items-center gap-4 p-5 bg-surface-container-lowest rounded-2xl shadow-sm border border-outline-variant/10 group hover:border-primary/20 transition-all">
-                      <div className="h-16 w-16 rounded-2xl overflow-hidden bg-primary/5 flex items-center justify-center text-primary font-bold text-2xl flex-shrink-0">
-                         {child.photoUrl ? <img src={child.photoUrl} className="w-full h-full object-cover" /> : child.name.charAt(0)}
-                      </div>
-                      <div>
-                        <div className="font-headline font-black text-primary flex items-center gap-2">
-                            {child.name} 
-                            <span className="text-on-surface-variant/40 text-[11px] tracking-normal font-medium italic underline decoration-1 underline-offset-2">• {child.age} years</span>
-                        </div>
-                        <div className="text-xs text-on-surface-variant font-medium leading-relaxed opacity-60 line-clamp-2">{child.bio || "Loves blocks and puzzles."}</div>
-                      </div>
-                   </div>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          {/* Description */}
-          <section className="space-y-6">
-            <h2 className="text-2xl font-black italic tracking-tighter text-primary">About the Afternoon</h2>
-            <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-outline-variant/10 leading-relaxed text-on-surface-variant font-medium whitespace-pre-wrap">
-                {job.description}
-            </div>
-          </section>
-        </div>
-
-        {/* Right Column: Sticky Action Card */}
-        <div className="lg:col-span-4">
-          <div className="sticky top-24 space-y-6">
-            <div className="bg-surface-container-lowest p-8 rounded-[2.5rem] shadow-2xl shadow-primary/5 border border-outline-variant/10 relative overflow-hidden">
-               {/* Accent line */}
-               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-secondary to-primary-container"></div>
-               
-               <div className="flex justify-between items-start mb-8">
-                <div>
-                  <div className="text-[10px] text-on-surface-variant/40 font-bold uppercase tracking-[0.2em] mb-2 leading-none">Total Package</div>
-                  <div className="text-4xl font-black italic tracking-tighter text-primary leading-none">${totalWeekly.toFixed(2)}</div>
-                </div>
-                <button className="h-14 w-14 rounded-2xl flex items-center justify-center border border-outline-variant/30 text-on-surface-variant hover:text-secondary hover:bg-secondary/5 transition-all active:scale-90">
-                  <MaterialIcon name="bookmark" />
-                </button>
-              </div>
-
-              <div className="space-y-5 mb-10">
-                <div className="flex items-center justify-between text-xs font-bold py-3 border-b border-outline-variant/10">
-                  <span className="text-on-surface-variant/60 uppercase tracking-widest">Base Rate (${job.minRate} x {totalHours}h)</span>
-                  <span className="text-primary font-black">${totalWeekly.toFixed(2)}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs font-bold py-3 border-b border-outline-variant/10">
-                  <span className="text-on-surface-variant/60 uppercase tracking-widest">Booking Fee</span>
-                  <span className="text-tertiary font-black italic">COVERED BY CLIENT</span>
-                </div>
-                <div className="flex items-center justify-between text-xl font-black italic tracking-tighter pt-4 text-primary">
-                  <span>Take Home Pay</span>
-                  <span>${totalWeekly.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <ApplyButton jobId={awaitedParams.id} isVerified={isVerified} hasApplied={hasApplied} familyName={job.profile?.familyName} />
-
-              <p className="text-center text-[10px] text-on-surface-variant/40 mt-6 font-bold uppercase tracking-widest px-8 leading-relaxed">
-                Trusted in Midtown, UES, and the West Side Since 2026.
-              </p>
-            </div>
-
-            {/* Verification Incentive Card if not verified */}
-            {!isVerified && (
-               <Link href="/dashboard/nanny/certifications" className="block bg-gradient-to-br from-error/5 to-error/10 p-6 rounded-3xl border border-error/5 group hover:scale-[1.02] transition-all duration-500">
-                  <div className="flex gap-4">
-                    <div className="w-12 h-12 bg-white rounded-xl shadow-sm flex items-center justify-center flex-shrink-0 text-error">
-                      <MaterialIcon name="workspace_premium" fill />
-                    </div>
-                    <div>
-                      <h4 className="font-headline font-black text-error text-sm uppercase italic tracking-tighter leading-none mb-1">Verification Required</h4>
-                      <p className="text-[11px] text-error/60 font-medium leading-relaxed italic">
-                        Unlock this job and increase your hiring speed by 40% by completing your activation.
-                      </p>
-                    </div>
-                  </div>
-               </Link>
-            )}
-
-            {/* Context Card */}
-            <div className="bg-primary/5 p-6 rounded-3xl border border-primary/5">
-                <div className="flex gap-4">
-                  <MaterialIcon name="auto_awesome" className="text-primary animate-pulse" />
-                  <div className="text-[11px] text-on-surface-variant/70 italic font-medium leading-normal">
-                    <strong className="block text-primary font-black uppercase not-italic tracking-widest text-[9px] mb-1">Fast Match Tip</strong>
-                    Families in <span className="text-primary font-bold">{job.profile?.location || "Manhattan"}</span> prefer caregivers with active First Aid & CPR certifications. Refresh yours today in the Certifications tab.
-                  </div>
-                </div>
-            </div>
+      {/* TopAppBar Navigation Shell */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-sm border-b border-outline-variant/10">
+        <div className="flex items-center justify-between px-6 py-3 w-full max-w-[1440px] mx-auto">
+          <div className="flex items-center gap-8">
+            <span className="text-xl font-bold tracking-tight text-slate-900 font-headline italic">KindredCare US</span>
+            <nav className="hidden md:flex items-center gap-6 font-headline text-sm font-bold">
+              <Link href="/dashboard/nanny" className="text-slate-500 hover:text-slate-700 transition-all">Dashboard</Link>
+              <Link href="/dashboard/nanny/open-roles" className="text-primary font-black border-b-2 border-primary transition-all">Browse Jobs</Link>
+              <Link href="/dashboard/nanny/applications" className="text-slate-500 hover:text-slate-700 transition-all">My Applications</Link>
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+             <MaterialIcon name="notifications" className="text-slate-400" />
+             <MaterialIcon name="chat_bubble" className="text-slate-400" />
+             <div className="w-10 h-10 rounded-full bg-surface-container overflow-hidden border-2 border-outline-variant/20">
+                <img src="/illustrations/kid_girl.png" className="w-full h-full object-cover" />
+             </div>
           </div>
         </div>
-      </div>
+      </header>
+
+      <main className="pt-24 pb-20 px-4 md:px-8 max-w-7xl mx-auto flex flex-col md:flex-row gap-8">
+        {/* Left Column: Details */}
+        <div className="flex-1 space-y-12">
+          
+          {/* Header Section */}
+          <div className="mb-12">
+            <nav className="flex items-center gap-2 text-on-surface-variant text-[10px] font-black uppercase tracking-widest mb-4 italic">
+              <Link href="/dashboard/nanny/open-roles" className="hover:text-primary transition-colors">Browse Jobs</Link>
+              <span className="material-symbols-outlined text-[10px]">chevron_right</span>
+              <span className="text-primary">{job.profile?.familyName || "Verified Family"}</span>
+            </nav>
+            <h1 className="font-headline text-4xl lg:text-5xl font-extrabold tracking-tight text-primary mb-2 text-left">
+               The {job.profile?.familyName || "Family"} — {job.title || (isRetainer ? "Recruitment Priority" : "Daily Support")}
+            </h1>
+            <p className="text-on-surface-variant font-bold flex items-center gap-2 text-sm italic opacity-60">
+               <MaterialIcon name="location_on" className="text-primary text-sm" />
+               {job.profile?.location || "Private Residence"} • {isRetainer ? "Weekly Retainer" : "Part-time Hourly"}
+            </p>
+          </div>
+
+          {/* Hero Section & Overview Bento */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
+            {/* Main Hero Image Card */}
+            <div className="lg:col-span-8 relative overflow-hidden rounded-xl shadow-2xl bg-surface-container-lowest h-[450px]">
+              <img 
+                src={familyPhoto} 
+                className="w-full h-full object-cover" 
+                alt="Family Portrait"
+              />
+              <div className="absolute top-6 left-6">
+                <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-xl">
+                  <MaterialIcon name="verified" className="text-blue-600 text-sm" fill />
+                  <span className="font-headline font-black text-[10px] uppercase tracking-widest text-primary">Verified Family</span>
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0 h-1/2 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
+              <div className="absolute bottom-8 left-8 text-white">
+                <div className="flex gap-8">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-60 mb-1">Weekly Budget</span>
+                    <span className="text-4xl font-black font-headline italic tracking-tighter decoration-secondary decoration-2 underline-offset-8 underline">
+                      {isRetainer ? `$${job.retainerBudget}` : `$${job.minRate}/hr`}
+                    </span>
+                  </div>
+                  <div className="w-px h-12 bg-white/20"></div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] uppercase tracking-[0.2em] font-black opacity-60 mb-1">Requirement</span>
+                    <span className="text-4xl font-black font-headline italic tracking-tighter">
+                       {isRetainer ? "40 hrs" : `${totalWeeklyHours} hrs`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Job Quick Overview Cards */}
+            <div className="lg:col-span-4 flex flex-col gap-6">
+              <div className="bg-white p-8 rounded-xl shadow-xl border-l-[6px] border-primary group text-left">
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary-fixed flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+                    <MaterialIcon name="account_balance_wallet" fill />
+                  </div>
+                  <h3 className="font-headline font-black text-primary italic leading-none">Payment Security</h3>
+                </div>
+                <p className="text-on-surface-variant text-xs leading-relaxed mb-6 font-medium italic opacity-70">
+                  Your earnings are protected. This family has pre-authorized the first month of recruitment via our Escrow holding system.
+                </p>
+                <span className="inline-flex items-center gap-2 px-3 py-1 bg-tertiary-fixed text-on-tertiary-fixed rounded-full text-[9px] font-black uppercase tracking-[0.15em]">
+                  Funds Secured in Escrow
+                </span>
+              </div>
+
+              <div className="bg-surface-container-low p-8 rounded-xl space-y-6 text-left">
+                <h3 className="font-headline font-black text-primary italic leading-none text-lg">Prerequisites</h3>
+                <ul className="space-y-4">
+                  {activeRequirements.length > 0 ? activeRequirements.map((req, i) => (
+                    <li key={i} className="flex items-center gap-3 text-xs font-black uppercase tracking-widest text-on-surface-variant/60">
+                      <MaterialIcon name={req.icon} className="text-primary text-lg" />
+                      {req.label}
+                    </li>
+                  )) : (
+                    <li className="flex items-center gap-3 text-xs font-black uppercase tracking-widest text-on-surface-variant/30">
+                      <MaterialIcon name="info" className="text-lg" />
+                      Standard Nanny Requirements
+                    </li>
+                  )}
+                </ul>
+              </div>
+              
+              <ApplyButton jobId={awaitedParams.id} isVerified={isVerified} hasApplied={hasApplied} familyName={job.profile?.familyName} fullWidth />
+            </div>
+          </div>
+
+          {/* Child Profiles Section */}
+          <section className="mb-20">
+             <div className="flex items-end justify-between mb-12">
+               <div>
+                 <span className="text-secondary font-black uppercase tracking-[0.3em] text-[10px] italic">The Little Ones</span>
+                 <h2 className="font-headline text-4xl font-black italic tracking-tighter text-primary">Child Profiles</h2>
+               </div>
+               <div className="h-0.5 flex-1 mx-12 bg-surface-container/30 hidden lg:block"></div>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               {job.children?.length > 0 ? job.children.map((child: any, idx: number) => (
+                 <div key={child.id} className="bg-white p-8 rounded-2xl shadow-xl hover:shadow-2xl transition-all relative overflow-visible flex gap-8 group text-left">
+                   <div className="flex-shrink-0">
+                      <div className="w-28 h-28 squircle-top-left-bottom-right overflow-hidden shadow-inner ring-4 ring-surface-container-low grayscale group-hover:grayscale-0 transition-all duration-700">
+                         <img 
+                           src={child.photoUrl || (child.type === 'infant' || child.type === 'toddler' ? "/illustrations/kid_boy.png" : "/illustrations/kid_girl.png")} 
+                           className="w-full h-full object-cover" 
+                           alt={child.name}
+                         />
+                      </div>
+                   </div>
+                   <div className="flex-grow space-y-4">
+                      <div className="flex justify-between items-start text-left">
+                         <div>
+                            <h3 className="font-headline font-black text-3xl italic tracking-tighter text-primary leading-none mb-1">{child.name}</h3>
+                            <span className="text-on-surface-variant font-black text-[10px] uppercase tracking-widest opacity-40 italic">{child.age} Years Old</span>
+                         </div>
+                         <span className="bg-secondary-fixed-dim text-on-secondary-fixed text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full capitalize">{child.type || "Child"}</span>
+                      </div>
+                      <p className="text-on-surface-variant text-[13px] leading-relaxed italic font-medium opacity-80 line-clamp-2">
+                        "{child.bio || "No biography has been shared for this profile yet."}"
+                      </p>
+                      
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {child.interests && child.interests.length > 0 ? child.interests.map((interest: string, i: number) => (
+                          <span key={i} className="px-3 py-1 bg-surface-container-low rounded-lg text-[10px] font-black uppercase tracking-widest text-primary/60 border border-outline-variant/10 group-hover:bg-primary/5">
+                            {interest}
+                          </span>
+                        )) : (
+                          <span className="px-3 py-1 bg-surface-container-low rounded-lg text-[10px] font-black uppercase tracking-widest text-on-surface-variant/40 border border-outline-variant/5 group-hover:bg-primary/5 italic">
+                            No interests listed
+                          </span>
+                        )}
+                      </div>
+
+                      <div className={cn(
+                        "p-4 rounded-xl flex items-start gap-3 border",
+                        child.medicalNotes ? "bg-error-container/10 border-error-container/20" : "bg-tertiary-fixed/10 border-tertiary-fixed/20"
+                      )}>
+                        <MaterialIcon name={child.medicalNotes ? "medical_services" : "info"} className={cn("text-lg", child.medicalNotes ? "text-error" : "text-tertiary")} />
+                        <div className="text-[10px] leading-relaxed">
+                          <p className="font-black uppercase tracking-widest italic mb-1 text-primary">{child.medicalNotes ? "Medical Note" : "Daily Activity Note"}</p>
+                          <p className="text-on-surface-variant font-medium opacity-60">
+                             {child.medicalNotes || "The parent has not specified any medical alerts for this child."}
+                          </p>
+                        </div>
+                      </div>
+                   </div>
+                 </div>
+               )) : (
+                 <div className="col-span-full py-20 bg-surface-container-low/30 rounded-[3.5rem] flex flex-col items-center gap-4 text-center">
+                    <MaterialIcon name="child_care" className="text-5xl text-outline-variant" />
+                    <p className="font-headline text-xl font-bold text-on-surface-variant italic">The parent has not yet attached child profiles to this job.</p>
+                 </div>
+               )}
+             </div>
+          </section>
+
+          {/* Family Values Section */}
+          <section className="mb-20 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center text-left">
+             <div className="relative group">
+                <div className="squircle-lg overflow-hidden bg-slate-200 aspect-video lg:aspect-square shadow-2xl relative z-10 border-8 border-white group-hover:scale-[1.02] transition-transform duration-700">
+                   <img 
+                     src={familyPhoto} 
+                     className="w-full h-full object-cover" 
+                     alt="Home"
+                   />
+                </div>
+                <div className="absolute -top-10 -left-10 w-40 h-40 bg-secondary-fixed/30 rounded-full blur-3xl -z-10 group-hover:scale-125 transition-transform duration-1000"></div>
+                <div className="absolute -bottom-10 -right-10 w-64 h-64 border-[12px] border-surface-container-high/40 squircle-lg -z-10"></div>
+             </div>
+             <div>
+                <span className="text-secondary font-black uppercase tracking-[0.4em] text-[10px] italic">Our Way of Life</span>
+                <h2 className="font-headline text-5xl font-black italic tracking-tighter text-primary mb-8 leading-none">Family Values <br /> & Philosophy</h2>
+                <div className="space-y-6 text-on-surface-variant leading-relaxed text-lg font-medium italic opacity-70">
+                   {job.profile?.philosophy ? (
+                      <div className="prose prose-slate italic">
+                        {job.profile.philosophy.split('\n').map((para: string, i: number) => (
+                           <p key={i}>{para}</p>
+                        ))}
+                      </div>
+                   ) : (
+                     <p className="p-8 bg-surface-container-low italic rounded-2xl border border-dashed border-outline-variant/30 text-left">
+                        "The family has not yet provided a philosophical statement. We recommend discussing their parenting style during the initial trial or interview."
+                     </p>
+                   )}
+                   
+                   <div className="flex gap-4 pt-6">
+                      <div className="flex-1 p-5 bg-white rounded-2xl shadow-sm border border-outline-variant/10">
+                         <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Language</p>
+                         <p className="text-xs font-bold leading-relaxed italic">{job.language || "English"}</p>
+                      </div>
+                      <div className="flex-1 p-5 bg-white rounded-2xl shadow-sm border border-outline-variant/10">
+                         <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Duties</p>
+                         <p className="text-xs font-bold leading-relaxed italic">{job.duties || "General care"}</p>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </section>
+
+          {/* Final CTA Area */}
+          <section className="bg-primary p-16 md:p-24 rounded-[3rem] text-white text-center relative overflow-hidden group">
+             <div className="absolute top-0 right-0 w-96 h-96 bg-primary-container rounded-full blur-[120px] opacity-40 -translate-y-1/2 translate-x-1/2 group-hover:scale-125 transition-transform duration-1000"></div>
+             <div className="relative z-10 space-y-10">
+                <span className="text-[10px] font-black uppercase tracking-[0.6em] text-primary-fixed block animate-pulse">Placement Opportunity</span>
+                <h2 className="font-headline text-5xl md:text-7xl font-black italic tracking-tighter leading-[0.85] italic">
+                   Ready to join the <br /> {job.profile?.familyName || "Family"} household?
+                </h2>
+                <p className="text-blue-100/70 text-lg md:text-2xl font-medium max-w-2xl mx-auto italic mb-12">
+                   This role is highly contested for its premium stability. Secure your spotlight and apply today for an initial screening.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                   <ApplyButton jobId={awaitedParams.id} isVerified={isVerified} hasApplied={hasApplied} familyName={job.profile?.familyName} size="lg" />
+                   <button className="w-full sm:w-auto border-2 border-white/20 text-white px-12 py-5 rounded-2xl font-black uppercase tracking-widest text-[11px] hover:bg-white/10 transition-all active:scale-95 shadow-xl">
+                      Save Opportunity
+                   </button>
+                </div>
+             </div>
+          </section>
+        </div>
+
+        {/* Right Sidebar: Actions (Desktop Only Toggle style) */}
+        <aside className="hidden lg:block w-80 shrink-0">
+           <div className="sticky top-24 space-y-8">
+              {/* Invitation Card */}
+              <div className="bg-white p-10 rounded-[2rem] shadow-2xl border border-outline-variant/10 text-center relative overflow-hidden group">
+                 <div className="mx-auto w-16 h-16 bg-primary/5 rounded-2xl flex items-center justify-center mb-8 rotate-3 group-hover:rotate-0 transition-transform">
+                    <MaterialIcon name="mail_lock" className="text-primary text-3xl" fill />
+                 </div>
+                 <h3 className="text-2xl font-black italic tracking-tighter text-primary mb-4">Trial Invitation</h3>
+                 <p className="text-xs text-on-surface-variant font-medium opacity-60 leading-relaxed italic mb-10">
+                    The {job.profile?.familyName || "Family"} family is seeking an immediate fit for their upcoming recruitment window.
+                 </p>
+                 <div className="space-y-4">
+                    <ApplyButton jobId={awaitedParams.id} isVerified={isVerified} hasApplied={hasApplied} familyName={job.profile?.familyName} fullWidth />
+                    <button className="w-full py-4 text-slate-400 font-black uppercase tracking-widest text-[10px]">Decline Interest</button>
+                 </div>
+                 <div className="pt-8 mt-8 border-t border-outline-variant/10 text-center">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-on-surface-variant/40 mb-4 italic">Guaranteed Payroll via Escrow</p>
+                    <div className="flex justify-center gap-4 opacity-30 grayscale transition-all group-hover:grayscale-0 group-hover:opacity-60">
+                       <img alt="Visa" className="h-4" src="https://upload.wikimedia.org/wikipedia/commons/d/d6/Visa_2021.svg" />
+                       <img alt="Mastercard" className="h-4" src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" />
+                    </div>
+                 </div>
+              </div>
+
+              {/* Map Preview */}
+              <div className="bg-white rounded-[2rem] overflow-hidden shadow-xl border border-outline-variant/5 group">
+                 <div className="h-48 bg-slate-100 relative overflow-hidden text-left">
+                    <img src={mapFallback} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 grayscale group-hover:grayscale-0" alt="Neighborhood" />
+                    <div className="absolute inset-0 bg-primary/5"></div>
+                    <div className="absolute top-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[9px] font-black text-primary uppercase tracking-widest shadow-md">
+                       {job.profile?.location ? `${job.profile.location.split(',')[0]} AREA` : "PRIVATE AREA"}
+                    </div>
+                 </div>
+                 <div className="p-6 text-left">
+                    <div className="flex items-center gap-3 mb-2">
+                       <MaterialIcon name="location_on" className="text-secondary" fill />
+                       <p className="text-[11px] font-black text-primary uppercase tracking-widest">Premium Enclave</p>
+                    </div>
+                    <p className="text-[10px] text-on-surface-variant font-medium opacity-50 italic italic leading-relaxed">
+                       Exact residence details will be shared once your application is approved for a trial.
+                    </p>
+                 </div>
+              </div>
+
+              {/* Support Section */}
+              <div className="p-8 bg-tertiary-fixed/20 rounded-[2rem] border border-tertiary-fixed/30 flex gap-4 ring-8 ring-tertiary-fixed/5 text-left">
+                 <MaterialIcon name="verified_user" className="text-tertiary shrink-0" fill />
+                 <div>
+                    <p className="font-black italic text-tertiary text-sm mb-1 leading-none">KindredCare Trust</p>
+                    <p className="text-[10px] text-tertiary/60 font-medium italic leading-relaxed">
+                       This placement is bound by our Family-Safe guarantee. All sessions are fully insured and pre-funded.
+                    </p>
+                 </div>
+              </div>
+           </div>
+        </aside>
+      </main>
+
+      {/* Mobile Footer NavBar Overlay */}
+      <footer className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-outline-variant/10 py-6 px-10 flex md:hidden items-center justify-between z-50">
+         <MaterialIcon name="dashboard" className="text-slate-300" />
+         <MaterialIcon name="search" className="text-primary" fill />
+         <MaterialIcon name="assignment_turned_in" className="text-slate-300" />
+         <MaterialIcon name="mail" className="text-slate-300" />
+         <MaterialIcon name="person" className="text-slate-300" />
+      </footer>
     </div>
   );
 }

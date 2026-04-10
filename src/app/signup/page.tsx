@@ -9,7 +9,6 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/Toast";
 import { useEffect } from "react";
-import Navbar from "@/components/Navbar";
 
 export default function SignUpPage() {
   const { showToast } = useToast();
@@ -130,7 +129,6 @@ export default function SignUpPage() {
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased min-h-screen">
-      <Navbar />
 
       <main className="min-h-screen pt-32 pb-16 flex items-center justify-center px-4 relative overflow-hidden">
         {/* Referral Popup for Social Signup */}

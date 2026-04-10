@@ -47,22 +47,6 @@ export default function ReferralProgramPage() {
         }}
       />
 
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm shadow-slate-200/50 transition-all">
-        <div className="flex justify-between items-center px-6 md:px-12 py-4 max-w-7xl mx-auto">
-          <Link href="/" className="text-xl font-bold text-slate-900 tracking-tighter font-headline">
-            KindredCare <span className="text-accent-red underline decoration-accent-red/20 underline-offset-4">US</span>
-          </Link>
-          <div className="hidden md:flex items-center space-x-8">
-            <Link className="text-slate-600 hover:text-primary transition-colors font-headline text-sm font-semibold tracking-tight" href="/browse">Find Nannies</Link>
-            <Link className="text-slate-600 hover:text-primary transition-colors font-headline text-sm font-semibold tracking-tight" href="/safety">Safety</Link>
-            <Link className="text-slate-600 hover:text-primary transition-colors font-headline text-sm font-semibold tracking-tight" href="/faq">FAQ</Link>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/login" className="text-slate-600 font-semibold text-sm px-4 py-2 hover:text-primary transition-all">Log In</Link>
-            <Link href="/signup" className="bg-gradient-to-br from-primary to-primary-container text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-lg shadow-primary/20 active:scale-95 transition-all">Join Now</Link>
-          </div>
-        </div>
-      </nav>
 
       <main className="pt-24 overflow-x-hidden">
         {/* Hero Section */}
@@ -365,48 +349,6 @@ export default function ReferralProgramPage() {
         </section>
       </main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-slate-100 bg-white pt-24 pb-12 px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-16 mb-24">
-          <div className="space-y-6">
-            <Link href="/" className="text-3xl font-black tracking-tighter text-primary font-headline italic">KindredCare</Link>
-            <p className="text-on-surface-variant font-medium opacity-60 leading-relaxed text-sm">
-              The premium marketplace for background-checked, professional childcare in the United States.
-            </p>
-          </div>
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-primary mb-8 italic">Marketplace</h4>
-            <ul className="space-y-4">
-               <li><Link href="/browse" className="text-on-surface-variant font-bold text-sm hover:text-secondary transition-colors">Find a Nanny</Link></li>
-               <li><Link href="/safety" className="text-on-surface-variant font-bold text-sm hover:text-secondary transition-colors">Safety Standards</Link></li>
-               <li><Link href="/referrals" className="text-on-surface-variant font-bold text-sm hover:text-secondary transition-colors">Become an Affiliate</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-primary mb-8 italic">Governance</h4>
-            <ul className="space-y-4">
-               <li><Link href="/terms" className="text-on-surface-variant font-bold text-sm hover:text-secondary transition-colors">Terms of Service</Link></li>
-               <li><Link href="/privacy" className="text-on-surface-variant font-bold text-sm hover:text-secondary transition-colors">Privacy Shield</Link></li>
-               <li><Link href="/cookies" className="text-on-surface-variant font-bold text-sm hover:text-secondary transition-colors">Cookie Preferences</Link></li>
-            </ul>
-          </div>
-          <div className="space-y-6 bg-slate-50 p-8 rounded-[2.5rem]">
-            <h4 className="text-[10px] font-black uppercase tracking-widest text-primary italic">Join our Newsletter</h4>
-            <div className="flex bg-white rounded-2xl p-2 shadow-sm border border-slate-100">
-               <input className="bg-transparent border-none outline-none flex-1 px-4 text-sm font-medium" placeholder="Email.." />
-               <button className="bg-primary text-white p-3 rounded-xl shadow-lg"><MaterialIcon name="arrow_forward" /></button>
-            </div>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto pt-10 border-t border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6">
-           <p className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant opacity-20">© 2024 KindredCare US. Securely Encrypted.</p>
-           <div className="flex gap-8 opacity-40 grayscale group hover:grayscale-0 transition-all">
-              <MaterialIcon name="security" className="text-xl" />
-              <MaterialIcon name="verified_user" className="text-xl" />
-              <MaterialIcon name="payments" className="text-xl" />
-           </div>
-        </div>
-      </footer>
     </div>
   );
 }

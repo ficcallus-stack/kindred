@@ -13,7 +13,7 @@ export default function PremiumPage() {
   const handleSubscribe = async () => {
     try {
       setIsLoading(true);
-      const { url } = await createSubscriptionSession("month");
+      const { url } = await createSubscriptionSession("plus");
       window.location.href = url;
     } catch (err: any) {
       showToast(err.message || "Something went wrong.", "error");

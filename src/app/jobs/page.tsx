@@ -1,5 +1,4 @@
 import { MaterialIcon } from "@/components/MaterialIcon";
-import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { db } from "@/db";
@@ -25,7 +24,6 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
   if (!isAuthorized) {
     return (
       <div className="bg-surface min-h-screen flex flex-col">
-        <Navbar />
         <main className="flex-1 flex flex-col items-center justify-center p-6 text-center">
           <div className="bg-error-container text-on-error-container p-6 rounded-full mb-8 shadow-xl">
              <MaterialIcon name="security" className="text-6xl" fill />
@@ -61,6 +59,7 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
     createdAt: jobs.createdAt,
     familyName: users.fullName,
     isPremium: users.isPremium,
+    subscriptionTier: users.subscriptionTier,
     scheduleType: jobs.scheduleType,
   })
   .from(jobs)
@@ -75,7 +74,6 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
 
   return (
     <div className="bg-background min-h-screen">
-      <Navbar />
 
       <div className="flex pt-20">
         {/* SideNavBar / Filters */}
@@ -119,16 +117,39 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
               </div>
             </header>
 
-            {allJobs.length > 0 ? allJobs.map((job) => (
-              <div key={job.id} className="group bg-surface-container-lowest rounded-[2.5rem] p-4 md:p-10 shadow-sm border border-outline-variant/10 hover:border-primary/20 hover:shadow-2xl transition-all flex flex-col md:flex-row gap-10 relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-2 h-full bg-secondary transition-all group-hover:w-3"></div>
+            {allJobs.length > 0 ? allJobs.map((job) => {
+              const isElite = job.subscriptionTier === 'elite';
+              const isPlus = job.subscriptionTier === 'plus';
+
+              return (
+              <div 
+                key={job.id} 
+                className={cn(
+                  "group rounded-[2.5rem] p-4 md:p-10 shadow-sm border transition-all flex flex-col md:flex-row gap-10 relative overflow-hidden",
+                  isElite 
+                    ? "bg-gradient-to-br from-white to-secondary/5 border-secondary/30 shadow-2xl shadow-secondary/10 hover:shadow-secondary/20" 
+                    : isPlus 
+                    ? "bg-gradient-to-br from-white to-primary/5 border-primary/20 shadow-xl shadow-primary/5 hover:shadow-primary/10"
+                    : "bg-surface-container-lowest border-outline-variant/10 hover:border-primary/20 hover:shadow-2xl"
+                )}
+              >
+                {/* Visual Status Bar */}
+                <div className={cn(
+                  "absolute top-0 left-0 w-2 h-full transition-all group-hover:w-3",
+                  isElite ? "bg-secondary" : isPlus ? "bg-primary" : "bg-outline-variant"
+                )}></div>
                 
-                <div className="flex-1 space-y-8">
+                <div className="flex-1 space-y-8 relative z-10">
                   <div className="flex flex-wrap items-center gap-3">
-                    {job.isPremium ? (
-                      <span className="inline-flex items-center px-4 py-1.5 bg-secondary text-white text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-secondary/20 animate-pulse border-2 border-white/20">
-                        <MaterialIcon name="diamond" className="text-lg mr-2" fill />
-                        Premium Family
+                    {isElite ? (
+                      <span className="inline-flex items-center px-4 py-1.5 bg-secondary text-white text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-secondary/20 border-2 border-white/20">
+                        <MaterialIcon name="diamond" className="text-lg mr-2 animate-bounce duration-1000" fill />
+                        Elite Family
+                      </span>
+                    ) : isPlus ? (
+                      <span className="inline-flex items-center px-4 py-1.5 bg-primary text-white text-[10px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-primary/20 border-2 border-white/20">
+                        <MaterialIcon name="verified_user" className="text-lg mr-2" fill />
+                        Plus Member
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-4 py-1.5 bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-black rounded-full uppercase tracking-widest shadow-sm">
@@ -136,17 +157,35 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                         Verified Family
                       </span>
                     )}
-                    <span className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant bg-surface-container-low px-4 py-1.5 rounded-full">Active Posting</span>
+                    {isElite && (
+                      <span className="text-[10px] font-black uppercase tracking-widest text-secondary-container bg-secondary/10 px-4 py-1.5 rounded-full flex items-center gap-1.5">
+                        <MaterialIcon name="bolt" className="text-sm" fill />
+                        Priority Posting
+                      </span>
+                    )}
                   </div>
                   
                   <div>
                     <Link href={`/jobs/${job.id}`}>
-                      <h3 className="text-3xl font-black text-primary mb-2 font-headline tracking-tight hover:underline underline-offset-8 decoration-secondary">{job.title}</h3>
+                      <h3 className={cn(
+                        "text-3xl font-black mb-2 font-headline tracking-tight hover:underline underline-offset-8 transition-all",
+                        isElite ? "text-primary decoration-secondary" : "text-primary decoration-primary/30"
+                      )}>
+                        {job.title}
+                      </h3>
                     </Link>
-                    <p className="text-on-surface-variant flex items-center gap-2 text-sm font-medium opacity-70 italic">
-                      <MaterialIcon name="family_restroom" className="text-xl text-secondary" />
-                      {job.familyName}
-                    </p>
+                    <div className="flex items-center gap-2">
+                       <p className="text-on-surface-variant flex items-center gap-2 text-sm font-medium opacity-70 italic">
+                        <MaterialIcon name="family_restroom" className={cn("text-xl", isElite ? "text-secondary" : "text-primary/50")} />
+                        {job.familyName}
+                      </p>
+                      {isElite && (
+                        <div className="flex items-center gap-1 px-2 py-0.5 bg-secondary/10 rounded-full animate-in fade-in zoom-in duration-500">
+                          <MaterialIcon name="verified" className="text-secondary text-sm" fill />
+                          <span className="text-[8px] font-black text-secondary uppercase tracking-[0.15em]">Official Elite</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-4">
@@ -159,12 +198,20 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                     <div className="flex items-center gap-8">
                       <div className="flex flex-col text-center sm:text-left">
                         <span className="text-[10px] uppercase font-black text-on-surface-variant/40 tracking-[0.2em] mb-1">Budget</span>
-                        <span className="text-3xl font-black text-primary tabular-nums">{job.budget}<span className="text-xs font-black text-slate-400 align-middle ml-1">/HR</span></span>
+                        <span className={cn(
+                          "text-3xl font-black tabular-nums",
+                          isElite ? "text-primary" : "text-primary/80"
+                        )}>
+                          {job.budget}<span className="text-xs font-black text-slate-400 align-middle ml-1">/HR</span>
+                        </span>
                       </div>
                       <div className="w-[1px] h-10 bg-outline-variant/20 hidden sm:block"></div>
                       <div className="flex flex-col text-center sm:text-left">
                         <span className="text-[10px] uppercase font-black text-on-surface-variant/40 tracking-[0.2em] mb-1">Schedule</span>
-                        <span className="text-sm font-black text-secondary flex items-center gap-2 uppercase tracking-widest mt-2">
+                        <span className={cn(
+                          "text-sm font-black flex items-center gap-2 uppercase tracking-widest mt-2",
+                          isElite ? "text-secondary" : "text-primary/60"
+                        )}>
                           <MaterialIcon name={job.scheduleType === 'recurring' ? 'sync' : 'event'} className="text-lg" />
                           {job.scheduleType === 'recurring' ? 'Recurring' : 'One-time'}
                         </span>
@@ -179,7 +226,12 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                       </Link>
                       <Link 
                         href={`/jobs/${job.id}/apply`}
-                        className="flex-1 sm:flex-none px-10 py-5 bg-primary text-on-primary font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1 transition-all text-center"
+                        className={cn(
+                          "flex-1 sm:flex-none px-10 py-5 font-black uppercase tracking-widest text-xs rounded-2xl shadow-xl transition-all text-center",
+                          isElite 
+                            ? "bg-primary text-on-primary shadow-primary/20 hover:shadow-secondary/40 hover:-translate-y-1" 
+                            : "bg-primary text-on-primary shadow-primary/20 hover:shadow-primary/40 hover:-translate-y-1"
+                        )}
                       >
                         Apply Now
                       </Link>
@@ -187,7 +239,8 @@ export default async function JobsPage({ searchParams }: { searchParams: Promise
                   </div>
                 </div>
               </div>
-            )) : (
+            );
+            }) : (
               <div className="py-40 flex flex-col items-center justify-center text-center opacity-30 italic">
                 <MaterialIcon name="work_off" className="text-8xl mb-6" />
                 <h3 className="text-3xl font-black font-headline text-primary">No Jobs Currently Posted</h3>

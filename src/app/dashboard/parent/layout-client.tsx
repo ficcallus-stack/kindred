@@ -1,10 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import { ResumeJobBanner } from "@/components/dashboard/ResumeJobBanner";
+import { 
+  LayoutDashboard, 
+  Briefcase, 
+  Calendar, 
+  MessageSquare, 
+  Wallet, 
+  HelpCircle,
+  ShieldCheck,
+  Diamond,
+  PlusCircle,
+  Home as HouseholdIcon,
+  HelpCircle as SupportIcon,
+  LogOut
+} from "lucide-react";
 
 interface ParentDashboardLayoutProps {
   children: React.ReactNode;
@@ -12,10 +26,10 @@ interface ParentDashboardLayoutProps {
 }
 
 const NAV_ITEMS = [
-  { id: "overview", label: "Family Hub", icon: "dashboard", href: "/dashboard/parent" },
-  { id: "jobs", label: "Job Postings", icon: "work", href: "/dashboard/parent/jobs" },
+  { id: "overview", label: "Family Hub", icon: "grid_view", href: "/dashboard/parent" },
+  { id: "jobs", label: "Job Postings", icon: "work_outline", href: "/dashboard/parent/jobs" },
   { id: "bookings", label: "Bookings", icon: "calendar_today", href: "/dashboard/parent/bookings" },
-  { id: "messages", label: "Messages", icon: "chat", href: "/dashboard/messages" },
+  { id: "messages", label: "Messages", icon: "chat_bubble_outline", href: "/dashboard/messages" },
   { id: "wallet", label: "Billing & Credits", icon: "account_balance_wallet", href: "/dashboard/parent/wallet" },
   { id: "help", label: "Help Center", icon: "help_outline", href: "/dashboard/parent/help" },
 ];
@@ -27,57 +41,7 @@ export default function ParentDashboardLayout({ children, user }: ParentDashboar
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen antialiased pb-24 md:pb-0">
       <ResumeJobBanner />
-      {/* Top Navigation Bar */}
-      <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md shadow-sm shadow-blue-900/5 h-20">
-        <div className="flex justify-between items-center px-4 md:px-8 h-full w-full max-w-screen-2xl mx-auto">
-          <div className="flex items-center gap-12">
-            <Link href="/" className="text-xl font-bold text-blue-900 italic font-headline truncate group transition-all">
-              KindredCare US
-            </Link>
-            <div className="hidden md:flex gap-8 font-headline text-sm font-semibold tracking-tight">
-              <Link href="#" className="text-slate-500 hover:text-blue-700 transition-colors">How it Works</Link>
-              <Link href="#" className="text-slate-500 hover:text-blue-700 transition-colors">Help</Link>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-6">
-            <div className="flex items-center gap-1 md:gap-4 text-slate-500">
-              <Link 
-                href="/dashboard/parent/verification" 
-                className={cn(
-                  "p-2 hover:bg-slate-50 rounded-lg transition-all active:scale-95 flex items-center gap-2",
-                  pathname.includes("verification") ? "text-primary bg-primary/5" : ""
-                )}
-                title="Account Verification"
-              >
-                <MaterialIcon name="verified_user" className="text-xl md:text-2xl" />
-                <span className="hidden lg:block text-[10px] font-black uppercase tracking-widest">Verify</span>
-              </Link>
-              <Link 
-                href="/dashboard/messages" 
-                className={cn(
-                  "p-2 hover:bg-slate-50 rounded-lg transition-all active:scale-95 flex items-center gap-2 relative",
-                  pathname.includes("messages") ? "text-primary bg-primary/5" : ""
-                )}
-                title="Messages"
-              >
-                <MaterialIcon name="chat_bubble" className="text-xl md:text-2xl" />
-                <span className="hidden lg:block text-[10px] font-black uppercase tracking-widest">Inbox</span>
-                <div className="absolute top-1.5 right-1.5 w-2 h-2 bg-secondary rounded-full border-2 border-white"></div>
-              </Link>
-              <button className="p-2 hover:bg-slate-50 rounded-lg transition-all active:scale-95">
-                <MaterialIcon name="notifications" className="text-xl md:text-2xl" />
-              </button>
-            </div>
-            <div className="h-9 w-9 md:h-10 md:w-10 rounded-full bg-slate-200 overflow-hidden ring-2 ring-primary/5 shadow-sm group cursor-pointer">
-              <img 
-                alt="User profile" 
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.fullName}`}
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform"
-              />
-            </div>
-          </div>
-        </div>
-      </nav>
+      {/* Global Navbar is now handled in RootLayout */}
 
       <div className="flex pt-20 min-h-screen relative">
         {/* Side Navigation Bar (Desktop Only) */}
@@ -91,7 +55,7 @@ export default function ParentDashboardLayout({ children, user }: ParentDashboar
                     {user?.photoURL ? (
                       <img src={user.photoURL} alt="Family" className="w-full h-full object-cover" />
                     ) : (
-                      <MaterialIcon name="household" fill />
+                      <HouseholdIcon size={20} />
                     )}
                   </div>
                   <div className="min-w-0">
@@ -100,7 +64,7 @@ export default function ParentDashboardLayout({ children, user }: ParentDashboar
                     </p>
                     {user.isPremium ? (
                       <div className="flex items-center gap-1 text-secondary animate-pulse mt-1">
-                        <MaterialIcon name="diamond" className="text-[12px]" fill />
+                        <Diamond size={12} className="fill-secondary" />
                         <p className="text-[10px] font-black uppercase tracking-wider">Premium Member</p>
                       </div>
                     ) : (
@@ -136,7 +100,7 @@ export default function ParentDashboardLayout({ children, user }: ParentDashboar
                       : "text-slate-600 hover:text-blue-900 hover:translate-x-1"
                   )}
                 >
-                  <MaterialIcon name={item.icon} fill={pathname === item.href} />
+                  <MaterialIcon name={item.icon} className={cn("transition-all", pathname === item.href ? "opacity-100" : "opacity-40")} />
                   <span>{item.label}</span>
                 </Link>
               ))}
@@ -146,20 +110,21 @@ export default function ParentDashboardLayout({ children, user }: ParentDashboar
                   href="/dashboard/parent/post-job"
                   className="block w-full py-4 bg-primary text-white rounded-2xl font-headline font-black uppercase tracking-widest text-[10px] shadow-xl shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all text-center"
                 >
+                  <PlusCircle size={14} className="inline-block mr-2" />
                   Post a New Job
                 </Link>
               </div>
             </div>
 
             <div className="p-6 border-t border-slate-200/50 flex flex-col gap-4">
-              <Link href="#" className="flex items-center gap-3 text-slate-500 font-headline text-sm font-medium hover:text-blue-900 transition-colors">
-                <MaterialIcon name="contact_support" /> Support
+              <Link href="/dashboard/support" className="flex items-center gap-3 text-slate-500 font-headline text-sm font-medium hover:text-blue-900 transition-colors">
+                <SupportIcon size={18} /> Support
               </Link>
               <button 
                 onClick={() => window.location.href = "/login"}
                 className="flex items-center gap-3 text-slate-500 font-headline text-sm font-medium hover:text-blue-900 transition-colors w-full text-left"
               >
-                <MaterialIcon name="logout" className="text-secondary" /> Sign Out
+                <LogOut size={18} className="text-secondary" /> Sign Out
               </button>
             </div>
           </aside>
@@ -167,7 +132,7 @@ export default function ParentDashboardLayout({ children, user }: ParentDashboar
 
         {/* Main Content Area */}
         <main className={cn("flex-grow bg-surface-container-low min-h-full transition-all overflow-hidden")}>
-          <div className="max-w-7xl mx-auto">
+          <div className={cn(isPostJob ? "w-full" : "max-w-7xl mx-auto")}>
             {children}
           </div>
         </main>

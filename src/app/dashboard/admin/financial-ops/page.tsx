@@ -1,11 +1,13 @@
 import { getPayoutRequests, getPayoutLedger, getAdminDashboardSummary } from "../actions";
+import { getFinancialAnalyticsData } from "./analyticsActions";
 import FinancialOpsClient from "./FinancialOpsClient";
 
 export default async function FinancialOpsPage() {
-  const [pending, ledger, summary] = await Promise.all([
+  const [pending, ledger, summary, analyticsData] = await Promise.all([
     getPayoutRequests(),
     getPayoutLedger(),
     getAdminDashboardSummary(),
+    getFinancialAnalyticsData()
   ]);
 
   return (
@@ -31,7 +33,8 @@ export default async function FinancialOpsPage() {
       <FinancialOpsClient 
         pending={pending} 
         ledger={ledger} 
-        summary={summary} 
+        summary={summary}
+        analyticsData={analyticsData}
       />
     </div>
   );

@@ -36,6 +36,48 @@
       "when": 1774472707837,
       "tag": "0004_bizarre_gambit",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775311099286,
+      "tag": "0005_red_scarlet_witch",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775439448929,
+      "tag": "0006_complex_talkback",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775503943806,
+      "tag": "0007_black_sleepwalker",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775513512899,
+      "tag": "0008_overrated_krista_starr",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1775719627478,
+      "tag": "0009_noisy_fabian_cortez",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1775722683513,
+      "tag": "0010_reflective_mindworm",
+      "breakpoints": true
     }
   ]
 }

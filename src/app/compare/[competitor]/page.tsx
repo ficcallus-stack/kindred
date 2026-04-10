@@ -1,8 +1,6 @@
 import { Metadata } from 'next';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
-import FAQSchema from '@/components/seo/FAQSchema';
 import { MaterialIcon } from '@/components/MaterialIcon';
+import FAQSchema from "@/components/seo/FAQSchema";
 
 export async function generateMetadata({ params }: { params: { competitor: string } }): Promise<Metadata> {
   const competitor = params.competitor.replace(/-/g, '.');
@@ -30,7 +28,6 @@ export default function ComparePage({ params }: { params: { competitor: string }
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen flex flex-col">
-      <Navbar />
       <FAQSchema faqs={faqs} />
 
       <main className="pt-32 pb-24 px-6 flex-1 max-w-5xl mx-auto w-full">
@@ -91,7 +88,6 @@ export default function ComparePage({ params }: { params: { competitor: string }
 
       </main>
 
-      <Footer />
     </div>
   );
 }

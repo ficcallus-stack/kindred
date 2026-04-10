@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 export async function updateParentProfileAction(data: {
   familyName: string;
   bio: string;
+  philosophy: string;
   location: string;
   familyPhoto: string;
   latitude?: number;
@@ -28,6 +29,7 @@ export async function updateParentProfileAction(data: {
       .set({
         familyName: data.familyName,
         bio: data.bio,
+        philosophy: data.philosophy,
         location: data.location,
         familyPhoto: data.familyPhoto,
         latitude: data.latitude?.toString(),
@@ -40,6 +42,7 @@ export async function updateParentProfileAction(data: {
       id: userId,
       familyName: data.familyName,
       bio: data.bio,
+      philosophy: data.philosophy,
       location: data.location,
       familyPhoto: data.familyPhoto,
       latitude: data.latitude?.toString(),

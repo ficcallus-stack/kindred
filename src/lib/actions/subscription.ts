@@ -7,15 +7,13 @@ import { users as usersTable } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
-const MONTHLY_PRICE_CENTS = 2300;
-const ANNUAL_PRICE_CENTS = 15000;
-const PREMIUM_PRODUCT_NAME_MONTHLY = "Kindred Premium Parent (Monthly)";
-const PREMIUM_PRODUCT_NAME_ANNUAL = "Kindred Premium Parent (Annual)";
+const PLUS_PRICE_CENTS = 2900;
+const ELITE_PRICE_CENTS = 5900;
 
 /**
- * Creates a Stripe Checkout Session for the Parent Premium subscription.
+ * Creates a Stripe Checkout Session for a specific subscription tier.
  */
-export async function createSubscriptionSession(interval: "month" | "year" = "month") {
+export async function createSubscriptionSession(tier: "plus" | "elite" = "plus") {
   const user = await requireUser();
 
   const dbUser = await db.query.users.findFirst({
@@ -27,42 +25,52 @@ export async function createSubscriptionSession(interval: "month" | "year" = "mo
   }
 
   // 1. Get or Create Product & Price
-  const productName = interval === "month" ? PREMIUM_PRODUCT_NAME_MONTHLY : PREMIUM_PRODUCT_NAME_ANNUAL;
-  const priceCents = interval === "month" ? MONTHLY_PRICE_CENTS : ANNUAL_PRICE_CENTS;
+  const productName = tier === "plus" ? "Kindred Plus" : "Kindred Elite";
+  const priceCents = tier === "plus" ? PLUS_PRICE_CENTS : ELITE_PRICE_CENTS;
   
   let priceId = "";
 
-  // Search for existing price
-  const prices = await stripe.prices.list({
-    limit: 20,
-    active: true,
-    expand: ["data.product"],
-  });
+  // Import constants
+  const { STRIPE_PLUS_PRICE_ID, STRIPE_ELITE_PRICE_ID } = await import("@/lib/stripe");
+  const configPriceId = tier === "plus" ? STRIPE_PLUS_PRICE_ID : STRIPE_ELITE_PRICE_ID;
 
-  const existingPrice = prices.data.find(
-    (p) => 
-      (p.product as any).name === productName && 
-      p.unit_amount === priceCents &&
-      p.recurring?.interval === interval
-  );
-
-  if (existingPrice) {
-    priceId = existingPrice.id;
+  // Use config ID if it's not a placeholder
+  if (configPriceId && !configPriceId.includes("placeholder")) {
+    priceId = configPriceId;
   } else {
-    // Create new product and price
-    const product = await stripe.products.create({
-      name: productName,
-      description: "Unlimited real-time messaging, featured profile status, and priority support.",
+    // Dynamic search fallback
+    const prices = await stripe.prices.list({
+      limit: 20,
+      active: true,
+      expand: ["data.product"],
     });
 
-    const price = await stripe.prices.create({
-      unit_amount: priceCents,
-      currency: "usd",
-      recurring: { interval: interval },
-      product: product.id,
-    });
+    const existingPrice = prices.data.find(
+      (p) => 
+        (p.product as any).name === productName && 
+        p.unit_amount === priceCents
+    );
 
-    priceId = price.id;
+    if (existingPrice) {
+      priceId = existingPrice.id;
+    } else {
+      // Create new product and price
+      const product = await stripe.products.create({
+        name: productName,
+        description: tier === "plus" 
+          ? "Unlimited messaging and professional priority access."
+          : "Automatic job boosting, priority placement, and exclusive concierge access.",
+      });
+
+      const price = await stripe.prices.create({
+        unit_amount: priceCents,
+        currency: "usd",
+        recurring: { interval: "month" },
+        product: product.id,
+      });
+
+      priceId = price.id;
+    }
   }
 
   // 2. Ensure Stripe Customer Exists
@@ -99,12 +107,14 @@ export async function createSubscriptionSession(interval: "month" | "year" = "mo
     subscription_data: {
       metadata: {
         userId: user.uid,
+        tier: tier,
       },
     },
     success_url: `${origin}/dashboard/parent/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/dashboard/parent/subscription?canceled=true`,
     metadata: {
       userId: user.uid,
+      tier: tier,
     },
   });
 
@@ -123,6 +133,7 @@ export async function getSubscriptionStatus() {
     columns: {
       isPremium: true,
       subscriptionStatus: true,
+      subscriptionTier: true,
       stripeSubscriptionId: true,
     }
   });

@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { StripeProvider } from "@/components/StripeProvider";
+import { EmbeddedCheckout } from "./EmbeddedCheckout";
 
 interface PaymentStepProps {
   booking: any;
@@ -14,153 +16,240 @@ interface PaymentStepProps {
 export function PaymentStep({ booking, nanny, savedCards }: PaymentStepProps) {
   const [loading, setLoading] = useState(false);
   
-  // Calculations
-  const hourlyRate = parseFloat(nanny.hourlyRate) || 0;
-  const days = Math.ceil(Math.abs(new Date(booking.endDate).getTime() - new Date(booking.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const subtotal = days * booking.hoursPerDay * hourlyRate;
-  const platformFee = subtotal * 0.025;
-  const total = subtotal + platformFee;
+  // Pricing Constants (Align with booking-actions.ts)
+  const EXTRA_CHILD_HOURLY = 5;
+  const EXTRA_CHILD_WEEKLY = 150;
+  const STRIPE_FEE_RATE = 0.029;
+  const KINDRED_FEE_RATE = 0.046;
+
+  // Re-calculate breakdown for display
+  const hourlyRate = parseFloat(nanny.hourlyRate) || 35;
+  const weeklyRate = parseFloat(nanny.weeklyRate) || 1200;
+  const isRetainer = booking.hiringMode === "retainer";
+  const extraChildren = Math.max(0, booking.childCount - 1);
+  
+  const totalHours = isRetainer ? 40 : (Object.values(booking.refinedSchedule || {}).filter(Boolean).length * 4);
+  const baseCare = isRetainer ? weeklyRate : (totalHours * hourlyRate);
+  const extraChildPremium = extraChildren * (isRetainer ? EXTRA_CHILD_WEEKLY : (totalHours * EXTRA_CHILD_HOURLY));
+  
+  const subtotal = baseCare + extraChildPremium;
+  const stripeFee = subtotal * STRIPE_FEE_RATE;
+  const kindredFee = subtotal * KINDRED_FEE_RATE;
+  const total = subtotal + stripeFee + kindredFee;
+
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
 
   const handleSecureFunds = async () => {
+    if (clientSecret) return; // Already initialized
+
     setLoading(true);
     try {
-      const { createFinalPaymentSession } = await import("@/lib/actions/booking-actions");
-      const { url } = await createFinalPaymentSession({ bookingId: booking.id });
-      if (url) window.location.href = url;
+      const { createBookingPaymentIntentAction } = await import("@/lib/actions/booking-actions");
+      const res = await createBookingPaymentIntentAction({ bookingId: booking.id });
+      if (res.clientSecret) {
+        setClientSecret(res.clientSecret);
+      }
     } catch (err) {
-      alert("Payment session failed. Please try again.");
+      console.error(err);
+      alert("Payment initialization failed. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-      {/* LHS: Payment & Security */}
-      <div className="lg:col-span-7 space-y-8">
-        <section className="space-y-6">
-          <h1 className="font-headline text-4xl font-extrabold text-primary tracking-tight">Secure Escrow Payment</h1>
-          <p className="text-on-surface-variant text-lg leading-relaxed max-w-xl">
-            Your trust is our priority. We use a secure escrow system to ensure your funds are protected until the service is successfully completed.
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-16 items-start animate-in fade-in slide-in-from-bottom-6 duration-1000">
+      
+      {/* Left Side: Content & Payment */}
+      <div className="lg:col-span-7 space-y-12">
+        <header className="space-y-4">
+          <h1 className="text-5xl font-extrabold tracking-tight text-primary font-headline leading-tight italic">Secure your booking.</h1>
+          <p className="text-xl text-on-surface-variant font-body leading-relaxed max-w-xl">
+              Your payment is held in a protected escrow account and only released when the care session is successfully completed.
           </p>
+        </header>
+
+        {/* Peace of Mind Guarantee */}
+        <div className="bg-tertiary rounded-[2.5rem] p-10 flex flex-col md:flex-row gap-8 items-start relative overflow-hidden group shadow-xl shadow-tertiary/20">
+          <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:scale-110 transition-transform duration-700">
+            <MaterialIcon name="security" className="text-9xl" />
+          </div>
+          <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:rotate-12">
+            <MaterialIcon name="verified_user" className="text-primary text-4xl" fill />
+          </div>
+          <div className="relative z-10">
+            <h3 className="text-2xl font-bold text-primary font-headline mb-3 italic">Peace of Mind Guarantee</h3>
+            <p className="text-on-tertiary/70 leading-relaxed mb-6 font-medium">
+              KindredCare holds your payment in a neutral account. Funds are only transferred once you confirm the care was provided. If your caregiver cancels, you get a 100% immediate refund.
+            </p>
+            <div className="flex flex-wrap gap-6">
+              <span className="flex items-center gap-2 text-[10px] font-black text-on-tertiary uppercase tracking-wider">
+                <MaterialIcon name="check_circle" className="text-lg" fill /> 100% Refundable
+              </span>
+              <span className="flex items-center gap-2 text-[10px] font-black text-on-tertiary uppercase tracking-wider">
+                <MaterialIcon name="lock" className="text-lg" fill /> Bank-Grade Security
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Select Payment Method */}
+        <section className="space-y-8">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-primary font-headline italic">Selection & Security</h2>
+          </div>
+          
+          <AnimatePresence mode="wait">
+            {!clientSecret ? (
+              <motion.div 
+                key="placeholder"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
+                <button 
+                  onClick={handleSecureFunds}
+                  disabled={loading}
+                  className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-outline-variant rounded-[1rem] hover:border-secondary hover:bg-secondary/5 transition-all group active:scale-95 disabled:opacity-50"
+                >
+                  <div className="w-14 h-14 rounded-full bg-surface-container-low flex items-center justify-center text-primary group-hover:bg-secondary group-hover:text-white transition-all mb-4">
+                    {loading ? (
+                      <div className="w-6 h-6 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+                    ) : (
+                      <MaterialIcon name="add_card" className="text-3xl" />
+                    )}
+                  </div>
+                  <span className="font-bold text-primary uppercase text-[10px] tracking-widest leading-none">Initialize Secure Payment</span>
+                  <span className="text-[10px] text-on-surface-variant/60 mt-2 font-black uppercase tracking-tighter">Credit, Debit, or Apple Pay</span>
+                </button>
+                <div className="hidden md:flex flex-col items-center justify-center p-8 bg-surface-container-low/30 rounded-[1rem] border border-outline-variant/30 opacity-40">
+                  <MaterialIcon name="shield" className="text-4xl mb-2 text-primary" fill />
+                  <span className="text-[9px] font-black uppercase tracking-widest">End-to-End Encrypted</span>
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="checkout"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="bg-white p-1 rounded-[1.5rem]"
+              >
+                <StripeProvider clientSecret={clientSecret}>
+                  <EmbeddedCheckout bookingId={booking.id} />
+                </StripeProvider>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </section>
 
-        {/* Escrow Explanation Card */}
-        <div className="bg-tertiary-fixed/30 p-8 rounded-2xl flex gap-6 items-start">
-          <div className="bg-tertiary-container text-on-tertiary rounded-xl p-3 flex items-center justify-center">
-            <MaterialIcon name="verified_user" fill />
+        {/* Trust Badges */}
+        <div className="pt-8 border-t border-outline-variant/40 flex flex-wrap gap-12">
+          <div className="flex items-center gap-3 opacity-60 grayscale hover:grayscale-0 transition-all">
+            <MaterialIcon name="enhanced_encryption" className="text-primary text-3xl" />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">AES-256 Encryption</span>
           </div>
-          <div>
-            <h3 className="font-headline text-lg font-bold text-on-tertiary-fixed">Peace of Mind Guarantee</h3>
-            <p className="text-on-tertiary-fixed-variant mt-2 leading-relaxed">
-              Funds are held securely in escrow and released only after care is completed. <span className="font-bold">100% refund</span> if the booking is cancelled according to our flexible policy.
-            </p>
+          <div className="flex items-center gap-3 opacity-60 grayscale hover:grayscale-0 transition-all">
+            <MaterialIcon name="payments" className="text-primary text-3xl" fill />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">Stripe Secure</span>
           </div>
-        </div>
-
-        {/* Payment Method Selection */}
-        <div className="space-y-4">
-          <h2 className="font-headline text-xl font-bold text-primary">Select Payment Method</h2>
-          <div className="space-y-3">
-            {savedCards.length > 0 ? (
-              savedCards.map((card, idx) => (
-                <label key={card.id} className="group relative flex items-center justify-between p-5 bg-white border-2 border-transparent rounded-xl cursor-pointer hover:bg-surface-container-low transition-all has-[:checked]:border-secondary-container has-[:checked]:bg-white shadow-sm">
-                  <input defaultChecked={idx === 0} className="sr-only" name="payment_method" type="radio"/>
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-8 bg-surface-container rounded flex items-center justify-center overflow-hidden">
-                       <MaterialIcon name="credit_card" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-on-surface uppercase">{card.card.brand} ending in {card.card.last4}</p>
-                      <p className="text-xs text-on-surface-variant">Expires {card.card.exp_month}/{card.card.exp_year}</p>
-                    </div>
-                  </div>
-                  <div className="w-5 h-5 rounded-full border-2 border-outline-variant group-has-[:checked]:border-secondary-container group-has-[:checked]:bg-secondary-container flex items-center justify-center">
-                    <div className="w-2 h-2 rounded-full bg-white opacity-0 group-has-[:checked]:opacity-100"></div>
-                  </div>
-                </label>
-              ))
-            ) : (
-              <div className="p-10 text-center bg-white rounded-2xl border-2 border-dashed border-outline-variant/30 text-on-surface-variant font-medium">
-                No saved cards yet. Please add one below.
-              </div>
-            )}
-            
-            <button 
-              onClick={handleSecureFunds}
-              className="w-full flex items-center justify-center gap-2 p-5 border-2 border-dashed border-outline-variant/50 rounded-xl text-on-surface-variant font-medium hover:border-primary/30 hover:text-primary transition-all"
-            >
-              <MaterialIcon name="add_circle" />
-              Add New Payment Method
-            </button>
-          </div>
-        </div>
-
-        {/* Security Badges */}
-        <div className="flex flex-wrap gap-4 pt-4 items-center opacity-50 grayscale">
-          <div className="flex items-center gap-2 px-4 py-2 bg-surface-container-low rounded-full">
-            <MaterialIcon name="lock" className="text-sm" />
-            <span className="text-[10px] font-black uppercase tracking-widest leading-none">Bank-grade Encryption</span>
-          </div>
-          <div className="flex items-center gap-2 px-4 py-2 bg-surface-container-low rounded-full">
-            <MaterialIcon name="shield_with_heart" className="text-sm" />
-            <span className="text-[10px] font-black uppercase tracking-widest leading-none">Stripe Secure</span>
+          <div className="flex items-center gap-3 opacity-60 grayscale hover:grayscale-0 transition-all">
+            <MaterialIcon name="verified" className="text-primary text-3xl" />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary">PCI DSS Compliant</span>
           </div>
         </div>
       </div>
 
-      {/* RHS Summary Card */}
-      <aside className="lg:col-span-5 sticky top-32">
-        <div className="bg-white rounded-3xl p-8 shadow-xl border border-outline-variant/10 space-y-8 relative overflow-hidden">
-          <div>
-            <h2 className="font-headline text-2xl font-bold text-primary mb-6">Booking Summary</h2>
-            <div className="flex items-center gap-5 mb-8">
-              <div className="relative w-24 h-24">
-                 <div className="w-full h-full bg-primary-container rounded-2xl rotate-[-3deg] shadow-lg overflow-hidden" />
-                 <div className="absolute -bottom-2 -right-2 bg-green-500 w-5 h-5 rounded-full border-4 border-white"></div>
+      {/* Right Side: Sticky Summary Sidebar */}
+      <aside className="lg:col-span-5 lg:sticky lg:top-28">
+        <div className="bg-white rounded-[2.5rem] shadow-[0_32px_64px_-16px_rgba(29,53,87,0.1)] p-10 border border-outline-variant/20 relative overflow-hidden group">
+          <div className="text-center mb-10">
+            <span className="text-[10px] font-black text-secondary uppercase tracking-[0.3em] block mb-4">Booking Summary</span>
+            <h3 className="text-2xl font-bold text-primary font-headline italic tracking-tighter">Professional Home Care</h3>
+          </div>
+
+          <div className="flex items-center gap-6 mb-12 p-6 bg-surface rounded-[1rem] border border-outline-variant/30 shadow-sm">
+            <div className="relative shrink-0">
+              <div className="w-20 h-20 rounded-2xl overflow-hidden shadow-md skew-x-1 rotate-1 border-2 border-white">
+                <img alt={nanny.name} className="w-full h-full object-cover" src={`https://api.dicebear.com/7.x/initials/svg?seed=${nanny.name}`} />
               </div>
-              <div>
-                <p className="text-[9px] font-black italic text-secondary uppercase tracking-[0.2em] mb-1">Premium Caregiver</p>
-                <h3 className="font-headline text-2xl font-black italic text-primary">{nanny.name}</h3>
-                <div className="flex items-center text-sm font-bold opacity-60">
-                   Brooklyn, NY
-                </div>
+              <div className="absolute -bottom-2 -right-2 bg-secondary text-white p-1 rounded-full shadow-lg">
+                <MaterialIcon name="verified" className="text-sm block" fill />
               </div>
             </div>
-
-            <div className="space-y-4 border-y border-outline-variant/10 py-6">
-              <div className="flex justify-between items-center">
-                 <span className="text-sm font-black opacity-40 uppercase tracking-widest">Rate</span>
-                 <span className="font-black italic text-primary">${hourlyRate}/hr</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-on-surface-variant font-medium">Platform Fee (2.5%)</span>
-                <span className="font-bold text-on-surface">${platformFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between items-end pt-4">
-                <div>
-                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-secondary font-label mb-1">Total to Escrow</p>
-                   <p className="font-headline text-5xl font-black italic tracking-tighter text-primary">${total.toFixed(2)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[9px] text-on-surface-variant uppercase font-black tracking-tighter opacity-40">Fully Refundable*</p>
-                </div>
+            <div>
+              <h4 className="font-headline font-black italic text-primary text-2xl mb-1">{nanny.name}</h4>
+              <div className="flex items-center gap-1.5 opacity-60 font-black uppercase text-[9px] tracking-widest text-slate-400">
+                 Verified Premium Partner
               </div>
             </div>
           </div>
 
-          <button 
-            onClick={handleSecureFunds}
-            disabled={loading}
-            className="w-full bg-primary text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] shadow-2xl shadow-primary/20 hover:scale-[1.02] transition-all flex items-center justify-center gap-3"
-          >
-            <MaterialIcon name="lock" fill />
-            {loading ? "Authorizing..." : "Secure Funds & Finalize"}
-          </button>
-          <p className="text-[9px] text-center text-on-surface-variant px-4 opacity-50 font-bold uppercase leading-relaxed">
-            By clicking, you authorize KindredCare to hold these funds. They will be transferred only after the care period ends.
+          <div className="space-y-5 mb-10">
+            <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest">
+              <span className="text-on-surface-variant font-medium">Base Care Rate</span>
+              <span className="text-primary">${baseCare.toFixed(2)}</span>
+            </div>
+            {extraChildPremium > 0 && (
+               <div className="flex justify-between items-center text-[11px] font-black uppercase tracking-widest text-secondary">
+                 <span className="font-medium">Additional Child (x{extraChildren})</span>
+                 <span>+${extraChildPremium.toFixed(2)}</span>
+               </div>
+            )}
+            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-300 italic">
+              <span className="font-medium font-inter">Stripe Processing (2.9%)</span>
+              <span className="font-plus-jakarta">${stripeFee.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-slate-300 italic">
+              <span className="font-medium font-inter">Kindred Platform Fee (4.6%)</span>
+              <span className="font-plus-jakarta">${kindredFee.toFixed(2)}</span>
+            </div>
+            
+            <div className="pt-8 border-t border-outline-variant/60">
+              <div className="flex justify-between items-baseline mb-2">
+                <span className="text-[10px] font-black text-primary uppercase tracking-widest">Total to Escrow</span>
+                <span className="text-5xl font-black text-primary font-headline tracking-tighter leading-none italic">${total.toFixed(0)}</span>
+              </div>
+              <div className="flex justify-end mt-2">
+                <span className="text-[9px] font-black text-white bg-secondary px-3 py-1 rounded-full uppercase tracking-widest">100% REFUNDABLE</span>
+              </div>
+            </div>
+          </div>
+
+          {!clientSecret && (
+            <button 
+              onClick={handleSecureFunds}
+              disabled={loading}
+              className="w-full py-6 bg-primary text-white rounded-2xl font-headline font-black text-lg uppercase tracking-[0.1em] flex items-center justify-center gap-3 shadow-2xl shadow-primary/20 hover:bg-primary-container hover:-translate-y-1 active:scale-95 transition-all mb-6 group"
+            >
+              {loading ? (
+                 <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                 <>
+                   <MaterialIcon name="lock" className="text-xl group-hover:rotate-12 transition-transform" />
+                   Secure Funds & Finalize
+                 </>
+              )}
+            </button>
+          )}
+          
+          <p className="text-[10px] leading-relaxed text-on-surface-variant/40 text-center italic font-inter px-4 font-bold uppercase tracking-widest">
+            By securing funds, you authorize KindredCare to hold this amount. 
+             Payment is only released to {nanny.name.split(" ")[0]} after the session ends.
           </p>
         </div>
+
+        <div className="mt-8 bg-secondary-fixed/20 p-6 rounded-[2rem] border border-secondary/10 flex gap-4">
+           <MaterialIcon name="verified_user" className="text-secondary" fill />
+           <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-primary">High-Trust Platform</p>
+              <p className="text-[10px] text-on-surface-variant font-medium leading-relaxed mt-1">
+                 Kindred handles the taxes, background checks, and professional payments so you can focus on your family.
+              </p>
+           </div>
+        </div>
       </aside>
+
     </div>
   );
 }

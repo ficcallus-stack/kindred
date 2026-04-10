@@ -3,7 +3,7 @@
 import { stripe } from "@/lib/stripe";
 import { db } from "@/db";
 import { wallets, walletTransactions, users as usersTable } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { requireUser } from "@/lib/get-server-user";
 
 /**
@@ -50,6 +50,16 @@ export async function getStripeConnectOnboarding(dashboardPath: string) {
       id: user.uid,
       balance: 0,
     }).onConflictDoNothing();
+  } else {
+    // 1b. REPAIR STEP: Ensure capabilities are requested for existing accounts
+    // This prevents "insufficient_capabilities_for_transfer" errors if the account link was created 
+    // before the transfers capability requirement was added.
+    await stripe.accounts.update(stripeId, {
+      capabilities: {
+        card_payments: { requested: true },
+        transfers: { requested: true },
+      },
+    });
   }
 
   // 2. Create account link
@@ -108,8 +118,8 @@ export async function withdrawFunds(amountCents: number) {
     .from(wallets)
     .where(eq(wallets.id, user.uid));
 
-  if (!wallet || wallet.balance < amountCents) {
-    throw new Error("Insufficient balance");
+  if (!wallet) {
+    throw new Error("Wallet not found");
   }
 
   const dbUser = await db.query.users.findFirst({
@@ -117,24 +127,52 @@ export async function withdrawFunds(amountCents: number) {
   });
 
   if (!dbUser?.stripeConnectId) {
-    throw new Error("Payout method not configured");
+    throw new Error("Payout method not configured. Please link your bank via Stripe Connect first.");
   }
 
-  // 1. Subtract from wallet immediately (Lock balance)
-  await db.update(wallets)
-    .set({ balance: wallet.balance - amountCents })
-    .where(eq(wallets.id, user.uid));
+  // 3. Dynamic Fee Logic (Friday = Free, Else = 1.5% Instant Fee)
+  const isFriday = new Date().getDay() === 5;
+  const instantFeeCents = isFriday ? 0 : Math.round(amountCents * 0.015);
+  const totalDeductionCents = amountCents + instantFeeCents;
 
-  // 2. Create pending transaction
-  await db.insert(walletTransactions).values({
-    walletId: user.uid,
-    amount: amountCents,
-    type: "withdrawal",
-    status: "pending",
-    description: "Manual Withdrawal - Pending Admin Approval",
+  if (wallet.balance < totalDeductionCents) {
+    throw new Error(`Insufficient balance for withdrawal + fee ($${(instantFeeCents / 100).toFixed(2)})`);
+  }
+
+  // Atomic balance deduction inside a transaction to prevent double-spend.
+  return await db.transaction(async (tx) => {
+    const result = await tx.update(wallets)
+      .set({ 
+        balance: sql`${wallets.balance} - ${totalDeductionCents}`,
+        processingBalance: sql`${wallets.processingBalance} + ${amountCents}`
+      })
+      .where(
+        sql`${wallets.id} = ${user.uid} AND ${wallets.balance} >= ${totalDeductionCents}`
+      )
+      .returning();
+
+    if (result.length === 0) {
+      throw new Error("Insufficient balance (concurrent withdrawal detected)");
+    }
+
+    // Create pending transaction
+    await tx.insert(walletTransactions).values({
+      walletId: user.uid,
+      amount: amountCents,
+      type: "withdrawal",
+      status: "pending",
+      description: isFriday 
+        ? "Payday Friday Withdrawal (Free)" 
+        : `Instant Transfer Withdrawal (1.5% Fee: $${(instantFeeCents / 100).toFixed(2)})`,
+    });
+
+    return { 
+      success: true, 
+      message: isFriday 
+        ? "Payday Friday request submitted!" 
+        : `Instant Transfer submitted ($${(instantFeeCents / 100).toFixed(2)} fee applied)` 
+    };
   });
-
-  return { success: true, message: "Withdrawal request submitted for approval" };
 }
 
 /**
@@ -199,19 +237,30 @@ export async function approveWithdrawal(transactionId: string) {
       stripeAccount: userRecord.stripeConnectId,
     });
 
-    // 3. Update status
-    await db.update(walletTransactions)
-      .set({ 
-        status: "completed", 
-        stripeTransferId: transfer.id,
-        description: `Approved by ${modRecord.fullName}. Payout ID: ${payout.id}`
-      })
-      .where(eq(walletTransactions.id, transactionId));
+    // 3. Update status and clear Processing Balance
+    await db.transaction(async (tx) => {
+      await tx.update(wallets)
+        .set({ processingBalance: sql`${wallets.processingBalance} - ${txn.amount}` })
+        .where(eq(wallets.id, txn.walletId));
+
+      await tx.update(walletTransactions)
+        .set({ 
+          status: "completed", 
+          stripeTransferId: transfer.id,
+          description: `Approved by ${modRecord.fullName}. Payout ID: ${payout.id}`
+        })
+        .where(eq(walletTransactions.id, transactionId));
+    });
 
     return { success: true };
   } catch (error: any) {
     console.error("Payout approval failed", error);
-    // Note: We don't revert balance here yet, let mod retry or reject manually
+    
+    // Specialist error handling for common capability issues
+    if (error.code === "insufficient_capabilities_for_transfer") {
+       throw new Error(`Onboarding Incomplete: The caregiver (${userRecord.fullName}) has not yet enabled transfers in their Stripe dashboard. Please ask them to visit their Wallet and complete the 'Bank Connection' steps.`);
+    }
+
     throw new Error(error.message || "Transfer to bank failed");
   }
 }
@@ -230,20 +279,24 @@ export async function rejectWithdrawal(transactionId: string, reason: string) {
   const [txn] = await db.select().from(walletTransactions).where(eq(walletTransactions.id, transactionId));
   if (!txn || txn.status !== "pending") throw new Error("Invalid transaction");
 
-  const [wallet] = await db.select().from(wallets).where(eq(wallets.id, txn.walletId));
+  // Atomic balance restoration + status update in a single transaction
+  await db.transaction(async (tx) => {
+    // 1. Atomically re-add balance and subtract from processing
+    await tx.update(wallets)
+      .set({ 
+        balance: sql`${wallets.balance} + ${txn.amount}`,
+        processingBalance: sql`${wallets.processingBalance} - ${txn.amount}`
+      })
+      .where(eq(wallets.id, txn.walletId));
 
-  // 1. Re-add balance
-  await db.update(wallets)
-    .set({ balance: (wallet?.balance || 0) + txn.amount })
-    .where(eq(wallets.id, txn.walletId));
-
-  // 2. Mark as failed/rejected
-  await db.update(walletTransactions)
-    .set({ 
-      status: "failed", 
-      description: `Rejected by Mod: ${reason}` 
-    })
-    .where(eq(walletTransactions.id, transactionId));
+    // 2. Mark as failed/rejected
+    await tx.update(walletTransactions)
+      .set({ 
+        status: "failed", 
+        description: `Rejected by Mod: ${reason}` 
+      })
+      .where(eq(walletTransactions.id, transactionId));
+  });
 
   return { success: true };
 }

@@ -21,6 +21,7 @@ export default function ParentSettingsPage() {
     familyName: "",
     familyPhoto: "",
     location: "",
+    philosophy: "",
     latitude: 0,
     longitude: 0,
     isConfirmed: false
@@ -34,6 +35,7 @@ export default function ParentSettingsPage() {
           familyName: p.familyName || "",
           familyPhoto: p.familyPhoto || "",
           location: p.location || "",
+          philosophy: p.philosophy || "",
           latitude: Number(p.latitude) || 0,
           longitude: Number(p.longitude) || 0,
           isConfirmed: !!p.location
@@ -71,6 +73,7 @@ export default function ParentSettingsPage() {
         familyName: draft.familyName,
         familyPhoto: draft.familyPhoto,
         location: draft.location,
+        philosophy: draft.philosophy,
         latitude: draft.latitude,
         longitude: draft.longitude
       });
@@ -179,6 +182,16 @@ export default function ParentSettingsPage() {
                       Confirm Location: {draft.location.split(',')[0]}
                     </button>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                   <label className="text-[10px] font-black uppercase tracking-widest text-on-surface-variant ml-2">Family Philosophy & Values</label>
+                   <textarea 
+                    placeholder="e.g. We prioritize outdoor play, gentle parenting, and limited screen time..."
+                    className="w-full rounded-2xl bg-surface-container-low border-none p-5 focus:ring-2 focus:ring-primary/20 font-medium transition-all min-h-[120px] resize-none"
+                    value={draft.philosophy}
+                    onChange={e => setDraft(prev => ({ ...prev, philosophy: e.target.value }))}
+                  />
                 </div>
               </div>
            </section>

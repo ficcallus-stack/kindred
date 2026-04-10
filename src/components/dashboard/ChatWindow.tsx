@@ -103,7 +103,7 @@ export function ChatWindow({
         const idToken = await firebaseUser!.getIdToken();
         if (!isMounted) return;
 
-        const client = createAblyClient(currentUser.id, idToken);
+        const client = createAblyClient(currentUser.id);
         if (!client) return;
 
         ably.current = client;

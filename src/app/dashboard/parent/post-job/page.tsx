@@ -34,6 +34,10 @@ export default function PostJobPage() {
     description: "",
     isFeatured: false,
     isBoosted: false,
+    hiringType: "hourly",
+    retainerBudget: 1200,
+    latitude: 0,
+    longitude: 0,
   });
   const [hasDraft, setHasDraft] = useState(false);
   const router = useRouter();
@@ -129,8 +133,15 @@ export default function PostJobPage() {
       const hasChildren = (formData as any).selectedChildrenIds?.length > 0 || formData.childCount > 0;
       return !!formData.location && !!formData.duration && !!formData.startDate && hasChildren;
     }
-    if (step === 2) return Object.values(formData.schedule).some(v => v);
-    if (step === 3) return !!formData.description && formData.description.length > 20; 
+    if (step === 2) {
+      if (formData.hiringType === "retainer") {
+        return !!formData.retainerBudget && formData.retainerBudget >= 300;
+      }
+      const hasSchedule = Object.values(formData.schedule).some(v => v);
+      const ratesValid = Number(formData.maxRate) >= Number(formData.minRate);
+      return hasSchedule && ratesValid;
+    }
+    if (step === 3) return !!formData.description && formData.description.length >= 20; 
     if (step === 4) return !!(formData as any).stripePaymentIntentId;
     return true;
   };
@@ -144,8 +155,19 @@ export default function PostJobPage() {
         if (!formData.duration) return showToast("Please select a job duration", "error");
         if (!formData.startDate) return showToast("Please select a start date", "error");
       }
-      if (step === 2 && !Object.values(formData.schedule).some(v => v)) {
-        return showToast("Please select at least one time slot in the schedule", "error");
+      if (step === 2) {
+        if (formData.hiringType === "retainer") {
+           if (!formData.retainerBudget || formData.retainerBudget < 300) {
+              return showToast("Minimum weekly retainer is $300", "error");
+           }
+        } else {
+           if (!Object.values(formData.schedule).some(v => v)) {
+             return showToast("Please select at least one time slot in the schedule", "error");
+           }
+           if (Number(formData.maxRate) < Number(formData.minRate)) {
+             return showToast("Max rate must be greater than or equal to min rate", "error");
+           }
+        }
       }
       if (step === 3 && (!formData.description || formData.description.length < 20)) {
         return showToast("Please provide a job description (at least 20 characters)", "error");
@@ -202,7 +224,7 @@ export default function PostJobPage() {
 
   return (
     <div className="bg-surface font-body text-on-surface min-h-screen">
-      <div className="flex max-w-7xl mx-auto min-h-screen">
+      <div className={cn("min-h-screen flex", step === 5 ? "w-full" : "max-w-7xl mx-auto")}>
         {/* Progress Sidebar */}
         <aside className="hidden md:flex flex-col pt-12 pb-24 h-[calc(100vh-64px)] w-64 fixed left-0 top-16 bg-slate-50/50 border-r border-outline-variant/10 overflow-y-auto">
           <div className="px-6 mb-8">
@@ -240,8 +262,8 @@ export default function PostJobPage() {
         </aside>
 
         {/* Main Content */}
-        <main className={cn("flex-1 pt-12 pb-20 px-6 md:px-12", step < 4 ? "md:ml-64" : step === 4 ? "md:ml-64" : "md:ml-64")}>
-          <div className="max-w-4xl mx-auto">
+        <main className={cn("flex-1 pt-12 pb-20 px-6 md:px-12", step < 4 ? "md:ml-64" : "md:ml-64")}>
+          <div className={cn(step === 5 ? "w-full" : "max-w-7xl mx-auto")}>
             {/* Resume Draft Banner */}
             {hasDraft && step === 1 && (
               <div className="mb-8 p-4 bg-primary/5 border border-primary/10 rounded-2xl flex items-center justify-between gap-4 animate-in slide-in-from-top-4 duration-500">
@@ -296,7 +318,7 @@ export default function PostJobPage() {
               {step === 2 && <Step2 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
               {step === 3 && <Step3 data={formData} updateData={updateData} onNext={nextStep} onBack={prevStep} />}
               {step === 4 && <Step4 data={formData} updateData={updateData} onNext={(id) => { updateData({ stripePaymentIntentId: id }); nextStep(true); }} onBack={prevStep} />}
-              {step === 5 && <Step5 data={formData} onEdit={goToStep} onBack={prevStep} onSubmit={handleSubmit} />}
+              {step === 5 && <Step5 data={formData} availableChildren={availableChildren} onEdit={goToStep} onBack={prevStep} onSubmit={handleSubmit} />}
             </div>
           </div>
         </main>

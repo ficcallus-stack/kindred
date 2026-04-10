@@ -5,8 +5,8 @@ import { MaterialIcon } from "@/components/MaterialIcon";
 import { syncUser } from "@/lib/user-sync";
 import { cn } from "@/lib/utils";
 import { db } from "@/db";
-import { applications, jobs, users, bookings, reviews, conversationMembers, caregiverVerifications, certifications, nannyProfiles, careTeam, parentProfiles, bookingSeries } from "@/db/schema";
-import { eq, desc, sql, and, count } from "drizzle-orm";
+import { applications, jobs, users, bookings, reviews, conversationMembers, caregiverVerifications, certifications, nannyProfiles, careTeam, parentProfiles, bookingSeries, certificationExams, examSubmissions } from "@/db/schema";
+import { eq, desc, sql, and, count, gt, inArray } from "drizzle-orm";
 import { format } from "date-fns";
 import { HiredModalTrigger } from "@/components/dashboard/HiredModalTrigger";
 import { RegularFamiliesGrid } from "@/components/dashboard/RegularFamiliesGrid";
@@ -14,8 +14,13 @@ import { StabilityCalendar } from "@/components/dashboard/StabilityCalendar";
 import { EarningsForecaster } from "@/components/dashboard/EarningsForecaster";
 import { ShiftControls } from "@/components/dashboard/ShiftControls";
 import { MilestoneEditor } from "@/components/dashboard/MilestoneEditor";
+import { getReferralStats } from "@/lib/actions/referrals";
+import { ProfilePerformanceWidget } from "./ProfilePerformanceWidget";
 import { getNannyFinancials } from "./financial-actions";
 import { getCareTeam } from "../parent/care-team/actions";
+import { isNannyProfileComplete, getMissingVisibilityFields } from "@/lib/nanny-guards";
+import { VisibilityStrip } from "./VisibilityStrip";
+import { CaregiverDashboardAlerts } from "@/components/dashboard/CaregiverDashboardAlerts";
 
 export default async function NannyDashboardHome() {
   const user = await syncUser();
@@ -104,20 +109,43 @@ export default async function NannyDashboardHome() {
   const myCertifications = await db.query.certifications.findMany({
     where: eq(certifications.caregiverId, user.id)
   });
-  const hasGlobalCert = myCertifications.some(c => c.type === "standards_program" && c.status === "completed");
+  const hasGlobalCert = myCertifications.some(c => (c.type === "standards_program" || c.type === "elite_bundle") && c.status === "completed");
+  const enrolledStandards = myCertifications.find(c => (c.type === "standards_program" || c.type === "elite_bundle") && (c.status === "enrolled" || c.status === "completed" || c.status === "in_progress"));
+  
+  // Get specialized statuses for the tracker
+  let certificationState: 'none' | 'enrolled' | 'marking' | 'failed' | 'completed' = 'none';
+  if (hasGlobalCert) {
+     certificationState = 'completed';
+  } else if (enrolledStandards) {
+     // Fetch the submission to see if it's marking or failed
+     const exam = await db.query.certificationExams.findFirst({
+         where: eq(certificationExams.certificationType, enrolledStandards.type as any)
+     });
+     if (exam) {
+         const lastSub = await db.query.examSubmissions.findFirst({
+             where: and(
+                 eq(examSubmissions.examId, exam.id),
+                 eq(examSubmissions.caregiverId, user.id)
+             ),
+             orderBy: [desc(examSubmissions.createdAt)]
+         });
+         
+         if (lastSub?.status === 'marking') {
+            certificationState = 'marking';
+         } else if (lastSub?.status === 'failed') {
+            certificationState = 'failed';
+         } else if (enrolledStandards.status === 'enrolled') {
+            certificationState = 'enrolled';
+         }
+     }
+  }
   const [profile] = await db.select().from(nannyProfiles).where(eq(nannyProfiles.id, user.id));
 
-  let profileCompleteness = 30; // Base 30% for account creation
-  if (profile?.bio) profileCompleteness += 20;
-  if (profile?.experienceYears) profileCompleteness += 20;
-  let photosLength = 0;
-  try {
-     if (profile?.photos) {
-        photosLength = Array.isArray(profile.photos) ? profile.photos.length : JSON.parse(profile.photos as any).length;
-     }
-  } catch(e) {}
-  if (photosLength > 0) profileCompleteness += 10;
-  if (verification?.status === "verified") profileCompleteness += 20;
+  // Calculate completeness based on weight of mandatory fields
+  const missingVisibilityFields = getMissingVisibilityFields(profile, user);
+  const totalMandatory = 7;
+  const fulfilledCount = totalMandatory - missingVisibilityFields.length;
+  let profileCompleteness = Math.round((fulfilledCount / totalMandatory) * 100);
   if (profileCompleteness > 100) profileCompleteness = 100;
 
   let actionState = "none";
@@ -169,9 +197,47 @@ export default async function NannyDashboardHome() {
   // Fetch Care Teams (To identify families for Milestone posting)
   const myFamilies = await getCareTeam();
 
+  const missingFields = getMissingVisibilityFields(profile, user);
+
+  // NEW: Fetch Job History & Upcoming
+  const upcomingBookings = await db.query.bookings.findMany({
+    where: and(
+        eq(bookings.caregiverId, user.id),
+        inArray(bookings.status, ["confirmed", "paid", "in_progress"]),
+        gt(bookings.startDate, new Date())
+    ),
+    with: { parent: { with: { parentProfile: true } } },
+    orderBy: [desc(bookings.startDate)],
+    limit: 3
+  });
+
+  const recentHistory = await db.query.bookings.findMany({
+    where: and(
+        eq(bookings.caregiverId, user.id),
+        inArray(bookings.status, ["completed", "cancelled"])
+    ),
+    with: { parent: true },
+    orderBy: [desc(bookings.startDate)],
+    limit: 3
+  });
+
+  // NEW: Fetch Referral Stats
+  const { stats: referralStats } = await getReferralStats();
+
   return (
-    <div className="space-y-6 pb-20">
-      <HiredModalTrigger booking={hiredAlertBooking} />
+    <div className="space-y-0 pb-20 -mt-6 -mx-6">
+       <VisibilityStrip 
+          isVerified={profile?.isVerified ?? false}
+          verificationStatus={verification?.status || "none"}
+          missingFields={missingFields}
+          enrolledInStandards={!!enrolledStandards}
+          isPremium={user.isPremium}
+       />
+       
+       <CaregiverDashboardAlerts userId={user.id} activeBooking={hiredAlertBooking} />
+
+       <div className="p-6 space-y-6">
+          <HiredModalTrigger booking={hiredAlertBooking} />
       {/* Welcome Section */}
       <section>
         <h1 className="text-3xl font-extrabold text-primary font-headline tracking-tight">Welcome back, {firstName}</h1>
@@ -184,44 +250,44 @@ export default async function NannyDashboardHome() {
 
           {/* Active Session / Upcoming Shift Widget */}
           {activeBooking && (
-             <div className="relative overflow-hidden bg-gradient-to-r from-navy to-primary p-6 rounded-3xl text-white shadow-xl shadow-primary/10 group">
+             <div className="relative overflow-hidden bg-white p-6 rounded-[2.5rem] border border-outline-variant/10 shadow-sm group">
                 <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="flex items-center gap-6 w-full md:w-auto">
-                    <div className="w-16 h-16 rounded-[1.2rem] overflow-hidden border-2 border-white/20 shadow-xl shrink-0 group-hover:scale-105 transition-transform duration-500">
+                    <div className="w-20 h-20 rounded-[1.5rem] overflow-hidden border-4 border-white shadow-xl shrink-0 group-hover:scale-105 transition-transform duration-500">
                       <img 
-                        src={(activeBooking.parent as any)?.parentProfile?.familyPhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${(activeBooking.parent as any).fullName}`} 
+                        src={(activeBooking.parent as any)?.parentProfile?.familyPhoto || `/illustrations/family_${(activeBooking.id.charCodeAt(0) % 4) + 1}.png`} 
                         alt="Family"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover grayscale-[0.2] group-hover:grayscale-0 transition-all duration-700"
                       />
                     </div>
                     <div>
-                      <span className="inline-flex items-center gap-2 px-2 py-0.5 rounded-full bg-white/10 text-white text-[9px] font-black uppercase tracking-widest mb-1.5 border border-white/20">
-                        <span className={cn("w-2 h-2 rounded-full", activeBooking.status === "in_progress" ? "bg-green-400 animate-pulse" : "bg-orange-400")}></span>
+                      <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary-fixed/30 text-secondary text-[9px] font-black uppercase tracking-widest mb-2 border border-secondary/10 font-label">
+                        <span className={cn("w-2 h-2 rounded-full", activeBooking.status === "in_progress" ? "bg-green-500 animate-pulse" : "bg-orange-400")}></span>
                         {activeBooking.status === "in_progress" ? "Active Session" : "Upcoming Shift"}
                       </span>
-                      <h2 className="text-2xl font-headline font-black text-white italic tracking-tighter leading-tight">The {(activeBooking.parent as any).fullName.split(" ").pop()} Family</h2>
-                      <p className="text-white/70 text-[11px] font-medium mt-0.5">
+                      <h2 className="text-3xl font-headline font-black text-primary italic tracking-tighter leading-tight">The {(activeBooking.parent as any).fullName.split(" ").pop()} Family</h2>
+                      <p className="text-on-surface-variant/60 text-[11px] font-bold mt-1 uppercase tracking-widest font-label">
                         {format(new Date(activeBooking.startDate), "h:mm a")} - {format(new Date(activeBooking.endDate), "h:mm a")} • {activeBooking.hoursPerDay} Hours
                       </p>
                     </div>
                   </div>
                   
-                  <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto shrink-0 mt-4 md:mt-0">
+                  <div className="flex flex-col md:flex-row items-center gap-4 w-full md:w-auto shrink-0 mt-4 md:mt-0 lg:pr-4">
                     {(activeBooking as any).isTrial && (
-                       <div className="px-4 py-2 bg-amber-500/20 rounded-xl border border-amber-500/30 text-amber-100 text-[10px] font-black uppercase tracking-widest animate-pulse">
-                          Honeymoon Phase (Trial)
+                       <div className="px-4 py-2 bg-amber-50 rounded-xl border border-amber-500/10 text-white text-[10px] font-black uppercase tracking-widest font-label animate-pulse">
+                          Trial Session
                        </div>
                     )}
                     <Link 
                       href={`/dashboard/nanny/bookings/${activeBooking.id}`}
-                      className="w-full md:w-auto bg-white text-primary px-6 py-3.5 rounded-xl font-black uppercase tracking-[0.1em] text-[10px] shadow-xl hover:bg-slate-50 active:scale-95 transition-all text-center flex items-center justify-center gap-2"
+                      className="w-full md:w-auto bg-[#1e293b] text-white px-8 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-2xl hover:scale-[1.02] active:scale-95 transition-all text-center flex items-center justify-center gap-3 font-label"
                     >
                       {activeBooking.status === "in_progress" ? "Manage Mode" : "Start Shift"}
                       <MaterialIcon name="arrow_forward" className="text-sm" />
                     </Link>
                   </div>
                 </div>
-                <MaterialIcon name="schedule" className="absolute -right-6 -bottom-8 text-[10rem] opacity-[0.04] text-white -rotate-12 pointer-events-none" />
+                <MaterialIcon name="schedule" className="absolute -right-6 -bottom-8 text-[10rem] opacity-[0.03] text-primary -rotate-12 pointer-events-none" />
              </div>
           )}
 
@@ -328,6 +394,82 @@ export default async function NannyDashboardHome() {
             </div>
           </div>
 
+          {/* Schedule & Recent Jobs Overview */}
+          <section className="space-y-4">
+             <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-primary font-headline flex items-center gap-2">
+                   <MaterialIcon name="event_note" className="text-secondary" />
+                   Schedule & Job History
+                </h3>
+                <Link href="/dashboard/nanny/bookings" className="text-secondary text-[10px] font-black uppercase tracking-widest hover:underline italic">
+                   Full Bookings Portal
+                </Link>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Upcoming */}
+                <div className="bg-white p-5 rounded-3xl border border-outline-variant/10 shadow-sm space-y-4">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Next 3 Confirmed Shifts</p>
+                   {upcomingBookings.length > 0 ? (
+                      <div className="space-y-3">
+                         {upcomingBookings.map((b: any) => (
+                            <Link 
+                               key={b.id} 
+                               href={`/dashboard/nanny/bookings/${b.id}`}
+                               className="flex items-center gap-4 p-3 bg-surface-container-low rounded-2xl hover:bg-slate-50 transition-all border border-transparent hover:border-outline-variant/20"
+                            >
+                               <div className="w-10 h-10 rounded-xl overflow-hidden shadow-sm shrink-0">
+                                  <img 
+                                     src={(b.parent as any)?.parentProfile?.familyPhoto || `/illustrations/family_${(b.id.charCodeAt(0) % 4) + 1}.png`} 
+                                     className="w-full h-full object-cover" 
+                                     alt="Family" 
+                                  />
+                               </div>
+                               <div className="flex-1 truncate">
+                                  <p className="text-xs font-black text-primary truncate italic">The {(b.parent as any).fullName.split(" ").pop()} Family</p>
+                                  <p className="text-[9px] font-medium text-slate-400">{format(new Date(b.startDate), "MMM d")} • {format(new Date(b.startDate), "h:mm a")}</p>
+                               </div>
+                               <MaterialIcon name="chevron_right" className="text-slate-300" />
+                            </Link>
+                         ))}
+                      </div>
+                   ) : (
+                      <div className="py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-outline-variant/10">
+                         <p className="text-[10px] font-bold text-slate-400">No upcoming jobs found</p>
+                      </div>
+                   )}
+                </div>
+
+                {/* History */}
+                <div className="bg-white p-5 rounded-3xl border border-outline-variant/10 shadow-sm space-y-4">
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent History</p>
+                   {recentHistory.length > 0 ? (
+                      <div className="space-y-3">
+                         {recentHistory.map((b: any) => (
+                            <div 
+                               key={b.id} 
+                               className="flex items-center gap-4 p-3 bg-slate-50/50 rounded-2xl border border-outline-variant/20"
+                            >
+                               <div className="w-8 h-8 rounded-full bg-green-50 flex items-center justify-center text-green-600 shrink-0">
+                                  <MaterialIcon name="verified" className="text-sm" />
+                               </div>
+                               <div className="flex-1 truncate">
+                                  <p className="text-xs font-black text-primary truncate italic">The {(b.parent as any).fullName.split(" ").pop()} Family</p>
+                                  <p className="text-[9px] font-medium text-slate-400">{format(new Date(b.startDate), "MMM d, yyyy")}</p>
+                               </div>
+                               <span className="text-xs font-black italic text-primary">${(b.totalAmount / 100).toFixed(0)}</span>
+                            </div>
+                         ))}
+                      </div>
+                   ) : (
+                      <div className="py-8 text-center bg-slate-50/50 rounded-2xl border border-dashed border-outline-variant/10">
+                         <p className="text-[10px] font-bold text-slate-400">No past jobs on record</p>
+                      </div>
+                   )}
+                </div>
+             </div>
+          </section>
+
           {/* Regular Families (Care Team) - Overhaul Stage 1 */}
           <RegularFamiliesGrid families={regularFamilies.map(f => ({
             id: f.id,
@@ -359,90 +501,74 @@ export default async function NannyDashboardHome() {
         {/* Right Column: Profile Performance Widget & Upsell */}
         <div className="lg:col-span-4 space-y-6">
           
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-outline-variant/10">
-            <h3 className="text-sm font-bold text-primary font-headline mb-4">Profile Performance</h3>
-            
-            {/* Toggle Section */}
-            <div className="flex items-center justify-between p-3 bg-surface-container-low rounded-2xl mb-4">
-              <span className="text-xs font-bold text-primary">Availability Status</span>
-              <div className="flex items-center gap-2">
-                <label className="relative inline-flex items-center cursor-not-allowed">
-                  <input className="sr-only peer" type="checkbox" checked={(profile?.availability as any) === "full_time" || (profile?.availability as any) === "part_time"} readOnly />
-                  <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
-                </label>
-                <span className={cn(
-                   "text-[10px] font-bold uppercase",
-                   ((profile?.availability as any) === "full_time" || (profile?.availability as any) === "part_time") ? "text-secondary" : "text-slate-500"
-                )}>
-                  {((profile?.availability as any) === "full_time" || (profile?.availability as any) === "part_time") ? "Active" : "Offline"}
-                </span>
-              </div>
-            </div>
-            
-            {/* Completeness Progress */}
-            <div className="space-y-2 mb-6">
-              <div className="flex justify-between text-[10px] font-bold uppercase tracking-wider">
-                <span className="text-slate-500">Profile Completeness</span>
-                <span className={cn("transition-colors", profileCompleteness === 100 ? "text-green-500" : "text-primary")}>{profileCompleteness}%</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden flex">
-                <div className={cn("h-full transition-all duration-1000", profileCompleteness === 100 ? "bg-green-500" : "bg-primary")} style={{ width: `${profileCompleteness}%` }}></div>
-              </div>
-              {profileCompleteness < 100 ? (
-                 <p className="text-[10px] text-slate-400 italic">Complete verification & bio to reach 100%</p>
-              ) : (
-                 <p className="text-[10px] text-green-600 font-medium flex items-center gap-1"><MaterialIcon name="verified" className="text-[12px]" /> Superb Profile</p>
-              )}
-            </div>
-            
-            {/* Stability Calendar (Overhaul Stage 2) */}
-            <StabilityCalendar shifts={seriesShifts.map(s => ({
+          <ProfilePerformanceWidget
+            profileCompleteness={profileCompleteness}
+            userId={user.id}
+            profileImageUrl={user.profileImageUrl || ""}
+            firstName={firstName}
+            weeklyRate={profile?.weeklyRate || ""}
+            hourlyRate={profile?.hourlyRate || ""}
+            bio={profile?.bio || ""}
+            tagline={(profile as any)?.tagline || ""}
+            reviewsCount={reviewStats?.total || 0}
+            avgRating={Number(reviewStats?.avgRating || 0)}
+            initialSettings={{
+              isOnline: (profile?.availability as any)?.isOnline ?? true,
+              travelRadius: (profile?.availability as any)?.travelRadius ?? profile?.maxTravelDistance ?? 15,
+              hourlyRate: profile?.hourlyRate || "25",
+              weeklyRate: profile?.weeklyRate || "800",
+              instantAvailable: (profile?.availability as any)?.instantAvailable ?? false,
+              instantUntil: (profile?.availability as any)?.instantUntil ?? undefined,
+              alwaysAvailable: (profile?.availability as any)?.alwaysAvailable ?? true,
+              weeklySchedule: (profile?.availability as any)?.weeklySchedule || {},
+            }}
+            emergencyContactName={user.emergencyContactName ?? undefined}
+            emergencyContactPhone={user.emergencyContactPhone ?? undefined}
+            seriesShifts={seriesShifts.map(s => ({
               id: s.id,
-              familyName: s.parent.fullName.split(" ").pop() || "Unknown",
+              familyName: s.parent?.fullName?.split(" ").pop() || "Family",
               daysOfWeek: s.daysOfWeek as number[],
               startTime: s.startTime,
               endTime: s.endTime
-            }))} />
+            }))}
+          />
 
-            {/* Toggle Section */}
-            <Link href={`/nannies/${user.id}`} className="block w-full text-center py-3 border-2 border-primary text-primary rounded-xl font-bold text-xs hover:bg-primary hover:text-white transition-all active:scale-95 group">
-              <span className="flex items-center justify-center gap-2">
-                 <MaterialIcon name="preview" className="text-lg text-primary group-hover:text-white transition-colors" />
-                 Preview My Marketplace Card
-              </span>
-            </Link>
-          </div>
-
-          {/* Compact Certification Upsell */}
-          {!hasGlobalCert ? (
-            <div className="bg-tertiary-fixed rounded-3xl p-6 relative overflow-hidden group border border-outline-variant/10 shadow-sm hover:shadow-lg transition-shadow">
-              <div className="relative z-10">
-                <h3 className="text-lg font-black text-on-tertiary-fixed font-headline leading-tight italic">Global Certified</h3>
-                <p className="text-on-tertiary-fixed-variant mt-2 text-[11px] font-medium leading-relaxed max-w-[80%]">
-                    Earn up to <span className="font-bold text-primary">3x higher pay</span> with professional certification.
-                </p>
-                <Link href="/dashboard/nanny/certifications" className="mt-4 w-full bg-primary text-white py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all">
-                    Upgrade Now
-                    <MaterialIcon name="arrow_forward" className="text-sm" />
-                </Link>
-              </div>
-              <MaterialIcon name="school" data-weight="fill" className="absolute -right-2 top-8 opacity-5 scale-125 rotate-12 text-[100px] text-tertiary pointer-events-none group-hover:scale-[1.4] transition-transform duration-700" />
-            </div>
-          ) : (
-             <div className="bg-green-50 rounded-3xl p-6 relative overflow-hidden group border border-green-200">
-                <div className="relative z-10 flex items-center gap-4">
-                   <div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center shrink-0 shadow-md">
-                      <MaterialIcon name="workspace_premium" className="text-white text-2xl" />
+          {/* Referral Program Card */}
+          <div className="bg-primary rounded-3xl p-6 text-white relative overflow-hidden group shadow-xl shadow-primary/10">
+             <div className="absolute inset-0 bg-gradient-to-br from-primary via-navy to-primary opacity-50"></div>
+             <div className="relative z-10 space-y-4">
+                <div className="flex items-center gap-3">
+                   <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                      <MaterialIcon name="stars" className="text-white text-lg animate-pulse" />
                    </div>
-                   <div>
-                      <h3 className="text-sm font-black text-green-900 font-headline uppercase tracking-widest leading-none mb-1">Elite Status</h3>
-                      <p className="text-green-700 text-[10px] font-bold">Global Care Certified</p>
+                   <span className="text-[10px] font-black uppercase tracking-widest opacity-80 italic">Ambassador Status</span>
+                </div>
+                
+                <div className="space-y-1">
+                   <h3 className="text-xl font-black font-headline italic tracking-tighter leading-tight">Refer & Earn $20</h3>
+                   <p className="text-white/60 text-[10px] font-medium leading-relaxed">Share Kindred with families you know and earn for each successful hire.</p>
+                </div>
+
+                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
+                   <div className="flex justify-between items-center mb-3">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Your Code</span>
+                      <span className="text-xs font-black italic tracking-widest">{referralStats.referralCode}</span>
+                   </div>
+                   <div className="flex justify-between items-center">
+                      <span className="text-[9px] font-black uppercase tracking-widest text-white/40">Balance</span>
+                      <span className="text-sm font-black italic text-emerald-400">${(referralStats.balance / 100).toFixed(0)}</span>
                    </div>
                 </div>
+
+                <button className="w-full bg-white text-primary py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-lg font-bold">
+                   Copy Referral Link
+                </button>
              </div>
-          )}
+             <MaterialIcon name="diversity_3" className="absolute -right-4 -bottom-6 text-[100px] opacity-[0.05] -rotate-12 pointer-events-none" />
+          </div>
         </div>
       </div>
+    </div>
     </div>
   );
 }

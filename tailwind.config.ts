@@ -54,6 +54,7 @@ const config: Config = {
         "primary-container": "#1D3557",
         "surface-tint": "#485f84",
         "on-tertiary-fixed": "#002021",
+        "cream": "#F9F7F2",
       },
       fontFamily: {
         headline: ["var(--font-headline)", "Plus Jakarta Sans", "sans-serif"],

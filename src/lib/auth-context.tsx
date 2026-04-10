@@ -4,7 +4,6 @@ import { createContext, useContext, useEffect, useState, useCallback } from "rea
 import {
   onAuthStateChanged,
   signOut as firebaseSignOut,
-  signInAnonymously,
   type User,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase-client";
@@ -51,8 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<"parent" | "caregiver" | "admin" | "moderator" | null>(null);
   const [dbUser, setDbUser] = useState<DbUser | null>(null);
 
-  // Sync session cookie whenever auth state changes
+  // Sync session cookie whenever auth state changes (unless impersonating)
   const syncSession = useCallback(async (fbUser: User | null) => {
+    // GHOST PROTOCOL: If impersonating, DO NOT sync the client SDK session.
+    // The server has already swapped the 'session' cookie, and syncing would overwrite it back to Admin.
+    const isImpersonating = typeof document !== 'undefined' && document.cookie.includes("admin_session_backup");
+    
+    if (isImpersonating) {
+      console.log("[Ghost Protocol] Platform sync paused (Ghost Mode active)");
+      return;
+    }
+
     if (fbUser) {
       const idToken = await fbUser.getIdToken();
       await fetch("/api/auth/session", {

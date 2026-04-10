@@ -4,7 +4,6 @@ import { useState } from "react";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
 
 type Role = "family" | "nanny";
 
@@ -193,7 +192,6 @@ export default function FAQPage() {
 
   return (
     <div className="bg-surface font-body text-on-surface antialiased">
-      <Navbar />
       
       <main className="pt-24 min-h-screen">
         {/* Hero Search Section */}

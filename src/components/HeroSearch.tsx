@@ -9,8 +9,21 @@ export default function HeroSearch() {
   const router = useRouter();
   const [selectedLoc, setSelectedLoc] = useState<{ loc: string, lat: number, lng: number } | null>(null);
 
-  const handleSearch = () => {
+  const trackSearch = async (loc: string) => {
+    try {
+      await fetch('/api/analytics/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ queryText: loc, filtersApplied: { source: 'landing_hero' } })
+      });
+    } catch (e) {
+      // Swalllow error, don't break UI for tracking
+    }
+  };
+
+  const handleSearch = async () => {
     if (selectedLoc) {
+      trackSearch(selectedLoc.loc);
       router.push(`/browse?location=${selectedLoc.loc}&lat=${selectedLoc.lat}&lng=${selectedLoc.lng}`);
     } else {
       router.push(`/browse`);
@@ -24,6 +37,7 @@ export default function HeroSearch() {
         <MapboxAutocomplete
           onSelect={(loc, lat, lng) => {
             setSelectedLoc({ loc, lat, lng });
+            trackSearch(loc);
             // Immediate redirection for "real-time" feel
             router.push(`/browse?location=${loc}&lat=${lat}&lng=${lng}`);
           }}

@@ -1,17 +1,17 @@
-import { pgTable, text, timestamp, boolean, decimal, integer, pgEnum, primaryKey, jsonb, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, decimal, integer, pgEnum, primaryKey, jsonb, foreignKey, index } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
 // ── Enums ──────────────────────────────────────────────────
 export const userRoleEnum = pgEnum("user_role", ["parent", "caregiver", "admin", "moderator"]);
 export const jobStatusEnum = pgEnum("job_status", ["open", "closed", "completed"]);
 export const applicationStatusEnum = pgEnum("application_status", ["pending", "accepted", "rejected"]);
-export const bookingStatusEnum = pgEnum("booking_status", ["pending", "paid", "confirmed", "in_progress", "completed", "cancelled"]);
-export const paymentStatusEnum = pgEnum("payment_status", ["pending", "authorized", "captured", "refunded", "failed"]);
+export const bookingStatusEnum = pgEnum("booking_status", ["pending", "paid", "confirmed", "in_progress", "completed", "cancelled", "disputed"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["pending", "authorized", "captured", "refunded", "failed", "held_in_escrow", "disputed"]);
 export const certificationTypeEnum = pgEnum("certification_type", ["registration", "elite_bundle", "standards_program"]);
 export const certificationStatusEnum = pgEnum("certification_status", ["pending_payment", "enrolled", "in_progress", "completed", "expired"]);
 export const verificationStatusEnum = pgEnum("verification_status", ["none", "draft", "pending", "verified", "rejected"]);
 export const walletTransactionTypeEnum = pgEnum("wallet_transaction_type", ["earning", "withdrawal"]);
-export const walletTransactionStatusEnum = pgEnum("wallet_transaction_status", ["pending", "completed", "failed"]);
+export const walletTransactionStatusEnum = pgEnum("wallet_transaction_status", ["pending", "cleared", "completed", "failed"]);
 export const examStatusEnum = pgEnum("exam_status", ["started", "submitted", "marking", "passed", "failed"]);
 export const referralStatusEnum = pgEnum("referral_status", ["pending", "signed_up", "reviewing", "completed", "failed"]);
 export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "past_due", "canceled", "incomplete", "trialing"]);
@@ -19,10 +19,11 @@ export const subscriptionStatusEnum = pgEnum("subscription_status", ["active", "
 
 export const ticketStatusEnum = pgEnum("ticket_status", ["open", "in_progress", "resolved", "closed"]);
 export const ticketPriorityEnum = pgEnum("ticket_priority", ["low", "medium", "high", "urgent"]);
-export const ticketCategoryEnum = pgEnum("ticket_category", ["general", "safety", "payment", "technical"]);
+export const ticketCategoryEnum = pgEnum("ticket_category", ["general", "safety", "payment", "technical", "dispute"]);
 export const supportStatusEnum = pgEnum("support_status", ["open", "closed"]);
 export const platformCreditTransactionTypeEnum = pgEnum("platform_credit_transaction_type", ["earned_booking", "earned_referral", "redeemed", "revoked_refund"]);
 export const chatUnlockMethodEnum = pgEnum("chat_unlock_method", ["stripe", "credits", "booking", "premium"]);
+export const subscriptionTierEnum = pgEnum("subscription_tier", ["none", "plus", "elite"]);
 
 // ── Users ──────────────────────────────────────────────────
 export const users = pgTable("users", {
@@ -38,9 +39,14 @@ export const users = pgTable("users", {
   stripeConnectId: text("stripe_connect_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   subscriptionStatus: subscriptionStatusEnum("subscription_status"),
+  subscriptionTier: subscriptionTierEnum("subscription_tier").default("none").notNull(),
   isPremium: boolean("is_premium").default(false).notNull(),
   stripeCustomerId: text("stripe_customer_id"),
   platformCredits: integer("platform_credits").default(0).notNull(), // New: 15 per USD spent, 100 = 1 USD
+  isGhost: boolean("is_ghost").default(false).notNull(), // Secret Engine Flag
+  phoneNumber: text("phone_number"), // Professional Contact for post-booking
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
   lastRoleSwitchedAt: timestamp("last_role_switched_at"), 
   lastActive: timestamp("last_active").defaultNow(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -51,6 +57,8 @@ export const users = pgTable("users", {
     foreignColumns: [table.id],
     name: "users_referred_by_fkey"
   }),
+  roleIdx: index("users_role_idx").on(table.role),
+  subscriptionIdx: index("users_subscription_idx").on(table.subscriptionTier),
 }));
 
 export const referrals = pgTable("referrals", {
@@ -78,6 +86,7 @@ export const nannyProfiles = pgTable("nanny_profiles", {
   bio: text("bio"),
   experienceYears: integer("experience_years").default(0),
   hourlyRate: decimal("hourly_rate", { precision: 10, scale: 2 }).default("0"),
+  weeklyRate: decimal("weekly_rate", { precision: 10, scale: 2 }).default("0"),
   location: text("location"),
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
@@ -97,9 +106,20 @@ export const nannyProfiles = pgTable("nanny_profiles", {
   certifications: jsonb("certifications").$type<string[]>().default([]),
   videoUrl: text("video_url"),
   isOccupied: boolean("is_occupied").default(false).notNull(),
+  
+  // Overhaul Step 6: Security & Professional Assets
+  lastNameUpdateAt: timestamp("last_name_update_at"),
+  hasCar: boolean("has_car").default(false).notNull(),
+  carDescription: text("car_description"),
+  detailedExperience: text("detailed_experience"),
+
   maxTravelDistance: integer("max_travel_distance").default(25).notNull(),
+  interests: jsonb("interests").$type<string[]>().default([]).notNull(), // Shared from children context
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+    locationIdx: index("nanny_location_idx").on(table.location),
+    isVerifiedIdx: index("nanny_verified_idx").on(table.isVerified),
+}));
 
 // ── Children ───────────────────────────────────────────────
 export const children = pgTable("children", {
@@ -110,7 +130,9 @@ export const children = pgTable("children", {
   type: text("type").notNull(), // e.g., "toddler", "pre-schooler", "infant"
   bio: text("bio"),
   photoUrl: text("photo_url"),
-  specialNeeds: jsonb("special_needs").$type<string[]>().default([]), // JSON array stored as jsonb
+  specialNeeds: jsonb("special_needs").$type<string[]>().default([]), 
+  interests: jsonb("interests").$type<string[]>().default([]).notNull(), // NEW: Data-driven likings
+  medicalNotes: text("medical_notes"), // NEW: Crucial health alerts
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -121,7 +143,8 @@ export const parentProfiles = pgTable("parent_profiles", {
   familyPhoto: text("family_photo"),
   location: text("location"),
   bio: text("bio"),
-  householdManual: text("household_manual"), // The persistent "Wiki" for nannies
+  philosophy: text("philosophy"), // NEW: Family parenting style
+  householdManual: text("household_manual"), 
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -143,6 +166,8 @@ export const careTeam = pgTable("care_team", {
 export const jobs = pgTable("jobs", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   parentId: text("parent_id").notNull().references(() => users.id),
+  hiringType: text("hiring_type").default("hourly").notNull(), // "hourly" | "retainer"
+  retainerBudget: integer("retainer_budget"), // weekly budget in cents
   title: text("title").notNull(),
   description: text("description").notNull(),
   budget: text("budget").notNull(), // Display string like "$20-$30/hr"
@@ -150,15 +175,26 @@ export const jobs = pgTable("jobs", {
   maxRate: integer("max_rate"),
   location: text("location"),
   duration: text("duration"),
+  startDate: timestamp("start_date"), // New: Stage 3 requirements
   childCount: integer("child_count"),
+  selectedChildIds: jsonb("selected_child_ids").$type<string[]>().default([]), // New: Multi-child support
+  isPriority: boolean("is_priority").default(false).notNull(), // New: Fast-Track Placement
   status: jobStatusEnum("status").default("open").notNull(),
   scheduleType: text("schedule_type").default("recurring").notNull(), // recurring, one_time
-  schedule: jsonb("schedule").$type<Record<string, boolean>>().default({}), // The weekly grid
+  schedule: jsonb("schedule").$type<Record<string, boolean>>().default({}), // The actual weekly grid
+  scheduleMode: text("schedule_mode").default("simple"), // simple vs precise
   specificDates: jsonb("specific_dates").$type<string[]>().default([]), // For one_time jobs
-  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripePaymentIntentId: text("stripe_payment_intent_id").unique(),
   isFeatured: boolean("is_featured").default(false).notNull(),
   isDraft: boolean("is_draft").default(false).notNull(),
   isBoosted: boolean("is_boosted").default(false).notNull(),
+  isSynthetic: boolean("is_synthetic").default(false).notNull(),
+  
+  // NEW: Structured Data-Driven Fields
+  requirements: jsonb("requirements").$type<Record<string, boolean>>().default({}),
+  duties: text("duties"),
+  language: text("language").default("English"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -180,6 +216,7 @@ export const bookings = pgTable("bookings", {
   caregiverId: text("caregiver_id").notNull().references(() => users.id),
   jobId: text("job_id").references(() => jobs.id),
   seriesId: text("series_id"), // Nullable initially for Stage 2
+  hiringMode: text("hiring_mode").default("hourly").notNull(), // "hourly" | "retainer"
   startDate: timestamp("start_date").notNull(),
   endDate: timestamp("end_date").notNull(),
   hoursPerDay: integer("hours_per_day").notNull(),
@@ -198,9 +235,22 @@ export const bookings = pgTable("bookings", {
   isOvertime: boolean("is_overtime").default(false).notNull(), // Extra shift outside retainer
   isTrial: boolean("is_trial").default(false).notNull(), // New Step 6 Overhaul: Trial Session
   retainerAdjustmentId: text("retainer_adjustment_id"), // Link to specific monthly payroll item
+  
+  childCount: integer("child_count").default(1).notNull(),
+  selectedChildIds: jsonb("selected_child_ids").$type<string[]>().default([]),
 
+  locationDescription: text("location_description"), // Detailed house/place description + links
+  phoneNumber: text("phone_number"), // Parent's mobile for this booking
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+    parentIdIdx: index("bookings_parent_id_idx").on(table.parentId),
+    caregiverIdIdx: index("bookings_caregiver_id_idx").on(table.caregiverId),
+    statusIdx: index("bookings_status_idx").on(table.status),
+    stripePiIdx: index("bookings_stripe_pi_idx").on(table.stripePaymentIntentId),
+}));
 
 // ── Booking Series (Stage 3 overhaul) ──────────────────────
 export const bookingSeries = pgTable("booking_series", {
@@ -255,6 +305,7 @@ export const conversationMembers = pgTable("conversation_members", {
   conversationId: text("conversation_id").notNull().references(() => conversations.id),
   userId: text("user_id").notNull().references(() => users.id),
   isArchived: boolean("is_archived").default(false).notNull(),
+  lastReadAt: timestamp("last_read_at").defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
 }));
@@ -270,7 +321,11 @@ export const messages = pgTable("messages", {
   fileName: text("file_name"),
   metadata: jsonb("metadata").$type<Record<string, any>>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+    convoIdIdx: index("messages_convo_id_idx").on(table.conversationId),
+    senderIdIdx: index("messages_sender_id_idx").on(table.senderId),
+    createdAtIdx: index("messages_created_at_idx").on(table.createdAt),
+}));
 
 // ── Reviews ────────────────────────────────────────────────
 export const reviews = pgTable("reviews", {
@@ -394,12 +449,48 @@ export const notifications = pgTable("notifications", {
   isRead: boolean("is_read").default(false).notNull(),
   linkUrl: text("link_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+    userIdIdx: index("notifications_user_id_idx").on(table.userId),
+    isReadIdx: index("notifications_is_read_idx").on(table.isRead),
+    typeIdx: index("notifications_type_idx").on(table.type),
+}));
+
+// ── Broadcast Notifications ──────────────────────────────
+export const broadcastNotifications = pgTable("broadcast_notifications", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  linkUrl: text("link_url"),
+  priority: text("priority").default("normal").notNull(), // normal, high
+  targetRole: text("target_role").default("all").notNull(), // all, parent, caregiver
+  senderId: text("sender_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const userBroadcastReads = pgTable("user_broadcast_reads", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  broadcastId: text("broadcast_id").notNull().references(() => broadcastNotifications.id),
+  readAt: timestamp("read_at").defaultNow().notNull(),
+});
+
+// ── Push Subscriptions ────────────────────────────────────
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id),
+  endpoint: text("endpoint").notNull().unique(),
+  auth: text("auth").notNull(),
+  p256dh: text("p256dh").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ── Wallets ────────────────────────────────────────────────
 export const wallets = pgTable("wallets", {
   id: text("id").primaryKey().references(() => users.id),
-  balance: integer("balance").default(0).notNull(), // in cents
+  balance: integer("balance").default(0).notNull(), // in cents (Available for withdrawal)
+  pendingBalance: integer("pending_balance").default(0).notNull(), // in cents (Locked in Escrow)
+  processingBalance: integer("processing_balance").default(0).notNull(), // in cents (Settling from bank)
+  taxReserve: integer("tax_reserve").default(0).notNull(), // in cents (User-saved for taxes)
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -410,10 +501,15 @@ export const walletTransactions = pgTable("wallet_transactions", {
   type: walletTransactionTypeEnum("type").notNull(),
   status: walletTransactionStatusEnum("status").default("pending").notNull(),
   description: text("description"),
+  earningType: text("earning_type"), // "retainer" | "hourly" | "overtime" | "bonus" | null
   stripeTransferId: text("stripe_transfer_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+    walletIdIdx: index("wallet_tx_wallet_id_idx").on(table.walletId),
+    typeIdx: index("wallet_tx_type_idx").on(table.type),
+    statusIdx: index("wallet_tx_status_idx").on(table.status),
+}));
 
 // ── Processed Webhook Events (Idempotency) ────────────────
 export const processedWebhookEvents = pgTable("processed_webhook_events", {
@@ -429,6 +525,20 @@ export const auditLogs = pgTable("audit_logs", {
   entityType: text("entity_type").notNull(), // e.g., "caregiver_verification", "ticket", "exam_submission"
   entityId: text("entity_id").notNull(),
   metadata: jsonb("metadata"), // details like { oldStatus: "pending", newStatus: "verified" }
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Reference Submissions (NEW: Trust Automation) ──────────
+export const referenceSubmissions = pgTable("reference_submissions", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  caregiverId: text("caregiver_id").notNull().references(() => users.id),
+  employerEmail: text("employer_email").notNull(),
+  employerName: text("employer_name").notNull(),
+  token: text("token").notNull().unique(),
+  status: text("status").default("pending").notNull(), // pending, completed
+  rating: integer("rating"),
+  comment: text("comment"),
+  verifiedAt: timestamp("verified_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -497,6 +607,22 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   tickets: many(tickets),
   careTeamAsParent: many(careTeam, { relationName: "careTeamParent" }),
   careTeamAsCaregiver: many(careTeam, { relationName: "careTeamCaregiver" }),
+  broadcastReads: many(userBroadcastReads),
+  pushSubscriptions: many(pushSubscriptions),
+}));
+
+export const broadcastNotificationsRelations = relations(broadcastNotifications, ({ one, many }) => ({
+    sender: one(users, { fields: [broadcastNotifications.senderId], references: [users.id] }),
+    reads: many(userBroadcastReads),
+}));
+
+export const userBroadcastReadsRelations = relations(userBroadcastReads, ({ one }) => ({
+    user: one(users, { fields: [userBroadcastReads.userId], references: [users.id] }),
+    broadcast: one(broadcastNotifications, { fields: [userBroadcastReads.broadcastId], references: [broadcastNotifications.id] }),
+}));
+
+export const pushSubscriptionsRelations = relations(pushSubscriptions, ({ one }) => ({
+    user: one(users, { fields: [pushSubscriptions.userId], references: [users.id] }),
 }));
 
 export const nannyProfilesRelations = relations(nannyProfiles, ({ one }) => ({
@@ -654,3 +780,40 @@ export const newsletterSubscribers = pgTable("newsletter_subscribers", {
   email: text("email").notNull().unique(),
   subscribedAt: timestamp("subscribed_at").defaultNow().notNull(),
 });
+
+// Consistently use 'reviews' (L317) instead of 'platformReviews'
+// Consistently use 'tickets' (L331) instead of 'supportTickets'
+// Consistently use 'certificationExams' (L387) instead of 'exams'
+
+// ── Search & Filter Analytics ──────────────────────────────
+export const searchAnalytics = pgTable("search_analytics", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").references(() => users.id),
+  queryText: text("query_text").notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  filtersApplied: jsonb("filters_applied").$type<Record<string, any>>().default({}),
+  resultsCount: integer("results_count").default(0).notNull(),
+  convertedToContact: boolean("converted_to_contact").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ── Care Activities (Session Logs) ─────────────────────────
+export const careActivities = pgTable("care_activities", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  bookingId: text("booking_id").notNull().references(() => bookings.id),
+  parentId: text("parent_id").notNull().references(() => users.id),
+  caregiverId: text("caregiver_id").notNull().references(() => users.id),
+  type: text("type").notNull(), // meal, sleep, activity, medication, milestone, incident
+  content: text("content").notNull(),
+  photoUrl: text("photo_url"),
+  videoUrl: text("video_url"),
+  metadata: jsonb("metadata").$type<Record<string, any>>(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const careActivitiesRelations = relations(careActivities, ({ one }) => ({
+    booking: one(bookings, { fields: [careActivities.bookingId], references: [bookings.id] }),
+    parent: one(users, { fields: [careActivities.parentId], references: [users.id] }),
+    caregiver: one(users, { fields: [careActivities.caregiverId], references: [users.id] }),
+}));

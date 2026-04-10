@@ -7,6 +7,8 @@ import { AuthProvider } from "@/lib/auth-context";
 import CookieBanner from "@/components/CookieBanner";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { AuthGuard } from "@/components/providers/AuthGuard";
+import AblyClientProvider from "@/components/AblyProvider";
+import Navbar from "@/components/Navbar";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -38,11 +40,18 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+import { cookies } from "next/headers";
+import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Check for Ghost Protocol Impersonation
+  const cookieStore = await cookies();
+  const isImpersonating = !!cookieStore.get("admin_session_backup")?.value;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@graph": [
@@ -91,12 +100,16 @@ export default function RootLayout({
           />
         </head>
         <body className="antialiased bg-surface text-on-surface font-body min-h-screen flex flex-col">
+          <ImpersonationBanner isImpersonating={isImpersonating} />
           <ToastProvider>
             <AuthGuard />
             <PostHogProvider>
-              <main className="flex-grow">
-                {children}
-              </main>
+              <AblyClientProvider>
+                <Navbar />
+                <main className="flex-grow">
+                  {children}
+                </main>
+              </AblyClientProvider>
             </PostHogProvider>
           </ToastProvider>
           <Footer />

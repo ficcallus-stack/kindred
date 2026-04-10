@@ -6,6 +6,13 @@ import { adminAuth } from "@/lib/firebase-admin";
 export async function POST(request: NextRequest) {
   try {
     const { idToken } = await request.json();
+    
+    // Ghost Guard: If impersonating, DO NOT overwrite the swapped session with the admin's original token from the client SDK.
+    const isImpersonating = !!request.cookies.get("admin_session_backup")?.value;
+    if (isImpersonating) {
+      console.log("[Ghost Guard] Skipping session sync (Protocol Active)");
+      return NextResponse.json({ status: "skipped", reason: "ghost_protocol_active" });
+    }
 
     // Create session cookie valid for 14 days
     const expiresIn = 60 * 60 * 24 * 14 * 1000; // 14 days

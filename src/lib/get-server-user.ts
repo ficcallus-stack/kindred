@@ -17,7 +17,8 @@ export async function getServerUser(): Promise<ServerUser | null> {
 
     if (!sessionCookie) return null;
 
-    const decoded = await adminAuth.verifySessionCookie(sessionCookie, false);
+    // VULN-09 FIX: Enable revocation check
+    const decoded = await adminAuth.verifySessionCookie(sessionCookie, true);
     return {
       uid: decoded.uid,
       email: decoded.email || null,

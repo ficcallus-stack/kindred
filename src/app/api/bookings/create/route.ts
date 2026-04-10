@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 import { requireUser } from "@/lib/get-server-user";
+import { Pulse } from "@/lib/notifications/engine";
 import { db } from "@/db";
 import { bookings, payments } from "@/db/schema";
 import { stripe } from "@/lib/stripe";
@@ -57,6 +58,21 @@ export async function POST(req: NextRequest) {
     status: "pending",
     description: "Booking payment",
   });
+
+  // 🔔 Trigger Kindred Pulse
+  try {
+    const formattedDate = new Date(startDate || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    await Pulse.sendDirect(caregiverId, {
+      title: "New Booking Request! 📅",
+      message: `A family has requested a booking starting ${formattedDate}. Open to review and confirm.`,
+      type: "booking",
+      linkUrl: `/dashboard/nanny/bookings/${bookingId}`,
+      priority: "high"
+    });
+  } catch (err) {
+    console.error("Pulse notification failed in booking create:", err);
+    // Non-blocking
+  }
 
   return NextResponse.json({
     bookingId,

@@ -1,0 +1,90 @@
+[
+  {
+    "familyId": "1775819745744-3raf032d0",
+    "parent": {
+      "fullName": "David Chen",
+      "email": "dchen.tech@outlook.com",
+      "phoneNumber": "773-555-0922"
+    },
+    "profile": {
+      "familyName": "The Chen-O'Malley Family",
+      "zipcode": "60614",
+      "bio": "I am David, a single father to two energetic kids. I work in the tech sector and usually have a demanding schedule that requires me to be in the office three days a week. I am looking for a nanny who can pick the kids up from school and preschool, help with homework, and get dinner started. The kids are very close and love to play together, so someone who can facilitate creative play instead of relying on the television is essential for us. Reliability and clear communication are my top priorities.",
+      "philosophy": "Gentle parenting focused on emotional intelligence and collaborative problem solving.",
+      "householdManual": "- Limit sugar intake to one treat after dinner.\n- Homework must be completed before any outdoor play.\n- Security system must be armed whenever leaving the house.\n- Emergency contact list is posted on the side of the refrigerator.",
+      "illustrationUrl": "https://res.cloudinary.com/divmdsql4/image/upload/v1775819617/hqqpdo9duu9exesx6v7f.png"
+    },
+    "children": [
+      {
+        "name": "Elias",
+        "age": 6,
+        "type": "School-age",
+        "bio": "Elias is a thoughtful first-grader who enjoys puzzles and is very protective of his younger sister.",
+        "interests": [
+          "LEGOs",
+          "soccer",
+          "reading comics"
+        ],
+        "medicalNotes": "Severe peanut allergy; EpiPen is located in the kitchen cabinet.",
+        "photoUrl": "https://res.cloudinary.com/divmdsql4/image/upload/v1775819677/jw1ko0edzazk5z8wmppj.png"
+      },
+      {
+        "name": "Sienna",
+        "age": 4,
+        "type": "Pre-schooler",
+        "bio": "Sienna is a social butterfly who loves making up stories and dressing up in costumes.",
+        "interests": [
+          "coloring",
+          "dress-up",
+          "singing"
+        ],
+        "medicalNotes": "None.",
+        "photoUrl": "https://res.cloudinary.com/divmdsql4/image/upload/v1775819747/xcdcminazxfqrvhsty2c.png"
+      }
+    ]
+  },
+  {
+    "familyId": "1775819538852-w8qgb3kt5",
+    "parent": {
+      "fullName": "Julianne Rivera",
+      "email": "j.rivera.pro@gmail.com",
+      "phoneNumber": "323-555-0184"
+    },
+    "profile": {
+      "familyName": "The Rivera-Holt Family",
+      "zipcode": "90026",
+      "bio": "My name is Julianne and I am looking for a reliable nanny to join our busy household. I work as a production coordinator from my home office and my partner travels frequently for work. We have a very active toddler and a sweet infant who is just starting to find her groove. We need someone who can manage the chaos of mornings, handle some light meal preparation, and take the kids to the local park for fresh air. We value someone who is proactive and can keep the living areas tidy while we juggle our professional lives.",
+      "philosophy": "Montessori-aligned with a strong emphasis on fostering independence and emotional regulation.",
+      "householdManual": "- No screen time permitted during the workday.\n- Please provide organic, whole-food snacks only.\n- Shoes must be removed at the front entrance.\n- Always ensure the backyard gate is double-latched.",
+      "illustrationUrl": "https://res.cloudinary.com/divmdsql4/image/upload/v1775819424/svxmimirxkth670ndvvr.png"
+    },
+    "children": [
+      {
+        "name": "Leo",
+        "age": 3,
+        "type": "Toddler",
+        "bio": "Leo is an energetic explorer who loves building complex structures and learning how things work.",
+        "interests": [
+          "trains",
+          "digging in dirt",
+          "building blocks"
+        ],
+        "medicalNotes": "Mild eczema on arms; requires moisturizer after hand washing.",
+        "photoUrl": "https://res.cloudinary.com/divmdsql4/image/upload/v1775819476/m6agksmmwpejevratspc.png"
+      },
+      {
+        "name": "Maya",
+        "age": 0,
+        "type": "Infant",
+        "bio": "Maya is a calm baby who is currently fascinated by textures and sounds.",
+        "interests": [
+          "teething rings",
+          "musical rattles",
+          "rolling over"
+        ],
+        "medicalNotes": "Currently teething; may need a cold teether from the fridge.",
+        "photoUrl": "https://res.cloudinary.com/divmdsql4/image/upload/v1775819541/q0uz3uogewysghobcvkh.png"
+      }
+    ]
+  }
+]

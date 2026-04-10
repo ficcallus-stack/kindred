@@ -1,8 +1,26 @@
+"use client";
+
+import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { MaterialIcon } from "./MaterialIcon";
 import { NewsletterForm } from "./NewsletterForm";
 
 export default function Footer() {
+  const pathname = usePathname();
+
+  const isAuthPage = [
+    "/login", 
+    "/signup", 
+    "/forgot-password", 
+    "/verify-email",
+    "/register/nanny",
+    "/register/parent"
+  ].includes(pathname);
+
+  const isDashboardPage = pathname.startsWith("/dashboard");
+
+  if (isAuthPage || isDashboardPage) return null;
+
   return (
     <footer className="bg-[#f8faff] text-primary w-full py-16 font-body z-10 relative border-t border-primary/5">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-12 px-8 max-w-7xl mx-auto">
